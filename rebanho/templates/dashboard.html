@@ -1,0 +1,537 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Fazenda Ipanema{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<style>
+  .prev-box{border-radius:8px;padding:10px;text-align:center;}
+  .prev-box-num{font-size:20px;font-weight:700;line-height:1;}
+  .prev-box-lbl{font-size:10px;font-weight:500;margin-top:3px;}
+  .sem-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .pes-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid #f5f5f5;}
+  .pes-row:last-child{border-bottom:none;}
+  .pes-rank{width:22px;height:22px;border-radius:50%;background:#f3f4f6;display:flex;
+            align-items:center;justify-content:center;font-size:10px;font-weight:700;
+            color:#6b7280;flex-shrink:0;}
+</style>
+
+<!-- ── Seção 1: Topbar ──────────────────────────────────────────────── -->
+<div class="dash-topbar">
+  <div>
+    <div class="dash-title">Dashboard</div>
+    <div class="dash-sub" id="dash-date">carregando...</div>
+  </div>
+  <div class="dash-topbar-right">
+    <div class="dash-live">
+      <div class="dash-live-dot"></div>
+      <span>Ao vivo · <span id="dash-hora">--:--</span></span>
+    </div>
+    <button class="topbar-btn" onclick="recarregarDashboard(this)" title="Atualizar">🔄</button>
+    <button class="topbar-btn" onclick="abrirConfig()" title="Configurações">⚙️</button>
+  </div>
+</div>
+
+<!-- ── Seção 2: Alertas ─────────────────────────────────────────────── -->
+<div id="dash-alerts-box" class="dash-alerts" style="display:none;"></div>
+
+<!-- ── Loading ─────────────────────────────────────────────────────── -->
+<div id="dash-loading" style="display:flex;align-items:center;gap:12px;color:#555;padding:20px 0;">
+  <div class="spinner"></div><span>Carregando dashboard...</span>
+</div>
+
+<!-- ── Conteúdo principal ───────────────────────────────────────────── -->
+<div id="dashMain" style="display:none;">
+
+  <!-- Seção 3: KPI Strip -->
+  <div id="dash-kpi-strip" class="kpi-row" style="margin-bottom:12px;"></div>
+
+  <!-- Seção 4: Grid 3 colunas -->
+  <div style="display:grid;grid-template-columns:1.1fr .9fr .9fr;gap:12px;margin-bottom:12px;">
+
+    <!-- Card Previsão de Saída -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon icon-blue">📅</div>
+          <div>
+            <div class="card-title">Previsão de Saída</div>
+            <div class="card-subtitle" id="prev-sub">—</div>
+          </div>
+        </div>
+        <span id="prev-badge" class="badge badge-green">—</span>
+      </div>
+      <div class="card-body">
+        <div id="prev-boxes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"></div>
+        <div id="prev-gmd-bar" style="margin-bottom:10px;"></div>
+        <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+          <thead><tr>
+            <th style="text-align:left;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">ANIMAL</th>
+            <th style="text-align:right;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">PESO</th>
+            <th style="text-align:right;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">GMD</th>
+            <th style="text-align:right;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">DIAS</th>
+          </tr></thead>
+          <tbody id="prev-tabela"></tbody>
+        </table>
+      </div>
+      <div class="card-footer"><a href="/relatorios-page">Ver relatório completo →</a></div>
+    </div>
+
+    <!-- Card Pastagem & Lotes -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon icon-green">🌿</div>
+          <div>
+            <div class="card-title">Pastagem & Lotes</div>
+            <div class="card-subtitle" id="past-sub">semáforos</div>
+          </div>
+        </div>
+        <span id="past-badge" class="badge badge-blue">—</span>
+      </div>
+      <div class="card-body">
+        <div id="past-sem-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;"></div>
+        <div style="font-size:10px;font-weight:600;color:#9ca3af;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px;">Piquetes por urgência</div>
+        <div id="past-piquetes-lista" style="margin-bottom:10px;"></div>
+        <div id="past-footer-bar" style="font-size:11px;color:#9ca3af;padding:6px 0;border-top:0.5px solid #f5f5f5;"></div>
+      </div>
+      <div class="card-footer"><a href="/pastagem-page">Ver mapa da fazenda →</a></div>
+    </div>
+
+    <!-- Card Financeiro -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon icon-amber">💰</div>
+          <div>
+            <div class="card-title">Financeiro do Rebanho</div>
+            <div class="card-subtitle">Investimento e custo médio</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="fin-boxes"></div>
+      </div>
+      <div class="card-footer"><a href="/financeiro-page">Ver financeiro completo →</a></div>
+    </div>
+
+  </div>
+
+  <!-- Seção 5: Grid 2 colunas -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+    <!-- Últimas Pesagens -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon icon-amber">⚖️</div>
+          <div>
+            <div class="card-title">Últimas Pesagens</div>
+            <div class="card-subtitle" id="pes-sub">—</div>
+          </div>
+        </div>
+        <span id="pes-badge" class="badge badge-blue">—</span>
+      </div>
+      <div class="card-body">
+        <div id="pes-lista"></div>
+      </div>
+      <div class="card-footer"><a href="/pesagem-page">Registrar nova pesagem →</a></div>
+    </div>
+
+    <!-- Saídas Previstas por Mês -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon icon-blue">📊</div>
+          <div>
+            <div class="card-title">Saídas Previstas por Mês</div>
+            <div class="card-subtitle" id="dist-sub">próximos 12 meses</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body" style="position:relative;">
+        <canvas id="grafico-dist-saidas" height="160"></canvas>
+      </div>
+      <div class="card-footer"><a href="/relatorios-page">Ver relatório completo →</a></div>
+    </div>
+
+  </div>
+
+</div><!-- /dashMain -->
+
+<!-- ── Modal Config ──────────────────────────────────────────────────── -->
+<div id="modalConfig" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+     z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:380px;width:90%;
+              box-shadow:0 8px 32px rgba(0,0,0,.18);">
+    <h3 style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:18px;">⚙️ Configurações do Dashboard</h3>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:13px;font-weight:600;color:#374151;">Peso alvo padrão (kg)</label>
+      <input id="cfgPesoAlvo" type="number" step="1"
+        style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="font-size:13px;font-weight:600;color:#374151;">Preço da arroba padrão (R$)</label>
+      <input id="cfgPrecoArroba" type="number" step="0.01"
+        style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="fecharConfig()"
+        style="padding:8px 18px;border-radius:6px;background:#e5e7eb;color:#374151;cursor:pointer;border:none;font-size:13px;">
+        Cancelar</button>
+      <button onclick="salvarConfig()"
+        style="padding:8px 18px;border-radius:6px;background:#1B5E20;color:#fff;cursor:pointer;border:none;font-size:13px;">
+        Salvar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TIPOS = ['VACA','TOURO','BOI','GARROTE','NOVILHA','BEZERRO','BEZERRA'];
+const TIPO_CORES = {
+  VACA:'#388E3C', TOURO:'#1565C0', BOI:'#6D4C41',
+  GARROTE:'#EF6C00', NOVILHA:'#7B1FA2', BEZERRO:'#00838F', BEZERRA:'#C62828',
+};
+const MESES_ABR = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+let _graficoDist = null;
+let _configAtual = {};
+
+// ── Relógio ──────────────────────────────────────────────────────────
+function atualizarRelogio() {
+  const agora = new Date();
+  document.getElementById('dash-hora').textContent =
+    agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  const data = agora.toLocaleDateString('pt-BR', {
+    weekday:'long', day:'numeric', month:'long', year:'numeric'
+  });
+  document.getElementById('dash-date').textContent =
+    data.charAt(0).toUpperCase() + data.slice(1);
+}
+atualizarRelogio();
+setInterval(atualizarRelogio, 30000);
+
+// ── Carregar dashboard ────────────────────────────────────────────────
+async function carregarDashboard() {
+  try {
+    const dados = await fetch('/relatorios/kpis').then(r => r.json());
+    _configAtual = dados.config || {};
+
+    renderAlertas(dados.alertas || []);
+    renderKpiCards(dados.rebanho || {}, dados.nutricao || null);
+    renderPrevisao(dados.previsao_saida || {});
+    renderPastagem(dados.pastagem || {}, dados.lotes || {});
+    renderFinanceiro(dados.financeiro || {});
+    renderPesagens(dados.ultimas_pesagens || []);
+    renderDistribuicaoSaidas(dados.previsao_saida || {});
+
+    document.getElementById('dash-loading').style.display = 'none';
+    document.getElementById('dashMain').style.display = 'block';
+  } catch(e) {
+    document.getElementById('dash-loading').innerHTML =
+      '<span style="color:#dc2626;">❌ Erro ao carregar dados do servidor.</span>';
+  }
+}
+
+async function recarregarDashboard(btn) {
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  await carregarDashboard();
+  if (btn) { btn.textContent = '🔄'; btn.disabled = false; }
+  showToast('Dashboard atualizado!', 'sucesso');
+}
+
+// ── Alertas ───────────────────────────────────────────────────────────
+function renderAlertas(alertas) {
+  const box = document.getElementById('dash-alerts-box');
+  if (!alertas.length) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  const nivMap = {CRITICO:'da-crit', ATENCAO:'da-warn', INFO:'da-info'};
+  const titMap = {CRITICO:'URGENTE', ATENCAO:'ATENÇÃO', INFO:'INFO'};
+  box.innerHTML = alertas.slice(0, 3).map(a => {
+    const cls = nivMap[a.nivel] || 'da-info';
+    const tit = titMap[a.nivel] || a.nivel;
+    const ctaHref = a.nivel === 'CRITICO' ? '/financeiro-page' : '/relatorios-page';
+    return `
+    <div class="dash-alert ${cls}">
+      <span class="da-icon">${a.icone || '⚠️'}</span>
+      <div class="da-txt">
+        <b>${tit}</b>
+        <span>${a.msg}</span>
+      </div>
+      <button class="da-cta" onclick="window.location.href='${ctaHref}'">Ver</button>
+    </div>`;
+  }).join('');
+}
+
+// ── KPI Cards ─────────────────────────────────────────────────────────
+function renderKpiCards(rebanho, nutricao) {
+  const strip = document.getElementById('dash-kpi-strip');
+  const total = rebanho.total_por_tipo || {};
+  let html = TIPOS.map(tipo => {
+    const qtd = total[tipo] || 0;
+    const cor = TIPO_CORES[tipo];
+    return `<div class="kpi-card" style="border-top:2.5px solid ${cor};">
+      <div class="kpi-number" style="color:${cor};">${qtd}</div>
+      <div class="kpi-label">${tipo}</div>
+      <div class="kpi-trend trend-flat">—</div>
+    </div>`;
+  }).join('');
+  html += `<div class="kpi-card" style="background:linear-gradient(135deg,#0d1f3c,#1a3a6b);border-color:#0d1f3c;">
+    <div class="kpi-number" style="color:#fff;">${rebanho.total_ativo || 0}</div>
+    <div class="kpi-label" style="color:rgba(255,255,255,0.45);">TOTAL ATIVO</div>
+  </div>`;
+  if (nutricao) {
+    const crit = nutricao.estoque_critico || 0;
+    const border = crit > 0 ? '#ef4444' : '#10b981';
+    html += `<a href="/nutricao-page" class="kpi-card" style="border-top:2.5px solid ${border};text-decoration:none;">
+      <div class="kpi-number" style="color:${border};">${nutricao.planos_ativos || 0}</div>
+      <div class="kpi-label">🌾 PLANOS NUT.</div>
+      <div class="kpi-trend ${crit>0?'trend-down':'trend-flat'}" style="font-size:10px;">
+        ${crit>0 ? `⚠️ ${crit} crítico` : fmtMoeda(nutricao.custo_mes||0)+'/mês'}
+      </div>
+    </a>`;
+  }
+  strip.innerHTML = html;
+}
+
+// ── Previsão de Saída ──────────────────────────────────────────────────
+function renderPrevisao(prev) {
+  const alvo = prev.peso_alvo || 480;
+  document.getElementById('prev-sub').textContent = `peso alvo: ${alvo} kg · GMD 90d`;
+  document.getElementById('prev-badge').textContent = `${prev.prontos || 0} prontos`;
+
+  document.getElementById('prev-boxes').innerHTML = [
+    {label:'Prontos agora', val:prev.prontos||0,       bg:'#dcfce7', fg:'#166534', bd:'#bbf7d0'},
+    {label:'Até 90 dias',   val:prev.no_prazo_90d||0,  bg:'#dbeafe', fg:'#1e40af', bd:'#bfdbfe'},
+    {label:'Até 180 dias',  val:prev.medio_prazo||0,   bg:'#fef9c3', fg:'#92400e', bd:'#fde68a'},
+    {label:'Sem dados',     val:prev.sem_dados||0,     bg:'#f3f4f6', fg:'#6b7280', bd:'#e5e7eb'},
+  ].map(b => `
+    <div class="prev-box" style="background:${b.bg};border:0.5px solid ${b.bd};">
+      <div class="prev-box-num" style="color:${b.fg};">${b.val}</div>
+      <div class="prev-box-lbl" style="color:${b.fg};">${b.label}</div>
+    </div>`).join('');
+
+  // Barra GMD
+  const animais = prev.animais_proximos || [];
+  const validos = animais.filter(a => a.gmd_real != null && a.gmd_real > 0);
+  const gmdMedio = validos.length ? (validos.reduce((s, a) => s + a.gmd_real, 0) / validos.length) : null;
+  const META = 0.8;
+  const MAX  = 1.5;
+  const gmdEl = document.getElementById('prev-gmd-bar');
+  if (gmdMedio != null) {
+    const pct     = Math.min(100, (gmdMedio / MAX) * 100);
+    const metaPct = Math.min(100, (META / MAX) * 100);
+    gmdEl.innerHTML = `
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:5px;">
+        <span style="color:#374151;font-weight:600;">GMD médio:
+          <span style="color:#1d4ed8;">${gmdMedio.toFixed(2)} kg/dia</span>
+        </span>
+        <span style="color:#7c3aed;font-size:10px;">meta ${META.toFixed(1)}</span>
+      </div>
+      <div style="position:relative;height:8px;background:#f3f4f6;border-radius:10px;overflow:visible;">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#3b82f6,#06b6d4);border-radius:10px;"></div>
+        <div style="position:absolute;top:-4px;bottom:-4px;left:${metaPct}%;width:2px;background:#7c3aed;border-radius:2px;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-top:3px;">
+        <span>0</span><span>0,5</span><span>1,0</span><span>1,5</span>
+      </div>`;
+  } else {
+    gmdEl.innerHTML = '';
+  }
+
+  const tbody = document.getElementById('prev-tabela');
+  if (!animais.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:10px;font-size:11.5px;">Nenhum dado de previsão</td></tr>';
+    return;
+  }
+  tbody.innerHTML = animais.slice(0, 4).map(a => {
+    const gmdCor = a.gmd_real == null ? '#9ca3af' : a.gmd_real >= 0.8 ? '#15803d' : a.gmd_real >= 0.4 ? '#92400e' : '#dc2626';
+    const dCor   = a.dias_restantes == null ? '#9ca3af' : a.dias_restantes <= 60 ? '#15803d' : a.dias_restantes <= 180 ? '#92400e' : '#9ca3af';
+    return `<tr style="border-bottom:0.5px solid #f5f5f5;">
+      <td style="padding:5px 4px;font-weight:600;color:#1B5E20;">${a.brinco}</td>
+      <td style="padding:5px 4px;text-align:right;">${a.peso_atual} kg</td>
+      <td style="padding:5px 4px;text-align:right;font-weight:600;color:${gmdCor};">${a.gmd_real != null ? a.gmd_real.toFixed(2) : '—'}</td>
+      <td style="padding:5px 4px;text-align:right;font-weight:600;color:${dCor};">${a.dias_restantes != null ? a.dias_restantes + 'd' : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Pastagem ───────────────────────────────────────────────────────────
+function renderPastagem(past, lotes) {
+  const lotesLista = lotes.lista || [];
+  const comUa = lotesLista.filter(l => l.ua_ha);
+  const uaMedia = comUa.length ? (comUa.reduce((s, l) => s + l.ua_ha, 0) / comUa.length) : null;
+  document.getElementById('past-badge').textContent = uaMedia ? uaMedia.toFixed(1) + ' UA/ha' : (past.piquetes||[]).length + ' piquetes';
+
+  document.getElementById('past-sem-grid').innerHTML = [
+    {label:'Prontos',      val:(past.verde||0),                    bg:'#dcfce7', fg:'#166534'},
+    {label:'Quase prontos',val:(past.amarelo||0),                  bg:'#fef9c3', fg:'#92400e'},
+    {label:'Não entrar',   val:(past.vermelho||0)+(past.sair_agora||0), bg:'#fee2e2', fg:'#991b1b'},
+    {label:'Ocupados',     val:(past.ocupado||0),                  bg:'#dbeafe', fg:'#1e40af'},
+  ].map(b => `
+    <div style="background:${b.bg};border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:18px;font-weight:700;color:${b.fg};line-height:1;">${b.val}</div>
+      <div style="font-size:9.5px;color:${b.fg};margin-top:2px;font-weight:500;">${b.label}</div>
+    </div>`).join('');
+
+  const urgMap = {SAIR_AGORA:0, VERMELHO:1, AMARELO:2, SEM_DADOS:3, VERDE:4, OCUPADO:5};
+  const semCors = {VERDE:'#16a34a', AMARELO:'#ca8a04', VERMELHO:'#dc2626', SAIR_AGORA:'#b91c1c', OCUPADO:'#1d4ed8', SEM_DADOS:'#9ca3af'};
+  const piquetes = (past.piquetes || [])
+    .sort((a, b) => (urgMap[a.semaforo] ?? 99) - (urgMap[b.semaforo] ?? 99))
+    .slice(0, 4);
+
+  document.getElementById('past-piquetes-lista').innerHTML = piquetes.map(p => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #f5f5f5;font-size:12px;">
+      <div class="sem-dot" style="background:${semCors[p.semaforo]||'#9ca3af'};"></div>
+      <div style="flex:1;font-weight:500;color:#374151;">${p.nome}</div>
+      <div style="font-size:10.5px;font-weight:600;color:${semCors[p.semaforo]||'#9ca3af'};">${p.semaforo.replace('_',' ')}</div>
+    </div>`).join('') || '<div style="color:#9ca3af;font-size:12px;padding:8px 0;">Nenhum piquete cadastrado</div>';
+
+  const alertaSeca = past.alerta_seca;
+  document.getElementById('past-footer-bar').innerHTML =
+    `${alertaSeca ? '⚠️' : '🌧️'} Chuva este mês: <b style="color:${alertaSeca?'#b45309':'#1b5e20'};">${past.chuva_mes_mm ?? 0} mm</b>${alertaSeca ? ' · <span style="color:#b45309;">abaixo de 50 mm!</span>' : ''}`;
+}
+
+// ── Financeiro ─────────────────────────────────────────────────────────
+function renderFinanceiro(fin) {
+  const box = document.getElementById('fin-boxes');
+  if (!fin.valor_total_compras_animais) {
+    box.innerHTML = '<p style="color:#9ca3af;font-size:12px;text-align:center;padding:20px;">Nenhuma compra de animal registrada</p>';
+    return;
+  }
+  box.innerHTML = `
+    <div style="background:linear-gradient(135deg,#0d1f3c,#1a3a6b);border-radius:10px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:10px;color:rgba(255,255,255,0.5);font-weight:600;margin-bottom:4px;letter-spacing:0.5px;text-transform:uppercase;">Total Investido no Rebanho</div>
+      <div style="font-size:22px;font-weight:700;color:#fff;">${fmtMoeda(fin.valor_total_compras_animais)}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div style="background:#f9fafb;border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:2px;">CUSTO / KG</div>
+        <div style="font-size:16px;font-weight:700;color:#374151;">${fin.custo_medio_kg != null ? 'R$ ' + fin.custo_medio_kg.toFixed(2) : '—'}</div>
+      </div>
+      <div style="background:#f9fafb;border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:2px;">CUSTO / @</div>
+        <div style="font-size:16px;font-weight:700;color:#374151;">${fin.custo_medio_arroba != null ? 'R$ ' + fin.custo_medio_arroba.toFixed(2) : '—'}</div>
+      </div>
+    </div>
+    ${fin.animal_mais_caro ? `
+    <div style="background:#f9fafb;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;">ANIMAL MAIS CARO</div>
+        <div style="font-weight:600;color:#1B5E20;font-size:12.5px;">${fin.animal_mais_caro.brinco}${fin.animal_mais_caro.nome ? ' — ' + fin.animal_mais_caro.nome : ''}</div>
+      </div>
+      <div style="font-weight:700;color:#374151;font-size:13px;">${fmtMoeda(fin.animal_mais_caro.valor_compra)}</div>
+    </div>` : ''}`;
+}
+
+// ── Pesagens ───────────────────────────────────────────────────────────
+function renderPesagens(pesagens) {
+  document.getElementById('pes-badge').textContent = pesagens.length + ' registros';
+  document.getElementById('pes-sub').textContent = pesagens.length + ' mais recentes';
+  const lista = document.getElementById('pes-lista');
+  if (!pesagens.length) {
+    lista.innerHTML = '<div style="color:#9ca3af;font-size:12px;text-align:center;padding:16px;">Nenhuma pesagem registrada</div>';
+    return;
+  }
+  lista.innerHTML = pesagens.slice(0, 5).map((p, i) => {
+    const ganho = p.ganho_kg ?? 0;
+    const gPos  = ganho >= 0;
+    const gCor  = ganho !== 0 ? (gPos ? '#16a34a' : '#dc2626') : '#9ca3af';
+    const gStr  = ganho !== 0 ? (gPos ? '↑' : '↓') + Math.abs(ganho) + ' kg' : '—';
+    return `<div class="pes-row">
+      <div class="pes-rank">${i + 1}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:12.5px;color:#1B5E20;">${p.brinco}</div>
+        <div style="font-size:10px;color:#9ca3af;">${fmtData(p.data)}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-weight:600;font-size:13px;color:#374151;">${p.peso} kg</div>
+        <div style="font-size:11px;font-weight:600;color:${gCor};">${gStr}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Distribuição de Saídas ─────────────────────────────────────────────
+function renderDistribuicaoSaidas(prev) {
+  const animais = prev.animais_proximos || [];
+  const hoje    = new Date();
+  const labels  = [], counts = [], cores = [];
+
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    labels.push(MESES_ABR[d.getMonth()]);
+    const qtd = animais.filter(a => a.data_prevista && a.data_prevista.startsWith(key)).length;
+    counts.push(qtd);
+    const cor = i === 0 ? 'rgba(22,101,52,0.85)'
+              : i <= 2  ? 'rgba(6,182,212,0.8)'
+              : i <= 5  ? 'rgba(59,130,246,0.7)'
+              : 'rgba(226,232,240,0.9)';
+    cores.push(qtd > 0 ? cor : 'rgba(226,232,240,0.5)');
+  }
+
+  const validos = animais.filter(a => a.gmd_real != null && a.gmd_real > 0);
+  const gmdMed  = validos.length ? (validos.reduce((s, a) => s + a.gmd_real, 0) / validos.length) : null;
+  const semDados= animais.filter(a => !a.gmd_real || a.gmd_real <= 0).length;
+  document.getElementById('dist-sub').textContent =
+    gmdMed ? `GMD médio: ${gmdMed.toFixed(2)} kg/dia · ${semDados} sem dados` : `${semDados} animais sem dados de GMD`;
+
+  if (_graficoDist) { _graficoDist.destroy(); _graficoDist = null; }
+  const ctx = document.getElementById('grafico-dist-saidas');
+  if (!ctx) return;
+  _graficoDist = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: counts,
+        backgroundColor: cores,
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => c.parsed.y + ' animais' } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: {size:10} }, grid: { color:'#f5f5f5' } },
+        x: { ticks: { font: {size:10} }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Config ─────────────────────────────────────────────────────────────
+function abrirConfig() {
+  document.getElementById('cfgPesoAlvo').value    = _configAtual.peso_alvo_padrao   || '480';
+  document.getElementById('cfgPrecoArroba').value = _configAtual.preco_arroba_padrao || '320';
+  document.getElementById('modalConfig').style.display = 'flex';
+}
+function fecharConfig() {
+  document.getElementById('modalConfig').style.display = 'none';
+}
+async function salvarConfig() {
+  const pesoAlvo = document.getElementById('cfgPesoAlvo').value;
+  const precoArr = document.getElementById('cfgPrecoArroba').value;
+  try {
+    await Promise.all([
+      fetch(`/config/peso_alvo_padrao?valor=${encodeURIComponent(pesoAlvo)}`, {method:'PUT'}),
+      fetch(`/config/preco_arroba_padrao?valor=${encodeURIComponent(precoArr)}`, {method:'PUT'}),
+    ]);
+    fecharConfig();
+    showToast('Configurações salvas!', 'sucesso');
+    carregarDashboard();
+  } catch { showToast('Erro ao salvar configurações.', 'erro'); }
+}
+
+document.addEventListener('DOMContentLoaded', carregarDashboard);
+setInterval(carregarDashboard, 300000);
+</script>
+{% endblock %}

@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}Balança TRU-TEST S3 — Fazenda Ipanema{% endblock %}
+{% block page_title %}Importação — Balança TRU-TEST S3{% endblock %}
+
+{% block content %}
+<style>
+  .drop-area {
+    border: 2px dashed #2E7D32; border-radius: 12px; padding: 36px 20px;
+    text-align: center; cursor: pointer; transition: all .2s;
+    background: #F9FFF9;
+  }
+  .drop-area.over { border-style: solid; background: #F1F8E9; }
+  .drop-area input[type=file] { display: none; }
+</style>
+
+<!-- ── Seção 1: Instruções ─────────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">
+  <button onclick="toggleInstrucoes()" style="width:100%;text-align:left;padding:14px 20px;background:none;border:none;cursor:pointer;font-size:14px;font-weight:600;color:#1B5E20;display:flex;justify-content:space-between;align-items:center;">
+    <span>📋 Como exportar da balança TRU-TEST S3</span>
+    <span id="iconInstr">▼</span>
+  </button>
+  <div id="instrucoes" style="padding:0 20px 16px;border-top:1px solid #e5e7eb;">
+    <ol style="font-size:13px;color:#374151;line-height:1.9;margin:12px 0 0 16px;">
+      <li>Na balança S3, acesse <strong>Menu → Sessões</strong> → selecione a sessão desejada</li>
+      <li>Pressione <strong>Exportar</strong> → escolha o formato <strong>CSV</strong> ou <strong>Excel</strong></li>
+      <li>Transfira o arquivo para o computador via <strong>cabo USB</strong> ou <strong>cartão SD</strong></li>
+      <li>Faça o upload do arquivo na seção abaixo</li>
+    </ol>
+    <p style="font-size:12px;color:#6b7280;margin-top:10px;background:#f9fafb;padding:10px 14px;border-radius:6px;">
+      ℹ️ O sistema aceita arquivos <strong>.csv</strong>, <strong>.xls</strong> e <strong>.xlsx</strong> exportados pela S3.
+      A coluna <strong>Animal ID</strong> deve corresponder ao brinco cadastrado no sistema.
+    </p>
+  </div>
+</div>
+
+<!-- ── Seção 2: Upload ─────────────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <h2 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:16px;">📤 Upload de Arquivo</h2>
+
+  <div class="drop-area" id="dropArea" onclick="document.getElementById('inputArquivo').click()">
+    <input type="file" id="inputArquivo" accept=".csv,.xls,.xlsx" onchange="selecionarArquivo(this.files[0])" />
+    <div id="dropIcon" style="font-size:36px;margin-bottom:8px;">📁</div>
+    <div id="dropTexto" style="font-size:14px;color:#555;">
+      Arraste o arquivo aqui ou <span style="color:#1B5E20;font-weight:600;">clique para selecionar</span>
+    </div>
+    <div style="font-size:12px;color:#9ca3af;margin-top:6px;">Aceita: .csv, .xls, .xlsx</div>
+  </div>
+
+  <div id="arquivoSelecionado" style="display:none;margin-top:12px;padding:10px 14px;background:#F1F8E9;border-radius:8px;border:1px solid #C8E6C9;display:none;align-items:center;gap:10px;">
+    <span style="font-size:18px;">📄</span>
+    <span id="nomeArquivo" style="font-size:13px;font-weight:600;color:#1B5E20;"></span>
+    <button onclick="limparArquivo()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#6b7280;font-size:16px;">✕</button>
+  </div>
+
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;">
+    <button id="btnImportar" onclick="importar()" disabled
+      style="background:#9ca3af;color:#fff;border:none;border-radius:8px;padding:10px 28px;cursor:not-allowed;font-size:15px;font-weight:600;transition:background .2s;">
+      💾 Importar Pesagens
+    </button>
+    <div id="spinnerImport" style="display:none;"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- ── Seção 3: Resultado ──────────────────────────────────────────── -->
+<div id="secaoResultado" style="display:none;margin-bottom:16px;">
+  <div id="cardResultado" style="border-radius:10px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <span id="resultIcon" style="font-size:28px;"></span>
+      <div>
+        <div id="resultMensagem" style="font-size:15px;font-weight:700;"></div>
+        <div id="resultSubtitulo" style="font-size:12px;color:#6b7280;margin-top:2px;"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numImportados" style="font-size:22px;font-weight:700;color:#1B5E20;"></div>
+        <div style="font-size:11px;color:#555;font-weight:600;">IMPORTADOS</div>
+      </div>
+      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numIgnorados" style="font-size:22px;font-weight:700;color:#E65100;"></div>
+        <div style="font-size:11px;color:#555;font-weight:600;">IGNORADOS</div>
+      </div>
+      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numErros" style="font-size:22px;font-weight:700;color:#dc2626;"></div>
+        <div style="font-size:11px;color:#555;font-weight:600;">ERROS</div>
+      </div>
+      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numTotal" style="font-size:22px;font-weight:700;color:#374151;"></div>
+        <div style="font-size:11px;color:#555;font-weight:600;">TOTAL</div>
+      </div>
+    </div>
+
+    <div id="tabelaIgnorados" style="display:none;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:600;color:#E65100;margin-bottom:6px;">⚠️ Registros ignorados:</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:rgba(0,0,0,.05);">
+          <th style="padding:5px 10px;text-align:left;">Brinco</th>
+          <th style="padding:5px 10px;text-align:left;">Data</th>
+          <th style="padding:5px 10px;text-align:left;">Motivo</th>
+        </tr></thead>
+        <tbody id="tbodyIgnorados"></tbody>
+      </table>
+    </div>
+
+    <div id="tabelaErros" style="display:none;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:600;color:#dc2626;margin-bottom:6px;">❌ Linhas com erro:</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:rgba(0,0,0,.05);">
+          <th style="padding:5px 10px;text-align:left;">Linha</th>
+          <th style="padding:5px 10px;text-align:left;">Motivo</th>
+        </tr></thead>
+        <tbody id="tbodyErros"></tbody>
+      </table>
+    </div>
+
+    <button onclick="novaImportacao()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:13px;margin-top:4px;">
+      ↩ Importar outro arquivo
+    </button>
+  </div>
+</div>
+
+<!-- ── Seção 4: Histórico ──────────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">
+  <div style="padding:14px 20px;border-bottom:1px solid #e5e7eb;">
+    <h2 style="font-size:14px;font-weight:600;color:#1B5E20;">📋 Importações anteriores</h2>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#F1F8E9;color:#33691e;">
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Data</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Arquivo</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Importados</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Ignorados</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Erros</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Total</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Detalhes</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyHistorico"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal detalhes -->
+<div id="modalDetalhes" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:620px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;">
+      <h3 style="font-size:14px;font-weight:600;color:#1B5E20;">Detalhes da Importação</h3>
+      <button onclick="document.getElementById('modalDetalhes').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <pre id="jsonDetalhes" style="padding:16px 20px;font-size:12px;color:#374151;white-space:pre-wrap;word-break:break-word;line-height:1.6;"></pre>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let arquivoAtual = null;
+
+// ── Instruções colapsável ────────────────────────────────────────────
+function toggleInstrucoes() {
+  const el = document.getElementById('instrucoes');
+  const ic = document.getElementById('iconInstr');
+  const vis = el.style.display !== 'none';
+  el.style.display = vis ? 'none' : 'block';
+  ic.textContent   = vis ? '▶' : '▼';
+}
+
+// ── Drag-and-drop ────────────────────────────────────────────────────
+const dropArea = document.getElementById('dropArea');
+
+dropArea.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropArea.classList.add('over');
+});
+dropArea.addEventListener('dragleave', () => dropArea.classList.remove('over'));
+dropArea.addEventListener('drop', e => {
+  e.preventDefault();
+  dropArea.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) selecionarArquivo(f);
+});
+
+function selecionarArquivo(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['csv','xls','xlsx'].includes(ext)) {
+    showToast('Formato não suportado. Use CSV, XLS ou XLSX.', 'erro');
+    return;
+  }
+  arquivoAtual = file;
+  document.getElementById('nomeArquivo').textContent = file.name;
+  document.getElementById('arquivoSelecionado').style.display = 'flex';
+  document.getElementById('dropIcon').textContent = '✅';
+  document.getElementById('dropTexto').innerHTML = `<strong>${file.name}</strong> selecionado`;
+  const btn = document.getElementById('btnImportar');
+  btn.disabled = false;
+  btn.style.background = '#1B5E20';
+  btn.style.cursor = 'pointer';
+}
+
+function limparArquivo() {
+  arquivoAtual = null;
+  document.getElementById('inputArquivo').value = '';
+  document.getElementById('arquivoSelecionado').style.display = 'none';
+  document.getElementById('dropIcon').textContent = '📁';
+  document.getElementById('dropTexto').innerHTML = 'Arraste o arquivo aqui ou <span style="color:#1B5E20;font-weight:600;">clique para selecionar</span>';
+  const btn = document.getElementById('btnImportar');
+  btn.disabled = true;
+  btn.style.background = '#9ca3af';
+  btn.style.cursor = 'not-allowed';
+}
+
+// ── Importar ─────────────────────────────────────────────────────────
+async function importar() {
+  if (!arquivoAtual) return;
+
+  document.getElementById('spinnerImport').style.display = 'block';
+  document.getElementById('btnImportar').disabled = true;
+
+  const form = new FormData();
+  form.append('arquivo', arquivoAtual);
+
+  try {
+    const r = await fetch('/balanca/importar', { method: 'POST', body: form });
+    const d = await r.json();
+
+    document.getElementById('spinnerImport').style.display = 'none';
+
+    if (!r.ok) {
+      showToast(d.detail || 'Erro na importação.', 'erro');
+      document.getElementById('btnImportar').disabled = false;
+      return;
+    }
+
+    renderResultado(d);
+    await carregarHistorico();
+    showToast(d.mensagem, d.importados > 0 ? 'sucesso' : 'erro');
+
+  } catch(e) {
+    document.getElementById('spinnerImport').style.display = 'none';
+    showToast('Erro de conexão com o servidor.', 'erro');
+    document.getElementById('btnImportar').disabled = false;
+  }
+}
+
+function renderResultado(d) {
+  const card = document.getElementById('cardResultado');
+  const sucesso = d.importados > 0;
+  card.style.background = sucesso ? '#F1F8E9' : (d.erros === d.total ? '#fff1f2' : '#FFF8E1');
+  card.style.border = `1px solid ${sucesso ? '#C8E6C9' : '#fca5a5'}`;
+
+  document.getElementById('resultIcon').textContent     = sucesso ? '✅' : '⚠️';
+  document.getElementById('resultMensagem').textContent = d.mensagem;
+  document.getElementById('resultSubtitulo').textContent = `Arquivo processado em ${new Date().toLocaleString('pt-BR')}`;
+  document.getElementById('numImportados').textContent  = d.importados;
+  document.getElementById('numIgnorados').textContent   = d.ignorados;
+  document.getElementById('numErros').textContent       = d.erros;
+  document.getElementById('numTotal').textContent       = d.total;
+
+  // Ignorados
+  const igns = d.detalhes?.ignorados || [];
+  if (igns.length > 0) {
+    const tbody = document.getElementById('tbodyIgnorados');
+    tbody.innerHTML = igns.map(g => `
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:4px 10px;font-weight:600;color:#1B5E20;">${g.brinco}</td>
+        <td style="padding:4px 10px;">${g.data ? fmtData(g.data) : '—'}</td>
+        <td style="padding:4px 10px;color:#E65100;">${g.motivo}</td>
+      </tr>`).join('');
+    document.getElementById('tabelaIgnorados').style.display = 'block';
+  }
+
+  // Erros
+  const errs = d.detalhes?.erros || [];
+  if (errs.length > 0) {
+    const tbody = document.getElementById('tbodyErros');
+    tbody.innerHTML = errs.map(e => `
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:4px 10px;">Linha ${e.linha}</td>
+        <td style="padding:4px 10px;color:#dc2626;">${e.motivo}</td>
+      </tr>`).join('');
+    document.getElementById('tabelaErros').style.display = 'block';
+  }
+
+  document.getElementById('secaoResultado').style.display = 'block';
+}
+
+function novaImportacao() {
+  limparArquivo();
+  document.getElementById('secaoResultado').style.display = 'none';
+  document.getElementById('tabelaIgnorados').style.display = 'none';
+  document.getElementById('tabelaErros').style.display = 'none';
+  document.getElementById('btnImportar').disabled = true;
+  document.getElementById('btnImportar').style.background = '#9ca3af';
+}
+
+// ── Histórico ─────────────────────────────────────────────────────────
+async function carregarHistorico() {
+  const lista = await fetch('/balanca/historico').then(r => r.json());
+  const tbody = document.getElementById('tbodyHistorico');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:18px;color:#9ca3af;">Nenhuma importação realizada.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map((r, i) => `
+    <tr style="background:${i%2===0?'#fff':'#fafafa'};border-bottom:1px solid #f3f4f6;">
+      <td style="padding:8px 12px;">${r.data_importacao}</td>
+      <td style="padding:8px 12px;font-weight:500;color:#1B5E20;">${r.nome_arquivo}</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#166534;">${r.importados}</td>
+      <td style="padding:8px 12px;text-align:center;color:#E65100;">${r.ignorados}</td>
+      <td style="padding:8px 12px;text-align:center;color:#dc2626;">${r.erros}</td>
+      <td style="padding:8px 12px;text-align:center;">${r.total_linhas}</td>
+      <td style="padding:8px 12px;text-align:center;">
+        <button onclick="verDetalhes(${r.id})"
+          style="background:#e5e7eb;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px;">
+          🔍 Ver
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function verDetalhes(id) {
+  const d = await fetch(`/balanca/historico/${id}/detalhes`).then(r => r.json());
+  document.getElementById('jsonDetalhes').textContent = JSON.stringify(d, null, 2);
+  document.getElementById('modalDetalhes').style.display = 'flex';
+}
+
+document.addEventListener('DOMContentLoaded', carregarHistorico);
+</script>
+{% endblock %}

@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+{% block title %}Financeiro — Fazenda Ipanema{% endblock %}
+{% block page_title %}Financeiro{% endblock %}
+
+{% block content %}
+<style>
+  .lbl{display:block;font-size:11px;font-weight:600;color:#555;margin-bottom:4px}
+  .inp{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px 10px;font-size:13px;box-sizing:border-box}
+  .inp:focus{outline:none;border-color:#2E7D32;box-shadow:0 0 0 2px rgba(46,125,50,.15)}
+  .sel{background:#fff}
+  .tab-btn{padding:8px 22px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:14px;font-weight:600;color:#6b7280}
+  .tab-btn.ativo{color:#1B5E20;border-bottom-color:#1B5E20}
+  .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600}
+</style>
+
+<!-- Abas -->
+<div x-data style="background:#fff;border-radius:10px 10px 0 0;padding:0 20px;border-bottom:1px solid #e5e7eb;margin-bottom:0;">
+  <button id="tabCmpBtn" onclick="mudarAba('compras')"
+          :class="$store.finAba==='compras' ? 'tab-btn ativo' : 'tab-btn'">🛒 Compras</button>
+  <button id="tabVndBtn" onclick="mudarAba('vendas')"
+          :class="$store.finAba==='vendas' ? 'tab-btn ativo' : 'tab-btn'">💵 Vendas</button>
+  <button id="tabDspBtn" onclick="mudarAba('despesas')"
+          :class="$store.finAba==='despesas' ? 'tab-btn ativo' : 'tab-btn'">📋 Despesas</button>
+</div>
+
+<!-- ── ABA COMPRAS ─────────────────────────────────────────────────── -->
+<div id="abaCompras"
+     x-data x-show="$store.finAba === 'compras'" x-transition.opacity.duration.150ms
+     style="background:#fff;border-radius:0 0 10px 10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px;">
+    <div><label class="lbl">FORNECEDOR</label><input id="cForn" class="inp" style="width:160px;" /></div>
+    <div><label class="lbl">DATA INÍCIO</label><input id="cIni" type="date" class="inp" style="width:140px;" /></div>
+    <div><label class="lbl">DATA FIM</label><input id="cFim" type="date" class="inp" style="width:140px;" /></div>
+    <button onclick="filtrarCompras()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">🔍 Filtrar</button>
+    <button onclick="limpar('c')" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;">✖ Limpar</button>
+    <div style="margin-left:auto;">
+      <button onclick="abrirModal('compra')" style="background:#2E7D32;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">➕ Nova Compra</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#F1F8E9;color:#33691e;">
+        <th class="th">ID</th><th class="th">Pedido</th><th class="th">Lote</th>
+        <th class="th">Fornecedor</th><th class="th">Descrição</th><th class="th">Data</th>
+        <th class="th" style="text-align:right;">Vl. Unit.</th>
+        <th class="th" style="text-align:right;">Qtd</th>
+        <th class="th" style="text-align:right;">Total</th>
+        <th class="th" style="text-align:center;">Ações</th>
+      </tr></thead>
+      <tbody id="tbodyCompras"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── ABA VENDAS ──────────────────────────────────────────────────── -->
+<div id="abaVendas"
+     x-data x-show="$store.finAba === 'vendas'" x-transition.opacity.duration.150ms
+     style="background:#fff;border-radius:0 0 10px 10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px;">
+    <div><label class="lbl">CLIENTE</label><input id="vCli" class="inp" style="width:160px;" /></div>
+    <div><label class="lbl">DATA INÍCIO</label><input id="vIni" type="date" class="inp" style="width:140px;" /></div>
+    <div><label class="lbl">DATA FIM</label><input id="vFim" type="date" class="inp" style="width:140px;" /></div>
+    <button onclick="filtrarVendas()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">🔍 Filtrar</button>
+    <button onclick="limpar('v')" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;">✖ Limpar</button>
+    <div style="margin-left:auto;">
+      <button onclick="abrirModal('venda')" style="background:#2E7D32;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">➕ Nova Venda</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#F1F8E9;color:#33691e;">
+        <th class="th">ID</th><th class="th">Pedido</th><th class="th">Lote</th>
+        <th class="th">Cliente</th><th class="th">Descrição</th><th class="th">Data</th>
+        <th class="th" style="text-align:right;">Vl. Unit.</th>
+        <th class="th" style="text-align:right;">Qtd</th>
+        <th class="th" style="text-align:right;">Total</th>
+        <th class="th" style="text-align:center;">Ações</th>
+      </tr></thead>
+      <tbody id="tbodyVendas"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── ABA DESPESAS ────────────────────────────────────────────────── -->
+<div id="abaDespesas"
+     x-data x-show="$store.finAba === 'despesas'" x-transition.opacity.duration.150ms
+     style="background:#fff;border-radius:0 0 10px 10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px;">
+    <div><label class="lbl">TIPO</label>
+      <select id="dTipo" class="inp sel" style="width:150px;"><option value="">Todos</option></select></div>
+    <div><label class="lbl">STATUS</label>
+      <select id="dStatus" class="inp sel" style="width:130px;"><option value="">Todos</option><option>PAGO</option><option>PENDENTE</option></select></div>
+    <div><label class="lbl">DATA INÍCIO</label><input id="dIni" type="date" class="inp" style="width:140px;" /></div>
+    <div><label class="lbl">DATA FIM</label><input id="dFim" type="date" class="inp" style="width:140px;" /></div>
+    <button onclick="filtrarDespesas()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">🔍 Filtrar</button>
+    <button onclick="limpar('d')" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;">✖ Limpar</button>
+    <div style="margin-left:auto;">
+      <button onclick="abrirModal('despesa')" style="background:#2E7D32;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">➕ Nova Despesa</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#F1F8E9;color:#33691e;">
+        <th class="th">ID</th><th class="th">Tipo</th><th class="th">Descrição</th>
+        <th class="th" style="text-align:right;">Valor</th>
+        <th class="th" style="text-align:center;">Vencimento</th>
+        <th class="th" style="text-align:center;">Status</th>
+        <th class="th" style="text-align:center;">Ações</th>
+      </tr></thead>
+      <tbody id="tbodyDespesas"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── MODAL GENÉRICO ─────────────────────────────────────────────── -->
+<div id="modalFin"
+     x-data="{ aberto: false }" x-cloak
+     x-show="aberto" x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+     x-transition:leave="transition ease-in duration-150" x-transition:leave-end="opacity-0"
+     @click.self="aberto=false"
+     style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:580px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+      <h2 id="modalFinTitulo" style="font-size:15px;font-weight:600;color:#1B5E20;"></h2>
+      <button onclick="fecharModalFin()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form id="formFin" onsubmit="salvarFin(event)" style="padding:18px 22px;">
+      <input type="hidden" id="finEditId" />
+      <input type="hidden" id="finTipo" />
+      <div id="camposCompraVenda" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><label class="lbl">Pedido</label><input id="finPedido" class="inp" /></div>
+        <div><label class="lbl">Lote</label><input id="finLote" class="inp" /></div>
+        <div id="wrapPessoa">
+          <label id="lblPessoa" class="lbl">Fornecedor *</label>
+          <select id="finPessoa" class="inp sel" required><option value="">Selecione...</option></select>
+        </div>
+        <div><label class="lbl">Data *</label><input id="finData" type="date" class="inp" required /></div>
+        <div style="grid-column:1/-1;"><label class="lbl">Descrição</label><input id="finDescricao" class="inp" /></div>
+        <div>
+          <label class="lbl">Valor Unit. *</label>
+          <input id="finValUnit" type="number" step="0.01" min="0" class="inp" required oninput="calcTotal()" />
+        </div>
+        <div>
+          <label class="lbl">Quantidade *</label>
+          <input id="finQtd" type="number" step="0.01" min="0.01" class="inp" required value="1" oninput="calcTotal()" />
+        </div>
+        <div style="grid-column:1/-1;">
+          <label class="lbl">Total (R$)</label>
+          <input id="finTotal" class="inp" readonly style="background:#f9fafb;font-weight:600;color:#1B5E20;" />
+        </div>
+        <div style="grid-column:1/-1;"><label class="lbl">Observações</label><textarea id="finObs" class="inp" rows="2"></textarea></div>
+      </div>
+      <div id="camposDespesa" style="display:none;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="lbl">Tipo *</label>
+          <select id="finDspTipo" class="inp sel"><option value="">Selecione</option></select>
+        </div>
+        <div><label class="lbl">Valor *</label><input id="finDspValor" type="number" step="0.01" min="0" class="inp" /></div>
+        <div style="grid-column:1/-1;"><label class="lbl">Descrição</label><input id="finDspDescr" class="inp" /></div>
+        <div><label class="lbl">Vencimento *</label><input id="finDspVenc" type="date" class="inp" /></div>
+        <div>
+          <label class="lbl">Status</label>
+          <select id="finDspStatus" class="inp sel"><option value="PENDENTE">PENDENTE</option><option value="PAGO">PAGO</option></select>
+        </div>
+        <div style="grid-column:1/-1;"><label class="lbl">Observações</label><textarea id="finDspObs" class="inp" rows="2"></textarea></div>
+      </div>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" onclick="fecharModalFin()" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:13px;">Cancelar</button>
+        <button type="submit" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:13px;">💾 Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .th{padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;}
+  .td{padding:8px 12px;}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('alpine:init', () => { Alpine.store('finAba', 'compras'); });
+
+let abaFin = 'compras';
+let clientesLista = [], fornecedoresLista = [], defsF = {};
+
+async function init() {
+  defsF = await fetch('/definicoes').then(r => r.json());
+  _pop('dTipo', defsF.tipos_despesa, true);
+  _pop('finDspTipo', defsF.tipos_despesa, false);
+
+  [clientesLista, fornecedoresLista] = await Promise.all([
+    fetch('/pessoas/clientes').then(r => r.json()),
+    fetch('/pessoas/fornecedores').then(r => r.json()),
+  ]);
+
+  document.getElementById('finData').value = new Date().toISOString().split('T')[0];
+  document.getElementById('finDspVenc').value = new Date().toISOString().split('T')[0];
+  await filtrarCompras();
+}
+
+function _pop(id, lista, comTodos) {
+  const el = document.getElementById(id); if (!el) return;
+  el.innerHTML = (comTodos ? '<option value="">Todos</option>' : '<option value="">Selecione</option>')
+    + lista.map(v => `<option>${v}</option>`).join('');
+}
+
+function mudarAba(aba) {
+  abaFin = aba;
+  if (window.Alpine) Alpine.store('finAba', aba);
+  if (aba === 'compras')  filtrarCompras();
+  if (aba === 'vendas')   filtrarVendas();
+  if (aba === 'despesas') filtrarDespesas();
+}
+
+function limpar(p) {
+  if (p === 'c') { document.getElementById('cForn').value=''; document.getElementById('cIni').value=''; document.getElementById('cFim').value=''; filtrarCompras(); }
+  if (p === 'v') { document.getElementById('vCli').value='';  document.getElementById('vIni').value=''; document.getElementById('vFim').value=''; filtrarVendas(); }
+  if (p === 'd') { document.getElementById('dTipo').value=''; document.getElementById('dStatus').value=''; document.getElementById('dIni').value=''; document.getElementById('dFim').value=''; filtrarDespesas(); }
+}
+
+// ── Compras ──
+async function filtrarCompras() {
+  const p = new URLSearchParams();
+  const f = document.getElementById('cForn').value.trim();
+  const i = document.getElementById('cIni').value;
+  const e = document.getElementById('cFim').value;
+  if (f) p.set('fornecedor', f);
+  if (i) p.set('data_inicio', i);
+  if (e) p.set('data_fim', e);
+  const lista = await fetch('/compras?' + p).then(r => r.json());
+  renderCV(lista, 'tbodyCompras', 'compra');
+}
+
+// ── Vendas ──
+async function filtrarVendas() {
+  const p = new URLSearchParams();
+  const c = document.getElementById('vCli').value.trim();
+  const i = document.getElementById('vIni').value;
+  const e = document.getElementById('vFim').value;
+  if (c) p.set('cliente', c);
+  if (i) p.set('data_inicio', i);
+  if (e) p.set('data_fim', e);
+  const lista = await fetch('/vendas?' + p).then(r => r.json());
+  renderCV(lista, 'tbodyVendas', 'venda');
+}
+
+function renderCV(lista, tbodyId, tipo) {
+  const tbody = document.getElementById(tbodyId);
+  const pessoaCampo = tipo === 'compra' ? 'fornecedor' : 'cliente';
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:18px;color:#9ca3af;">Nenhum registro.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = lista.map((r, i) => `
+    <tr style="background:${i%2===0?'#fff':'#fafafa'};border-bottom:1px solid #f3f4f6;">
+      <td class="td" style="color:#6b7280;">${r.id}</td>
+      <td class="td">${r.pedido||'—'}</td>
+      <td class="td">${r.lote||'—'}</td>
+      <td class="td;font-weight:500;">${r[pessoaCampo]||'—'}</td>
+      <td class="td">${r.descricao||'—'}</td>
+      <td class="td">${fmtData(r.data)}</td>
+      <td class="td" style="text-align:right;">${fmtMoeda(r.valor_unit)}</td>
+      <td class="td" style="text-align:right;">${r.quantidade}</td>
+      <td class="td" style="text-align:right;font-weight:600;color:#1B5E20;">${fmtMoeda(r.valor_total)}</td>
+      <td class="td" style="text-align:center;white-space:nowrap;">
+        <button onclick='editarFin(${JSON.stringify(r)}, "${tipo}")' style="background:#e5e7eb;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">✏️</button>
+        <button onclick="confirmarExclusao('/${tipo}s/${r.id}', ${tipo==='compra'?'filtrarCompras':'filtrarVendas'})" style="background:#fee2e2;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">🗑️</button>
+      </td>
+    </tr>`).join('');
+}
+
+// ── Despesas ──
+async function filtrarDespesas() {
+  const p = new URLSearchParams();
+  const t = document.getElementById('dTipo').value;
+  const s = document.getElementById('dStatus').value;
+  const i = document.getElementById('dIni').value;
+  const e = document.getElementById('dFim').value;
+  if (t) p.set('tipo', t);
+  if (s) p.set('status', s);
+  if (i) p.set('data_inicio', i);
+  if (e) p.set('data_fim', e);
+  const lista = await fetch('/despesas?' + p).then(r => r.json());
+  renderDespesas(lista);
+}
+
+function renderDespesas(lista) {
+  const tbody = document.getElementById('tbodyDespesas');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:18px;color:#9ca3af;">Nenhum registro.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map((d, i) => {
+    const vencida = d.vencida;
+    const pago = d.status === 'PAGO';
+    let bg = i%2===0 ? '#fff' : '#fafafa';
+    if (pago)    bg = '#f0fdf4';
+    if (vencida) bg = '#fff1f2';
+    const badgeCor = pago ? {bg:'#dcfce7',cor:'#166534',txt:'PAGO'} :
+                     vencida ? {bg:'#fee2e2',cor:'#991b1b',txt:'VENCIDA'} :
+                               {bg:'#FFF8E1',cor:'#92400e',txt:'PENDENTE'};
+    const btnPagar = (!pago) ? `<button onclick="marcarPago(${d.id})" title="Marcar PAGO"
+      style="background:#dcfce7;color:#166534;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:12px;">✅</button>` : '';
+    return `<tr style="background:${bg};border-bottom:1px solid #f3f4f6;">
+      <td class="td" style="color:#6b7280;">${d.id}</td>
+      <td class="td">${d.tipo||'—'}</td>
+      <td class="td">${d.descricao||'—'}</td>
+      <td class="td" style="text-align:right;font-weight:600;">${fmtMoeda(d.valor)}</td>
+      <td class="td" style="text-align:center;">${fmtData(d.vencimento)}</td>
+      <td class="td" style="text-align:center;">
+        <span class="badge" style="background:${badgeCor.bg};color:${badgeCor.cor};">${badgeCor.txt}</span>
+      </td>
+      <td class="td" style="text-align:center;white-space:nowrap;">
+        ${btnPagar}
+        <button onclick='editarFin(${JSON.stringify(d)}, "despesa")' style="background:#e5e7eb;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">✏️</button>
+        <button onclick="confirmarExclusao('/despesas/${d.id}', filtrarDespesas)" style="background:#fee2e2;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function marcarPago(id) {
+  const r = await fetch(`/despesas/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ valor: 0, vencimento: '2000-01-01', status: 'PAGO' }),
+  });
+  if (!r.ok) { showToast('Erro ao atualizar.', 'erro'); return; }
+  // busca atual para preservar campos
+  const atual = await fetch('/despesas').then(r => r.json()).then(l => l.find(x => x.id === id));
+  if (atual) {
+    await fetch(`/despesas/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ valor: atual.valor, vencimento: atual.vencimento, status: 'PAGO' }),
+    });
+  }
+  showToast('Despesa marcada como PAGO!', 'sucesso');
+  await filtrarDespesas();
+}
+
+// ── Modal ──
+function calcTotal() {
+  const v = parseFloat(document.getElementById('finValUnit').value) || 0;
+  const q = parseFloat(document.getElementById('finQtd').value) || 0;
+  document.getElementById('finTotal').value = fmtMoeda(v * q);
+}
+
+function abrirModal(tipo, reg) {
+  _alpineOpen('modalFin', true);
+  document.getElementById('finEditId').value = '';
+  document.getElementById('finTipo').value   = tipo;
+  document.getElementById('formFin').reset();
+  document.getElementById('finData').value   = new Date().toISOString().split('T')[0];
+  document.getElementById('finDspVenc').value= new Date().toISOString().split('T')[0];
+  document.getElementById('finQtd').value    = 1;
+  document.getElementById('finTotal').value  = '';
+
+  const isDsp = tipo === 'despesa';
+  document.getElementById('camposCompraVenda').style.display = isDsp ? 'none' : 'grid';
+  document.getElementById('camposDespesa').style.display     = isDsp ? 'grid' : 'none';
+
+  if (!isDsp) {
+    const isVenda = tipo === 'venda';
+    document.getElementById('modalFinTitulo').textContent = isVenda ? (reg?'Editar Venda':'Nova Venda') : (reg?'Editar Compra':'Nova Compra');
+    document.getElementById('lblPessoa').textContent = isVenda ? 'Cliente *' : 'Fornecedor *';
+    const selPessoa = document.getElementById('finPessoa');
+    const lista = isVenda ? clientesLista : fornecedoresLista;
+    selPessoa.innerHTML = '<option value="">Selecione...</option>' + lista.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
+    if (reg) {
+      document.getElementById('finEditId').value    = reg.id;
+      document.getElementById('finPedido').value    = reg.pedido || '';
+      document.getElementById('finLote').value      = reg.lote || '';
+      document.getElementById('finPessoa').value    = isVenda ? (reg.cliente||'') : (reg.fornecedor||'');
+      document.getElementById('finData').value      = reg.data || '';
+      document.getElementById('finDescricao').value = reg.descricao || '';
+      document.getElementById('finValUnit').value   = reg.valor_unit || '';
+      document.getElementById('finQtd').value       = reg.quantidade || 1;
+      document.getElementById('finObs').value       = reg.obs || '';
+      calcTotal();
+    }
+  } else {
+    document.getElementById('modalFinTitulo').textContent = reg ? 'Editar Despesa' : 'Nova Despesa';
+    if (reg) {
+      document.getElementById('finEditId').value    = reg.id;
+      document.getElementById('finDspTipo').value   = reg.tipo || '';
+      document.getElementById('finDspValor').value  = reg.valor || '';
+      document.getElementById('finDspDescr').value  = reg.descricao || '';
+      document.getElementById('finDspVenc').value   = reg.vencimento || '';
+      document.getElementById('finDspStatus').value = reg.status || 'PENDENTE';
+      document.getElementById('finDspObs').value    = reg.obs || '';
+    }
+  }
+}
+
+function editarFin(reg, tipo) { abrirModal(tipo, reg); }
+function fecharModalFin() { _alpineOpen('modalFin', false); }
+
+async function salvarFin(ev) {
+  ev.preventDefault();
+  const id   = document.getElementById('finEditId').value;
+  const tipo = document.getElementById('finTipo').value;
+
+  let body, url, method;
+  if (tipo !== 'despesa') {
+    const isVenda = tipo === 'venda';
+    const pessoaVal = document.getElementById('finPessoa').value;
+    body = {
+      pedido:      document.getElementById('finPedido').value.trim() || null,
+      lote:        document.getElementById('finLote').value.trim()   || null,
+      [isVenda ? 'cliente' : 'fornecedor']: pessoaVal || null,
+      data:        document.getElementById('finData').value,
+      descricao:   document.getElementById('finDescricao').value.trim() || null,
+      valor_unit:  parseFloat(document.getElementById('finValUnit').value) || 0,
+      quantidade:  parseFloat(document.getElementById('finQtd').value) || 1,
+      obs:         document.getElementById('finObs').value.trim() || null,
+    };
+    url    = id ? `/${tipo}s/${id}` : `/${tipo}s`;
+    method = id ? 'PUT' : 'POST';
+  } else {
+    const valor = parseFloat(document.getElementById('finDspValor').value);
+    const venc  = document.getElementById('finDspVenc').value;
+    if (!valor || !venc) { showToast('Valor e vencimento são obrigatórios.', 'erro'); return; }
+    body = {
+      tipo:      document.getElementById('finDspTipo').value || null,
+      descricao: document.getElementById('finDspDescr').value.trim() || null,
+      valor,
+      vencimento: venc,
+      status:    document.getElementById('finDspStatus').value,
+      obs:       document.getElementById('finDspObs').value.trim() || null,
+    };
+    url    = id ? `/despesas/${id}` : '/despesas';
+    method = id ? 'PUT' : 'POST';
+  }
+
+  const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (!r.ok) { showToast(d.detail || 'Erro ao salvar.', 'erro'); return; }
+  fecharModalFin();
+  showToast('Salvo com sucesso!', 'sucesso');
+  if (tipo === 'compra')  filtrarCompras();
+  if (tipo === 'venda')   filtrarVendas();
+  if (tipo === 'despesa') filtrarDespesas();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

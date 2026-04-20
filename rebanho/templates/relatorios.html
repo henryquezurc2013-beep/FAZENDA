@@ -1,0 +1,585 @@
+{% extends "base.html" %}
+{% block title %}Relatórios — Fazenda Ipanema{% endblock %}
+{% block page_title %}Relatórios{% endblock %}
+
+{% block content %}
+<style>
+  .tab-btn{padding:8px 18px;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;font-size:12.5px;font-weight:500;color:#888;font-family:inherit;transition:all .15s}
+  .tab-btn:hover{color:#1a1a1a}
+  .tab-btn.ativo{color:#0a2e0a;border-bottom-color:#2e7d32;font-weight:600}
+  .lbl{display:block;font-size:10.5px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+  .inp{border:0.5px solid #e8e8e8;border-radius:7px;padding:6px 10px;font-size:12.5px;font-family:inherit}
+  .card-total{background:#f0f7f0;border:0.5px solid #c3e6c3;border-radius:9px;padding:12px 20px;display:inline-block;margin-bottom:16px;}
+</style>
+
+<!-- Abas -->
+<div x-data style="background:#fff;border-radius:10px 10px 0 0;padding:0 16px;border-bottom:1px solid #e5e7eb;margin-bottom:0;overflow-x:auto;white-space:nowrap;">
+  <button id="rTab0" onclick="mudarRel(0)" :class="$store.relAba===0 ? 'tab-btn ativo' : 'tab-btn'">💵 Vendas</button>
+  <button id="rTab1" onclick="mudarRel(1)" :class="$store.relAba===1 ? 'tab-btn ativo' : 'tab-btn'">🛒 Compras</button>
+  <button id="rTab2" onclick="mudarRel(2)" :class="$store.relAba===2 ? 'tab-btn ativo' : 'tab-btn'">⚖️ Ganho de Peso</button>
+  <button id="rTab3" onclick="mudarRel(3)" :class="$store.relAba===3 ? 'tab-btn ativo' : 'tab-btn'">📋 Despesas</button>
+  <button id="rTab4" onclick="mudarRel(4)" :class="$store.relAba===4 ? 'tab-btn ativo' : 'tab-btn'">💀 Mortes</button>
+  <button id="rTab5" onclick="mudarRel(5)" :class="$store.relAba===5 ? 'tab-btn ativo' : 'tab-btn'">🌿 Qtd por Pasto</button>
+  <button id="rTab6" onclick="mudarRel(6)" :class="$store.relAba===6 ? 'tab-btn ativo' : 'tab-btn'">📅 Previsão de Saída</button>
+</div>
+
+<div style="background:#fff;border-radius:0 0 10px 10px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+
+  <!-- ── Vendas (0) ── -->
+  <div id="rel0">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      <div><label class="lbl">ANO</label><select id="anoVendas" class="inp" onchange="carregarVendas()"></select></div>
+      <div class="card-total"><div style="font-size:11px;font-weight:600;color:#555;">TOTAL ANUAL</div><div id="totalVendas" style="font-size:20px;font-weight:700;color:#1B5E20;"></div></div>
+    </div>
+    <div style="position:relative;height:280px;"><canvas id="chartVendas"></canvas></div>
+  </div>
+
+  <!-- ── Compras (1) ── -->
+  <div id="rel1" style="display:none;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      <div><label class="lbl">ANO</label><select id="anoCompras" class="inp" onchange="carregarCompras()"></select></div>
+      <div class="card-total"><div style="font-size:11px;font-weight:600;color:#555;">TOTAL ANUAL</div><div id="totalCompras" style="font-size:20px;font-weight:700;color:#E65100;"></div></div>
+    </div>
+    <div style="position:relative;height:280px;"><canvas id="chartCompras"></canvas></div>
+  </div>
+
+  <!-- ── Ganho Peso (2) ── -->
+  <div id="rel2" style="display:none;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      <div><label class="lbl">ANO</label><select id="anoPeso" class="inp" onchange="carregarPeso()"></select></div>
+    </div>
+    <div style="position:relative;height:280px;"><canvas id="chartPeso"></canvas></div>
+  </div>
+
+  <!-- ── Despesas (3) ── -->
+  <div id="rel3" style="display:none;">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
+      <div><label class="lbl">ANO</label><select id="anoDespesas" class="inp" onchange="carregarDespesas()"></select></div>
+      <div style="margin-top:16px;display:flex;gap:14px;">
+        <label style="font-size:13px;cursor:pointer;"><input type="radio" name="filtDsp" value="" checked onchange="carregarDespesas()"> Todos</label>
+        <label style="font-size:13px;cursor:pointer;"><input type="radio" name="filtDsp" value="PAGO" onchange="carregarDespesas()"> Apenas Pagos</label>
+        <label style="font-size:13px;cursor:pointer;"><input type="radio" name="filtDsp" value="PENDENTE" onchange="carregarDespesas()"> Apenas Pendentes</label>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div><div style="font-size:13px;font-weight:600;color:#555;margin-bottom:8px;">Por Mês</div><div style="position:relative;height:240px;"><canvas id="chartDespMes"></canvas></div></div>
+      <div><div style="font-size:13px;font-weight:600;color:#555;margin-bottom:8px;">Por Tipo</div><div style="position:relative;height:240px;"><canvas id="chartDespTipo"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ── Mortes (4) ── -->
+  <div id="rel4" style="display:none;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      <div><label class="lbl">ANO</label><select id="anoMortes" class="inp" onchange="carregarMortes()"></select></div>
+    </div>
+    <div style="position:relative;height:280px;"><canvas id="chartMortes"></canvas></div>
+  </div>
+
+  <!-- ── Qtd por Pasto (5) ── -->
+  <div id="rel5" style="display:none;">
+    <div id="tabelaPasto"></div>
+  </div>
+
+  <!-- ── Previsão de Saída (6) ── -->
+  <div id="rel6" style="display:none;">
+    <!-- Painel de parâmetros -->
+    <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;margin-bottom:20px;border:1px solid #e5e7eb;">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
+        <div><label class="lbl">Peso Alvo (kg) *</label><input id="ps-peso-alvo" type="number" class="inp" placeholder="480" style="width:110px;"></div>
+        <div><label class="lbl">Janela GMD</label>
+          <select id="ps-dias-gmd" class="inp" style="width:140px;">
+            <option value="30">30 dias</option>
+            <option value="60">60 dias</option>
+            <option value="90" selected>90 dias</option>
+            <option value="180">180 dias</option>
+            <option value="0">Todo histórico</option>
+          </select>
+        </div>
+        <div><label class="lbl">Preço da Arroba R$</label><input id="ps-preco-arroba" type="number" step="0.01" class="inp" placeholder="Ex: 320.00" style="width:130px;"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px;">
+        <div><label class="lbl">Tipo</label>
+          <select id="ps-tipo" class="inp" style="width:120px;"><option value="">Todos</option></select>
+        </div>
+        <div><label class="lbl">Pasto</label><input id="ps-pasto" class="inp" placeholder="Todos" style="width:120px;"></div>
+        <div><label class="lbl">Lote</label><input id="ps-lote" class="inp" placeholder="Todos" style="width:120px;"></div>
+        <div><label class="lbl">Status</label>
+          <select id="ps-status" class="inp" style="width:110px;">
+            <option value="ATIVO">ATIVO</option>
+            <option value="MORTO">MORTO</option>
+            <option value="">Todos</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="calcularPrevisao()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;">📅 Calcular Previsão</button>
+        <button onclick="limparPrevisao()" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;">Limpar</button>
+        <button id="btn-exportar-prev" onclick="exportarPrevisaoCSV()" style="display:none;background:#6b7280;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;">📥 Exportar CSV</button>
+      </div>
+    </div>
+
+    <!-- Cards resumo -->
+    <div id="ps-cards" style="display:none;margin-bottom:20px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px;">
+        <div style="background:#dcfce7;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;">✅</div>
+          <div id="ps-kpi-prontos" style="font-size:22px;font-weight:700;color:#15803d;">0</div>
+          <div style="font-size:12px;color:#166534;">Prontos</div>
+        </div>
+        <div style="background:#d1fae5;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;">🟢</div>
+          <div id="ps-kpi-noprazo" style="font-size:22px;font-weight:700;color:#065f46;">0</div>
+          <div style="font-size:12px;color:#065f46;">Até 90 dias</div>
+        </div>
+        <div style="background:#fef9c3;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;">🟡</div>
+          <div id="ps-kpi-medio" style="font-size:22px;font-weight:700;color:#a16207;">0</div>
+          <div style="font-size:12px;color:#a16207;">91-180 dias</div>
+        </div>
+        <div style="background:#f3f4f6;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;">⚪</div>
+          <div id="ps-kpi-semdados" style="font-size:22px;font-weight:700;color:#6b7280;">0</div>
+          <div style="font-size:12px;color:#6b7280;">Sem dados</div>
+        </div>
+        <div id="ps-card-receita" style="display:none;background:#eff6ff;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:12px;color:#1e40af;font-weight:600;">Receita estimada total</div>
+          <div id="ps-kpi-receita" style="font-size:18px;font-weight:700;color:#1e40af;">—</div>
+        </div>
+      </div>
+      <!-- GMD card -->
+      <div id="ps-gmd-card" style="background:#fff;border-radius:8px;padding:14px 20px;border:1px solid #e5e7eb;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:8px;">GMD médio do rebanho</div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div>GMD atual: <span id="ps-gmd-atual" style="font-weight:700;color:#1B5E20;">—</span> kg/dia</div>
+          <div>Meta para 90 dias: <span id="ps-gmd-meta" style="font-weight:700;color:#E65100;">—</span> kg/dia</div>
+        </div>
+        <div style="margin-top:10px;background:#e5e7eb;border-radius:6px;height:12px;overflow:hidden;">
+          <div id="ps-gmd-bar" style="height:100%;background:#2E7D32;border-radius:6px;transition:width .4s;width:0%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela principal -->
+    <div id="ps-tabela-wrap" style="display:none;overflow-x:auto;margin-bottom:20px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;" id="ps-tabela">
+        <thead>
+          <tr style="background:#F1F8E9;color:#33691e;">
+            <th style="padding:8px 6px;cursor:pointer;" onclick="ordenarPS('semaforo')">🚦</th>
+            <th style="padding:8px 8px;cursor:pointer;" onclick="ordenarPS('brinco')">Brinco</th>
+            <th style="padding:8px 8px;cursor:pointer;" onclick="ordenarPS('nome')">Nome</th>
+            <th style="padding:8px 8px;cursor:pointer;" onclick="ordenarPS('tipo')">Tipo</th>
+            <th style="padding:8px 8px;">Raça</th>
+            <th style="padding:8px 8px;cursor:pointer;" onclick="ordenarPS('pasto')">Pasto/Lote</th>
+            <th style="padding:8px 8px;text-align:right;cursor:pointer;" onclick="ordenarPS('peso_atual')">Atual</th>
+            <th style="padding:8px 8px;text-align:right;">Alvo</th>
+            <th style="padding:8px 8px;text-align:right;cursor:pointer;" onclick="ordenarPS('diferenca_kg')">Falta</th>
+            <th style="padding:8px 8px;text-align:center;cursor:pointer;" onclick="ordenarPS('gmd_real')">GMD</th>
+            <th style="padding:8px 8px;text-align:center;">Pes.</th>
+            <th style="padding:8px 8px;text-align:center;cursor:pointer;" onclick="ordenarPS('data_prevista')">Data Prevista</th>
+            <th style="padding:8px 8px;text-align:center;">Intervalo</th>
+            <th style="padding:8px 8px;text-align:right;">Arrobas</th>
+            <th id="th-receita" style="padding:8px 8px;text-align:right;display:none;">Receita Est.</th>
+            <th id="th-lucro"   style="padding:8px 8px;text-align:right;display:none;">Lucro Est.</th>
+          </tr>
+        </thead>
+        <tbody id="ps-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Gráfico distribuição -->
+    <div id="ps-chart-wrap" style="display:none;background:#fff;border-radius:8px;padding:16px;border:1px solid #e5e7eb;">
+      <div id="ps-chart-titulo" style="font-size:13px;font-weight:600;color:#374151;margin-bottom:12px;"></div>
+      <div style="position:relative;height:220px;"><canvas id="chartPrevisao"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('alpine:init', () => { Alpine.store('relAba', 0); });
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const TIPOS_ANIMAL = ['VACA','TOURO','BOI','GARROTE','NOVILHA','BEZERRO','BEZERRA'];
+let charts = {};
+
+function _anos() {
+  const ano = new Date().getFullYear();
+  const lista = [];
+  for (let a = 2020; a <= 2030; a++) lista.push(a);
+  return { lista, atual: ano };
+}
+
+function _populaAno(id) {
+  const { lista, atual } = _anos();
+  const el = document.getElementById(id);
+  el.innerHTML = lista.map(a => `<option ${a===atual?'selected':''}>${a}</option>`).join('');
+}
+
+function _destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function _barChart(canvasId, labels, data, cor, yLabel) {
+  _destroyChart(canvasId);
+  charts[canvasId] = new Chart(document.getElementById(canvasId), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: cor, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => yLabel === 'R$' ? 'R$ ' + v.toLocaleString('pt-BR') : v + ' kg' } }
+      }
+    }
+  });
+}
+
+// ── Vendas ──────────────────────────────────────────────────────────
+async function carregarVendas() {
+  const ano = document.getElementById('anoVendas').value;
+  const d = await fetch(`/relatorios/financeiro?ano=${ano}`).then(r => r.json());
+  const vals = MESES.map((_, i) => d.vendas[String(i+1)] || 0);
+  const total = vals.reduce((a,b) => a+b, 0);
+  document.getElementById('totalVendas').textContent = fmtMoeda(total);
+  _barChart('chartVendas', MESES, vals, '#2E7D32', 'R$');
+}
+
+// ── Compras ──────────────────────────────────────────────────────────
+async function carregarCompras() {
+  const ano = document.getElementById('anoCompras').value;
+  const d = await fetch(`/relatorios/financeiro?ano=${ano}`).then(r => r.json());
+  const vals = MESES.map((_, i) => d.compras[String(i+1)] || 0);
+  const total = vals.reduce((a,b) => a+b, 0);
+  document.getElementById('totalCompras').textContent = fmtMoeda(total);
+  _barChart('chartCompras', MESES, vals, '#F9A825', 'R$');
+}
+
+// ── Ganho de Peso ────────────────────────────────────────────────────
+async function carregarPeso() {
+  const ano = document.getElementById('anoPeso').value;
+  const d = await fetch(`/relatorios/ganho-peso?ano=${ano}`).then(r => r.json());
+  const vals = MESES.map((_, i) => d[String(i+1)] || 0);
+  _barChart('chartPeso', MESES, vals, '#1B5E20', 'kg');
+}
+
+// ── Despesas ─────────────────────────────────────────────────────────
+async function carregarDespesas() {
+  const ano    = document.getElementById('anoDespesas').value;
+  const status = document.querySelector('input[name="filtDsp"]:checked').value;
+  const url    = `/relatorios/despesas?ano=${ano}` + (status ? `&status=${status}` : '');
+  const d      = await fetch(url).then(r => r.json());
+
+  const valsMes  = MESES.map((_, i) => d.mensal[String(i+1)] || 0);
+  _destroyChart('chartDespMes');
+  charts['chartDespMes'] = new Chart(document.getElementById('chartDespMes'), {
+    type: 'bar',
+    data: { labels: MESES, datasets: [{ data: valsMes, backgroundColor: '#7B1FA2', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } } }
+  });
+
+  const tipoLabels = Object.keys(d.por_tipo);
+  const tipoVals   = Object.values(d.por_tipo);
+  _destroyChart('chartDespTipo');
+  if (tipoLabels.length > 0) {
+    charts['chartDespTipo'] = new Chart(document.getElementById('chartDespTipo'), {
+      type: 'pie',
+      data: { labels: tipoLabels, datasets: [{ data: tipoVals,
+        backgroundColor: ['#1B5E20','#F57F17','#1565C0','#880E4F','#BF360C','#006064','#4A148C'] }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+    });
+  }
+}
+
+// ── Mortes ───────────────────────────────────────────────────────────
+async function carregarMortes() {
+  const ano = document.getElementById('anoMortes').value;
+  const d   = await fetch(`/relatorios/mortes?ano=${ano}`).then(r => r.json());
+  const vals = MESES.map((_, i) => d[String(i+1)] || 0);
+  _destroyChart('chartMortes');
+  charts['chartMortes'] = new Chart(document.getElementById('chartMortes'), {
+    type: 'bar',
+    data: { labels: MESES, datasets: [{ data: vals, backgroundColor: '#dc2626', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+}
+
+// ── Qtd por Pasto ─────────────────────────────────────────────────────
+async function carregarPasto() {
+  const d = await fetch('/relatorios/qtd-pasto').then(r => r.json());
+  const pastos = Object.keys(d);
+  const wrap   = document.getElementById('tabelaPasto');
+
+  if (!pastos.length) { wrap.innerHTML = '<p style="color:#9ca3af;">Nenhum dado.</p>'; return; }
+
+  const totaisTipo = {};
+  TIPOS_ANIMAL.forEach(t => totaisTipo[t] = 0);
+  pastos.forEach(p => TIPOS_ANIMAL.forEach(t => { totaisTipo[t] += (d[p][t]||0); }));
+
+  let html = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#F1F8E9;color:#33691e;">
+      <th style="padding:9px 14px;text-align:left;border-bottom:2px solid #C8E6C9;">Pasto</th>
+      ${TIPOS_ANIMAL.map(t => `<th style="padding:9px 10px;text-align:center;border-bottom:2px solid #C8E6C9;">${t}</th>`).join('')}
+      <th style="padding:9px 10px;text-align:center;border-bottom:2px solid #C8E6C9;font-weight:700;">TOTAL</th>
+    </tr></thead><tbody>`;
+
+  pastos.forEach((p, i) => {
+    const totalPasto = TIPOS_ANIMAL.reduce((s, t) => s + (d[p][t]||0), 0);
+    html += `<tr style="background:${i%2===0?'#fff':'#fafafa'};border-bottom:1px solid #f3f4f6;">
+      <td style="padding:8px 14px;font-weight:600;color:#1B5E20;">${p}</td>
+      ${TIPOS_ANIMAL.map(t => `<td style="padding:8px 10px;text-align:center;">${d[p][t]||0}</td>`).join('')}
+      <td style="padding:8px 10px;text-align:center;font-weight:700;color:#1B5E20;">${totalPasto}</td>
+    </tr>`;
+  });
+
+  const totalGeral = TIPOS_ANIMAL.reduce((s, t) => s + totaisTipo[t], 0);
+  html += `<tr style="background:#F1F8E9;font-weight:700;">
+    <td style="padding:8px 14px;">TOTAL</td>
+    ${TIPOS_ANIMAL.map(t => `<td style="padding:8px 10px;text-align:center;">${totaisTipo[t]}</td>`).join('')}
+    <td style="padding:8px 10px;text-align:center;color:#1B5E20;">${totalGeral}</td>
+  </tr></tbody></table></div>`;
+  wrap.innerHTML = html;
+}
+
+// ── Previsão de Saída ────────────────────────────────────────────────
+let psData = null;
+let psSortField = 'data_prevista', psSortAsc = true;
+const TIPOS_ANIMAL_LIST = ['VACA','TOURO','BOI','GARROTE','NOVILHA','BEZERRO','BEZERRA'];
+
+function gmdBadge(gmd) {
+  if (gmd == null) return '<span style="color:#9ca3af;">—</span>';
+  let bg, color;
+  if (gmd > 0.8)       { bg='#14532d'; color='#fff'; }
+  else if (gmd >= 0.5) { bg='#dcfce7'; color='#15803d'; }
+  else if (gmd >= 0.3) { bg='#fef9c3'; color='#a16207'; }
+  else                  { bg='#fee2e2'; color='#b91c1c'; }
+  return `<span style="background:${bg};color:${color};padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px;">${gmd.toFixed(3)}</span>`;
+}
+
+function semafBadge(s) {
+  const map = {VERDE:'🟢',AMARELO:'🟡',CINZA:'⚪'};
+  return map[s] || '⚪';
+}
+
+function dataFmt(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function intervaloBar(otim, pess, prev) {
+  if (!otim || !pess) return '—';
+  const diasO = Math.round((new Date(otim)-new Date())/86400000);
+  const diasP = Math.round((new Date(pess)-new Date())/86400000);
+  const diasR = Math.round((new Date(prev)-new Date())/86400000);
+  const range = Math.max(diasP - diasO, 1);
+  const pos = Math.min(100, Math.max(0, Math.round((diasR - diasO)/range*100)));
+  return `<div title="Otimista: ${dataFmt(otim)} | Pessimista: ${dataFmt(pess)}" style="display:flex;align-items:center;gap:4px;font-size:10px;color:#6b7280;">
+    <span>${dataFmt(otim)}</span>
+    <div style="flex:1;min-width:50px;background:#e5e7eb;border-radius:3px;height:6px;position:relative;">
+      <div style="position:absolute;left:${pos}%;top:-2px;width:10px;height:10px;border-radius:50%;background:#1B5E20;transform:translateX(-50%);"></div>
+    </div>
+    <span>${dataFmt(pess)}</span>
+  </div>`;
+}
+
+function renderPSTabela() {
+  if (!psData) return;
+  const preco = parseFloat(document.getElementById('ps-preco-arroba').value) || null;
+  document.getElementById('th-receita').style.display = preco ? '' : 'none';
+  document.getElementById('th-lucro').style.display   = preco ? '' : 'none';
+
+  let lista = [...psData.animais];
+  lista.sort((a, b) => {
+    let va = a[psSortField], vb = b[psSortField];
+    if (va == null) va = psSortAsc ? 'Z' : '';
+    if (vb == null) vb = psSortAsc ? 'Z' : '';
+    return psSortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+
+  const tbody = document.getElementById('ps-tbody');
+  tbody.innerHTML = lista.map(r => {
+    const pronto = r.situacao === 'PRONTO';
+    const semDados = ['SEM_DADOS','GMD_INVALIDO'].includes(r.situacao);
+    let bg = pronto ? '#f0fdf4' : semDados ? '#f9fafb' : '#fff';
+    let dataTd;
+    if (pronto) {
+      dataTd = `<td style="padding:6px 8px;text-align:center;color:#15803d;font-weight:600;">✅ Pronto<br><button onclick="abrirVenda('${r.brinco}')" style="font-size:10px;background:#dcfce7;border:1px solid #86efac;border-radius:4px;padding:1px 6px;cursor:pointer;margin-top:2px;">Registrar Venda</button></td>`;
+    } else if (semDados) {
+      dataTd = `<td style="padding:6px 8px;text-align:center;color:#9ca3af;" title="Registre ao menos 2 pesagens para calcular o GMD"><a href="/pesagem-page?brinco=${r.brinco}" style="font-size:11px;color:#6b7280;">Sem dados — registrar pesagem</a></td>`;
+    } else {
+      dataTd = `<td style="padding:6px 8px;text-align:center;">
+        <div style="font-weight:600;">${dataFmt(r.data_prevista)}</div>
+        <div style="font-size:10px;color:#6b7280;">${r.dias_restantes} dias</div>
+      </td>`;
+    }
+    return `<tr style="background:${bg};border-bottom:1px solid #f3f4f6;">
+      <td style="padding:6px 6px;text-align:center;font-size:16px;">${semafBadge(r.semaforo)}</td>
+      <td style="padding:6px 8px;font-weight:600;color:#1B5E20;">${r.brinco}</td>
+      <td style="padding:6px 8px;">${r.nome||'—'}</td>
+      <td style="padding:6px 8px;">${r.tipo||'—'}</td>
+      <td style="padding:6px 8px;">${r.raca||'—'}</td>
+      <td style="padding:6px 8px;font-size:11px;">${r.pasto||'—'}${r.lote?'<br><span style="color:#6b7280;">'+r.lote+'</span>':''}</td>
+      <td style="padding:6px 8px;text-align:right;">${r.peso_atual} kg</td>
+      <td style="padding:6px 8px;text-align:right;">${r.peso_alvo} kg</td>
+      <td style="padding:6px 8px;text-align:right;color:${r.diferenca_kg>0?'#b91c1c':'#15803d'};">${r.diferenca_kg} kg</td>
+      <td style="padding:6px 8px;text-align:center;">${gmdBadge(r.gmd_real)}</td>
+      <td style="padding:6px 8px;text-align:center;color:#6b7280;">${r.qtd_pesagens}</td>
+      ${dataTd}
+      <td style="padding:6px 8px;">${intervaloBar(r.data_otimista, r.data_pessimista, r.data_prevista)}</td>
+      <td style="padding:6px 8px;text-align:right;">${r.arrobas_previstas}@</td>
+      ${preco ? `<td style="padding:6px 8px;text-align:right;">${r.receita_estimada!=null?fmtMoeda(r.receita_estimada):'—'}</td>` : ''}
+      ${preco ? `<td style="padding:6px 8px;text-align:right;color:${(r.lucro_estimado||0)>=0?'#15803d':'#b91c1c'};">${r.lucro_estimado!=null?fmtMoeda(r.lucro_estimado):'—'}</td>` : ''}
+    </tr>`;
+  }).join('');
+}
+
+function ordenarPS(campo) {
+  if (psSortField === campo) psSortAsc = !psSortAsc;
+  else { psSortField = campo; psSortAsc = true; }
+  renderPSTabela();
+}
+
+async function calcularPrevisao() {
+  const pesoAlvo = parseFloat(document.getElementById('ps-peso-alvo').value);
+  if (!pesoAlvo || pesoAlvo <= 0) { alert('Informe o peso alvo em kg'); return; }
+  const diasGmd   = document.getElementById('ps-dias-gmd').value;
+  const preco     = document.getElementById('ps-preco-arroba').value;
+  const tipo      = document.getElementById('ps-tipo').value;
+  const pasto     = document.getElementById('ps-pasto').value;
+  const lote      = document.getElementById('ps-lote').value;
+  const status    = document.getElementById('ps-status').value;
+
+  const params = new URLSearchParams({peso_alvo: pesoAlvo, dias_gmd: diasGmd, status});
+  if (tipo)  params.set('tipo', tipo);
+  if (pasto) params.set('pasto', pasto);
+  if (lote)  params.set('lote', lote);
+  if (preco) params.set('preco_arroba', preco);
+
+  const data = await fetch(`/relatorios/previsao-saida?${params}`).then(r=>r.json());
+  psData = data;
+
+  const r = data.resumo;
+  document.getElementById('ps-kpi-prontos').textContent  = r.prontos;
+  document.getElementById('ps-kpi-noprazo').textContent  = r.no_prazo_90d;
+  document.getElementById('ps-kpi-medio').textContent    = r.medio_prazo;
+  document.getElementById('ps-kpi-semdados').textContent = r.sem_dados;
+
+  if (preco && r.receita_total_estimada != null) {
+    document.getElementById('ps-card-receita').style.display = '';
+    document.getElementById('ps-kpi-receita').textContent = fmtMoeda(r.receita_total_estimada);
+  } else {
+    document.getElementById('ps-card-receita').style.display = 'none';
+  }
+
+  // GMD card
+  if (r.gmd_medio_rebanho) {
+    document.getElementById('ps-gmd-atual').textContent = r.gmd_medio_rebanho.toFixed(3);
+    const meta = pesoAlvo && r.total_animais > 0 ?
+      (data.animais.filter(a=>a.diferenca_kg>0).reduce((s,a)=>s+(a.diferenca_kg||0),0) /
+       (data.animais.filter(a=>a.diferenca_kg>0).length * 90)).toFixed(3) : '—';
+    document.getElementById('ps-gmd-meta').textContent = meta;
+    const pct = Math.min(100, Math.round(r.gmd_medio_rebanho / (parseFloat(meta)||1) * 100));
+    document.getElementById('ps-gmd-bar').style.width = pct + '%';
+    document.getElementById('ps-gmd-bar').style.background = pct >= 100 ? '#2E7D32' : pct >= 70 ? '#F9A825' : '#dc2626';
+  }
+
+  document.getElementById('ps-cards').style.display = '';
+  document.getElementById('ps-tabela-wrap').style.display = '';
+  document.getElementById('btn-exportar-prev').style.display = '';
+
+  renderPSTabela();
+
+  // Gráfico distribuição mensal
+  const mapa = {};
+  data.animais.forEach(a => {
+    if (!a.data_prevista) return;
+    const chave = a.data_prevista.slice(0,7);
+    mapa[chave] = (mapa[chave]||0)+1;
+  });
+  const keys = Object.keys(mapa).sort().slice(0, 12);
+  const vals = keys.map(k=>mapa[k]);
+  const cores = keys.map(k => {
+    const dias = Math.round((new Date(k+'-01')-new Date())/86400000);
+    return dias <= 90 ? '#2E7D32' : dias <= 180 ? '#F9A825' : '#9ca3af';
+  });
+  _destroyChart('chartPrevisao');
+  charts['chartPrevisao'] = new Chart(document.getElementById('chartPrevisao'), {
+    type: 'bar',
+    data: { labels: keys, datasets: [{ data: vals, backgroundColor: cores, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+  document.getElementById('ps-chart-titulo').textContent = `Distribuição de saídas previstas — peso alvo: ${pesoAlvo} kg`;
+  document.getElementById('ps-chart-wrap').style.display = '';
+}
+
+function limparPrevisao() {
+  ['ps-peso-alvo','ps-preco-arroba','ps-pasto','ps-lote'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ps-dias-gmd').value = '90';
+  document.getElementById('ps-tipo').value = '';
+  document.getElementById('ps-status').value = 'ATIVO';
+  ['ps-cards','ps-tabela-wrap','ps-chart-wrap'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('btn-exportar-prev').style.display = 'none';
+  psData = null;
+}
+
+function exportarPrevisaoCSV() {
+  if (!psData) return;
+  const pesoAlvo = document.getElementById('ps-peso-alvo').value;
+  const hoje = new Date().toISOString().slice(0,10);
+  const nome = `previsao_saida_${hoje}_pesoalvo_${pesoAlvo}kg.csv`;
+  const cols = ['Brinco','Nome','Tipo','Raça','Pasto','Lote','Peso Atual (kg)','Peso Alvo (kg)',
+    'Falta (kg)','GMD Real (kg/dia)','Qtd Pesagens','Data Prevista','Data Otimista','Data Pessimista',
+    'Arrobas Previstas','Receita Estimada (R$)','Lucro Estimado (R$)','Situação'];
+  const rows = psData.animais.map(r => [
+    r.brinco, r.nome||'', r.tipo||'', r.raca||'', r.pasto||'', r.lote||'',
+    r.peso_atual, r.peso_alvo, r.diferenca_kg, r.gmd_real!=null?r.gmd_real:'',
+    r.qtd_pesagens, dataFmt(r.data_prevista), dataFmt(r.data_otimista), dataFmt(r.data_pessimista),
+    r.arrobas_previstas, r.receita_estimada!=null?r.receita_estimada:'', r.lucro_estimado!=null?r.lucro_estimado:'', r.situacao,
+  ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+  const csv = '\uFEFF' + [cols.join(','), ...rows].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = nome;
+  a.click();
+}
+
+function abrirVenda(brinco) {
+  window.location.href = '/financeiro-page?tab=vendas&brinco=' + encodeURIComponent(brinco);
+}
+
+function initPS() {
+  const sel = document.getElementById('ps-tipo');
+  sel.innerHTML = '<option value="">Todos</option>' + TIPOS_ANIMAL_LIST.map(t=>`<option>${t}</option>`).join('');
+}
+
+// ── Troca de aba ──────────────────────────────────────────────────────
+const loaders = [carregarVendas, carregarCompras, carregarPeso, carregarDespesas, carregarMortes, carregarPasto, ()=>initPS()];
+let abaRelAtual = 0;
+
+function mudarRel(idx) {
+  for (let i = 0; i <= 6; i++) {
+    const el = document.getElementById(`rel${i}`);
+    if (el) el.style.display = i === idx ? 'block' : 'none';
+  }
+  abaRelAtual = idx;
+  if (window.Alpine) Alpine.store('relAba', idx);
+  loaders[idx]();
+}
+
+async function init() {
+  ['anoVendas','anoCompras','anoPeso','anoDespesas','anoMortes'].forEach(_populaAno);
+  await carregarVendas();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

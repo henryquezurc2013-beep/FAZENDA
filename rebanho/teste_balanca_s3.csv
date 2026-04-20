@@ -1,0 +1,6 @@
+Animal ID,Weight,Date,Time,Session
+BOI-001,468,17/04/2026,08:30,Sessao_Abril
+VAC-002,385,17/04/2026,08:32,Sessao_Abril
+BEZ-003,125,17/04/2026,08:35,Sessao_Abril
+INEXISTENTE-999,300,17/04/2026,08:36,Sessao_Abril
+BOI-001,abc,17/04/2026,08:37,Sessao_Abril

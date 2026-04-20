@@ -1,0 +1,638 @@
+{% extends "base.html" %}
+{% block title %}Cadastro de Animais — Fazenda Ipanema{% endblock %}
+{% block page_title %}Cadastro de Animais{% endblock %}
+
+{% block content %}
+
+<!-- ── Barra de filtros ──────────────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;padding:16px 20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;color:#555;font-weight:600;">BRINCO</label>
+      <input id="fBrinco" type="text" placeholder="Ex: BOI-001"
+        style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:130px;" />
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;color:#555;font-weight:600;">PASTO</label>
+      <select id="fPasto" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:120px;">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;color:#555;font-weight:600;">TIPO</label>
+      <select id="fTipo" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:120px;">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;color:#555;font-weight:600;">STATUS</label>
+      <select id="fStatus" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:120px;">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;color:#555;font-weight:600;">SEXO</label>
+      <select id="fSexo" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:110px;">
+        <option value="">Todos</option>
+        <option>MACHO</option><option>FÊMEA</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;color:#555;font-weight:600;">RAÇA</label>
+      <select id="fRaca" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:130px;">
+        <option value="">Todas</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label style="font-size:11px;color:#555;font-weight:600;">LOTE</label>
+      <input id="fLote" type="text" placeholder="Lote..."
+        style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:130px;" />
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:2px;">
+      <input type="checkbox" id="fSemLote" onchange="filtrar()"> Sem lote
+    </label>
+    <button onclick="filtrar()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">🔍 Filtrar</button>
+    <button onclick="limparFiltros()" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;">✖ Limpar</button>
+    <label x-data="{ mostrarCusto: false }" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:2px;">
+      <input type="checkbox" id="toggleCustos" x-model="mostrarCusto" @change="toggleColunasCusto()"> Exibir custos
+    </label>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button onclick="exportarCSV()" style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;">📥 Exportar CSV</button>
+      <button onclick="abrirModal()" style="background:#2E7D32;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">➕ Novo Animal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tabela ──────────────────────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">
+  <div id="tabelaWrap" style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#F1F8E9;color:#33691e;">
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Brinco</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Nome</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Tipo</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Raça</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Pasto</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Lote</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Status</th>
+          <th style="padding:10px 12px;text-align:right;border-bottom:2px solid #C8E6C9;">Peso (kg)</th>
+          <th class="col-custo" style="display:none;padding:10px 12px;text-align:right;border-bottom:2px solid #C8E6C9;">Valor Compra</th>
+          <th class="col-custo" style="display:none;padding:10px 12px;text-align:right;border-bottom:2px solid #C8E6C9;">Custo/kg</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Idade</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyAnimais"></tbody>
+    </table>
+  </div>
+  <!-- Paginação -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid #e5e7eb;">
+    <button id="btnAnterior" onclick="mudarPagina(-1)" style="background:#e5e7eb;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px;">Anterior</button>
+    <span id="infoPagina" style="font-size:13px;color:#6b7280;"></span>
+    <button id="btnProximo" onclick="mudarPagina(1)" style="background:#e5e7eb;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px;">Próximo</button>
+  </div>
+</div>
+
+<!-- ── Modal formulário ───────────────────────────────────────────── -->
+<div id="modalAnimal"
+     x-data="{ aberto: false }" x-cloak
+     x-show="aberto"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 scale-95"
+     x-transition:enter-end="opacity-100 scale-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @click.self="aberto=false; document.getElementById('fldBrinco').disabled=false;"
+     style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:780px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="padding:18px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1;">
+      <h2 id="modalTitulo" style="font-size:16px;font-weight:600;color:#1B5E20;"></h2>
+      <button onclick="fecharModalAnimal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form id="formAnimal" onsubmit="salvarAnimal(event)" style="padding:20px 24px;"
+          x-data="{ statusAnimal: '', origemAnimal: '' }">
+      <input type="hidden" id="editBrinco" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div><label class="lbl">Brinco *</label><input id="fldBrinco" class="inp" required /></div>
+        <div><label class="lbl">Nome</label><input id="fldNome" class="inp" /></div>
+        <div><label class="lbl">Sexo *</label><select id="fldSexo" class="inp sel" required><option value="">Selecione</option><option>MACHO</option><option>FÊMEA</option></select></div>
+        <div><label class="lbl">Origem *</label><select id="fldOrigem" class="inp sel" required x-model="origemAnimal" onchange="atualizarAvisoOrigemCompra()"><option value="">Selecione</option></select></div>
+        <div><label class="lbl">Data Compra</label><input id="fldDataCompra" type="date" class="inp" /></div>
+        <div><label class="lbl">Data Nascimento *</label><input id="fldDataNasc" type="date" class="inp" required /></div>
+        <div><label class="lbl">Raça *</label><select id="fldRaca" class="inp sel" required><option value="">Selecione</option></select></div>
+        <div><label class="lbl">Tipo *</label><select id="fldTipo" class="inp sel" required><option value="">Selecione</option></select></div>
+        <div><label class="lbl">Status *</label><select id="fldStatus" class="inp sel" required x-model="statusAnimal" onchange="toggleMorte(this.value)"><option value="">Selecione</option></select></div>
+        <div><label class="lbl">Pasto</label><select id="fldPasto" class="inp sel"><option value="">Nenhum</option></select></div>
+        <div><label class="lbl">Lote</label><input id="fldLote" class="inp" /></div>
+        <div><label class="lbl">Quantidade</label><input id="fldQtde" type="number" min="1" class="inp" value="1" /></div>
+        <div><label class="lbl">Pai (brinco)</label><input id="fldPai" class="inp" /></div>
+        <div><label class="lbl">Mãe (brinco)</label><input id="fldMae" class="inp" /></div>
+        <div><label class="lbl">Data Entrada</label><input id="fldEntrada" type="date" class="inp" /></div>
+        <div><label class="lbl">Data Desmama</label><input id="fldDesmama" type="date" class="inp" /></div>
+        <div><label class="lbl">Peso Atual (kg)</label><input id="fldPeso" type="number" step="0.1" class="inp" oninput="calcularCustos()" /></div>
+        <div x-show="origemAnimal !== 'NASCIMENTO'"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+          <label class="lbl">Valor de Compra (R$)</label>
+          <input id="fldValorCompra" type="number" step="0.01" class="inp" placeholder="Ex: 2500.00" oninput="calcularCustos()" />
+          <small id="avisoOrigemCompra" style="display:block;margin-top:4px;color:#6b7280;font-size:11px;"></small>
+        </div>
+        <div><label class="lbl">Custo / kg <span style="font-size:10px;color:#9ca3af;">(calculado)</span></label>
+          <input id="fldCustoKg" class="inp" disabled readonly style="background:#f9fafb;color:#374151;" placeholder="—">
+        </div>
+        <div><label class="lbl">Custo / arroba <span style="font-size:10px;color:#9ca3af;">(calculado)</span></label>
+          <input id="fldCustoArr" class="inp" disabled readonly style="background:#f9fafb;color:#374151;" placeholder="—">
+        </div>
+        <div id="investimentoBox" style="grid-column:1/-1;display:none;background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;">
+          <div style="font-size:11px;font-weight:700;color:#1B5E20;margin-bottom:8px;letter-spacing:.04em;">INVESTIMENTO</div>
+          <div id="investimentoConteudo" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;font-size:13px;color:#374151;"></div>
+        </div>
+        <div style="grid-column:1/-1;"><label class="lbl">Observações</label><textarea id="fldObs" class="inp" rows="2" style="resize:vertical;"></textarea></div>
+      </div>
+
+      <!-- Campos de morte — Alpine controla visibilidade -->
+      <div id="camposMorte" x-show="statusAnimal === 'MORTO'"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 -translate-y-1"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           x-transition:leave="transition ease-in duration-150"
+           x-transition:leave-end="opacity-0"
+           style="display:grid;margin-top:14px;grid-template-columns:1fr 1fr;gap:14px;">
+        <div><label class="lbl">Data da Morte *</label><input id="fldDataMorte" type="date" class="inp" /></div>
+        <div><label class="lbl">Motivo da Morte *</label><select id="fldMotivo" class="inp sel"><option value="">Selecione</option></select></div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" onclick="fecharModalAnimal()" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:8px 20px;cursor:pointer;font-size:14px;">Cancelar</button>
+        <button type="submit" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:8px 20px;cursor:pointer;font-size:14px;">💾 Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .lbl { display:block; font-size:10.5px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+  .inp { width:100%; border:0.5px solid #e8e8e8; border-radius:7px; padding:7px 10px; font-size:12.5px; box-sizing:border-box; font-family:inherit; }
+  .inp:focus { outline:none; border-color:#4caf50; box-shadow:0 0 0 3px rgba(76,175,80,.1); }
+  .inp.erro { border-color:#c62828; }
+  .sel { background:#fff; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+  .badge-ativo   { background:#dcfce7; color:#166534; }
+  .badge-morto   { background:#fee2e2; color:#991b1b; }
+  .badge-vendido { background:#dbeafe; color:#1e40af; }
+  .badge-abatido { background:#f3f4f6; color:#374151; }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const POR_PAGINA = 50;
+let todosAnimais = [], paginaAtual = 1, defs = {}, financeiroRebanho = {};
+
+// ── Inicialização ─────────────────────────────────────────────────────
+async function init() {
+  defs = await fetch('/definicoes').then(r => r.json());
+  financeiroRebanho = await fetch('/relatorios/kpis')
+    .then(r => r.json())
+    .then(k => k.financeiro_rebanho || {})
+    .catch(() => ({}));
+
+  _popular('fPasto',   defs.pastos,          true);
+  _popular('fTipo',    defs.tipos,            true);
+  _popular('fStatus',  defs.status_animal,    true);
+  _popular('fRaca',    defs.racas,            true);
+  _popular('fldOrigem',defs.origens,          false);
+  _popular('fldRaca',  defs.racas,            false);
+  _popular('fldTipo',  defs.tipos,            false);
+  _popular('fldStatus',defs.status_animal,    false);
+  _popular('fldPasto', defs.pastos,           false);
+  _popular('fldMotivo',defs.causas_morte,     false);
+
+  if (new URLSearchParams(location.search).get('custos') === '1') {
+    document.getElementById('toggleCustos').checked = true;
+  }
+  await filtrar();
+}
+
+function _popular(id, lista, comTodos) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const base = comTodos ? '<option value="">Todos</option>' : '<option value="">Selecione</option>';
+  sel.innerHTML = base + lista.map(v => `<option>${v}</option>`).join('');
+}
+
+// ── Filtros / tabela ─────────────────────────────────────────────────
+async function filtrar() {
+  const params = new URLSearchParams();
+  const b = document.getElementById('fBrinco').value.trim();
+  const p = document.getElementById('fPasto').value;
+  const t = document.getElementById('fTipo').value;
+  const s = document.getElementById('fStatus').value;
+  const x = document.getElementById('fSexo').value;
+  const r = document.getElementById('fRaca').value;
+  const l = document.getElementById('fLote') ? document.getElementById('fLote').value.trim() : '';
+  const semLote = document.getElementById('fSemLote') ? document.getElementById('fSemLote').checked : false;
+  if (b) params.set('brinco', b);
+  if (p) params.set('pasto', p);
+  if (t) params.set('tipo', t);
+  if (s) params.set('status', s);
+  if (x) params.set('sexo', x);
+  if (r) params.set('raca', r);
+  if (l) params.set('lote', l);
+  if (semLote) params.set('sem_lote', '1');
+
+  const lista = await fetch('/animais?' + params).then(r => r.json());
+  todosAnimais = lista;
+  paginaAtual = 1;
+  renderTabela();
+}
+
+function limparFiltros() {
+  ['fBrinco','fPasto','fTipo','fStatus','fSexo','fRaca','fLote'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.tagName === 'INPUT' ? (el.value = '') : (el.value = '');
+  });
+  const sl = document.getElementById('fSemLote');
+  if (sl) sl.checked = false;
+  filtrar();
+}
+
+function renderTabela() {
+  const inicio = (paginaAtual - 1) * POR_PAGINA;
+  const pagina = todosAnimais.slice(inicio, inicio + POR_PAGINA);
+  const tbody  = document.getElementById('tbodyAnimais');
+  const totalPags = Math.ceil(todosAnimais.length / POR_PAGINA) || 1;
+
+  document.getElementById('infoPagina').textContent =
+    `Página ${paginaAtual} de ${totalPags} (${todosAnimais.length} registros)`;
+  document.getElementById('btnAnterior').disabled = paginaAtual <= 1;
+  document.getElementById('btnProximo').disabled  = paginaAtual >= totalPags;
+
+  if (pagina.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:#9ca3af;">Nenhum animal encontrado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = pagina.map((a, i) => `
+    <tr style="background:${i%2===0?'#fff':'#fafafa'};border-bottom:1px solid #f3f4f6;">
+      <td style="padding:8px 12px;font-weight:600;color:#1B5E20;">${a.brinco}</td>
+      <td style="padding:8px 12px;">${a.nome || '—'}</td>
+      <td style="padding:8px 12px;">${a.tipo || '—'}</td>
+      <td style="padding:8px 12px;">${a.raca || '—'}</td>
+      <td style="padding:8px 12px;">${a.pasto || '—'}</td>
+      <td style="padding:8px 12px;">${a.lote || '<span style="color:#9ca3af;">—</span>'}</td>
+      <td style="padding:8px 12px;text-align:center;">${badgeStatus(a.status)}</td>
+      <td style="padding:8px 12px;text-align:right;">${a.peso_atual != null ? a.peso_atual : '—'}</td>
+      <td class="col-custo" style="display:none;padding:8px 12px;text-align:right;">${a.valor_compra != null ? fmtMoeda(a.valor_compra) : '—'}</td>
+      <td class="col-custo" style="display:none;padding:8px 12px;text-align:right;">${custoKgBadge(a.custo_kg)}</td>
+      <td style="padding:8px 12px;text-align:center;">${a.idade_anos}a ${a.idade_meses}m</td>
+      <td style="padding:8px 12px;text-align:center;white-space:nowrap;">
+        <button onclick='editarAnimal(${JSON.stringify(a)})' title="Editar"
+          style="background:#e5e7eb;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">✏️</button>
+        <button onclick="confirmarExclusao('/animais/${a.brinco}', filtrar)" title="Excluir"
+          style="background:#fee2e2;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">🗑️</button>
+        <button onclick="location.href='/pesagem-page?brinco=${a.brinco}'" title="Pesagens"
+          style="background:#e0f2fe;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">⚖️</button>
+        <button onclick="location.href='/sanidade-page?brinco=${a.brinco}'" title="Sanidade"
+          style="background:#fce7f3;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">💉</button>
+        <button onclick="abrirModalPrevisao('${a.brinco}',${a.peso_atual||0})" title="Previsão de saída"
+          style="background:#fef9c3;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">📅</button>
+      </td>
+    </tr>`).join('');
+  toggleColunasCusto();
+}
+
+function badgeStatus(s) {
+  const mapa = { ATIVO:'badge-ativo', MORTO:'badge-morto', VENDIDO:'badge-vendido', ABATIDO:'badge-abatido' };
+  return `<span class="badge ${mapa[s]||'badge-abatido'}">${s||'—'}</span>`;
+}
+
+function mudarPagina(delta) {
+  const total = Math.ceil(todosAnimais.length / POR_PAGINA) || 1;
+  paginaAtual = Math.min(Math.max(1, paginaAtual + delta), total);
+  renderTabela();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────
+function abrirModal(animal) {
+  _alpineOpen('modalAnimal', true);
+  document.getElementById('modalTitulo').textContent = animal ? 'Editar Animal' : 'Novo Animal';
+  document.getElementById('editBrinco').value = '';
+  document.getElementById('formAnimal').reset();
+  // Reset Alpine conditional state
+  const fd = _alpineData('formAnimal');
+  if (fd) { fd.statusAnimal = ''; fd.origemAnimal = ''; }
+  toggleMorte('');
+
+  if (animal) {
+    document.getElementById('editBrinco').value = animal.brinco;
+    document.getElementById('fldBrinco').value = animal.brinco;
+    document.getElementById('fldBrinco').disabled = true;
+    document.getElementById('fldNome').value      = animal.nome || '';
+    document.getElementById('fldSexo').value      = animal.sexo || '';
+    document.getElementById('fldOrigem').value    = animal.origem || '';
+    document.getElementById('fldDataCompra').value= animal.data_compra || '';
+    document.getElementById('fldDataNasc').value  = animal.data_nascimento || '';
+    document.getElementById('fldRaca').value      = animal.raca || '';
+    document.getElementById('fldTipo').value      = animal.tipo || '';
+    document.getElementById('fldStatus').value    = animal.status || '';
+    document.getElementById('fldPasto').value     = animal.pasto || '';
+    document.getElementById('fldLote').value      = animal.lote || '';
+    document.getElementById('fldQtde').value      = animal.qtde_animais || 1;
+    document.getElementById('fldPai').value       = animal.nome_pai || '';
+    document.getElementById('fldMae').value       = animal.nome_mae || '';
+    document.getElementById('fldEntrada').value   = animal.data_entrada || '';
+    document.getElementById('fldValorCompra').value = animal.valor_compra != null ? animal.valor_compra : '';
+    document.getElementById('fldDesmama').value   = animal.data_desmama || '';
+    document.getElementById('fldPeso').value      = animal.peso_atual || '';
+    calcularCustos();
+    atualizarAvisoOrigemCompra();
+    document.getElementById('fldObs').value       = animal.obs || '';
+    // Sync Alpine conditional state with loaded animal data
+    const fd = _alpineData('formAnimal');
+    if (fd) { fd.statusAnimal = animal.status || ''; fd.origemAnimal = animal.origem || ''; }
+    toggleMorte(animal.status);
+    if (animal.status === 'MORTO') {
+      document.getElementById('fldDataMorte').value = animal.data_morte || '';
+      document.getElementById('fldMotivo').value    = animal.motivo_morte || '';
+    }
+  } else {
+    document.getElementById('fldBrinco').disabled = false;
+    calcularCustos();
+    atualizarAvisoOrigemCompra();
+  }
+}
+
+function editarAnimal(a) { abrirModal(a); }
+
+function fecharModalAnimal() {
+  _alpineOpen('modalAnimal', false);
+  document.getElementById('fldBrinco').disabled = false;
+}
+
+function toggleMorte(status) {
+  // Alpine x-show handles visibility; this function only manages required attrs
+  document.getElementById('fldDataMorte').required = status === 'MORTO';
+  document.getElementById('fldMotivo').required = status === 'MORTO';
+  // Also sync Alpine state when called programmatically
+  const fd = _alpineData('formAnimal');
+  if (fd) fd.statusAnimal = status || '';
+}
+
+async function salvarAnimal(ev) {
+  ev.preventDefault();
+  const brincoEdit = document.getElementById('editBrinco').value;
+  const body = {
+    brinco:           document.getElementById('fldBrinco').value.trim().toUpperCase(),
+    nome:             document.getElementById('fldNome').value.trim() || null,
+    sexo:             document.getElementById('fldSexo').value || null,
+    origem:           document.getElementById('fldOrigem').value || null,
+    data_compra:      document.getElementById('fldDataCompra').value || null,
+    data_nascimento:  document.getElementById('fldDataNasc').value,
+    raca:             document.getElementById('fldRaca').value || null,
+    tipo:             document.getElementById('fldTipo').value || null,
+    status:           document.getElementById('fldStatus').value || null,
+    pasto:            document.getElementById('fldPasto').value || null,
+    lote:             document.getElementById('fldLote').value.trim() || null,
+    qtde_animais:     parseInt(document.getElementById('fldQtde').value) || 1,
+    nome_pai:         document.getElementById('fldPai').value.trim() || null,
+    nome_mae:         document.getElementById('fldMae').value.trim() || null,
+    data_entrada:     document.getElementById('fldEntrada').value || null,
+    data_desmama:     document.getElementById('fldDesmama').value || null,
+    peso_atual:       parseFloat(document.getElementById('fldPeso').value) || null,
+    valor_compra:     parseFloat(document.getElementById('fldValorCompra').value) || null,
+    obs:              document.getElementById('fldObs').value.trim() || null,
+    data_morte:       document.getElementById('fldDataMorte').value || null,
+    motivo_morte:     document.getElementById('fldMotivo').value || null,
+  };
+
+  const url    = brincoEdit ? `/animais/${brincoEdit}` : '/animais';
+  const method = brincoEdit ? 'PUT' : 'POST';
+
+  try {
+    const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) { showToast(data.detail || 'Erro ao salvar.', 'erro'); return; }
+    fecharModalAnimal();
+    showToast(brincoEdit ? 'Animal atualizado!' : 'Animal cadastrado!', 'sucesso');
+    await filtrar();
+  } catch { showToast('Erro de conexão.', 'erro'); }
+}
+
+// ── Exportar CSV ──────────────────────────────────────────────────────
+function exportarCSV() {
+  const params = new URLSearchParams();
+  const b = document.getElementById('fBrinco').value.trim();
+  const p = document.getElementById('fPasto').value;
+  const t = document.getElementById('fTipo').value;
+  const s = document.getElementById('fStatus').value;
+  const x = document.getElementById('fSexo').value;
+  const r = document.getElementById('fRaca').value;
+  const l = document.getElementById('fLote') ? document.getElementById('fLote').value.trim() : '';
+  const semLote = document.getElementById('fSemLote') ? document.getElementById('fSemLote').checked : false;
+  if (b) params.set('brinco', b);
+  if (p) params.set('pasto', p);
+  if (t) params.set('tipo', t);
+  if (s) params.set('status', s);
+  if (x) params.set('sexo', x);
+  if (r) params.set('raca', r);
+  if (l) params.set('lote', l);
+  if (semLote) params.set('sem_lote', '1');
+  window.location.href = '/exportar/animais?' + params;
+}
+
+function custoKgBadge(v) {
+  if (v == null) return '—';
+  const cor = v <= 6 ? '#15803d' : v <= 9 ? '#374151' : '#b91c1c';
+  return `<span style="color:${cor};font-weight:600;">R$ ${v.toFixed(2)}/kg</span>`;
+}
+
+function toggleColunasCusto() {
+  const show = document.getElementById('toggleCustos').checked;
+  document.querySelectorAll('.col-custo').forEach(el => {
+    el.style.display = show ? '' : 'none';
+  });
+}
+
+function calcularCustos() {
+  const vc  = parseFloat(document.getElementById('fldValorCompra').value) || 0;
+  const peso = parseFloat(document.getElementById('fldPeso').value) || 0;
+  const box = document.getElementById('investimentoBox');
+  const conteudo = document.getElementById('investimentoConteudo');
+  if (vc > 0 && peso > 0) {
+    const custoKg = vc / peso;
+    const custoArr = vc / (peso / 15);
+    document.getElementById('fldCustoKg').value  = fmtMoeda(custoKg) + ' / kg';
+    document.getElementById('fldCustoArr').value = fmtMoeda(custoArr) + ' / @';
+    const custoMedioKg = financeiroRebanho.custo_medio_kg || custoKg;
+    const valorEstimado = peso * custoMedioKg;
+    const dif = valorEstimado - vc;
+    const corDif = dif >= 0 ? '#15803d' : '#b91c1c';
+    const seta = dif >= 0 ? '↑' : '↓';
+    box.style.display = 'block';
+    conteudo.innerHTML = `
+      <span>Valor de compra: <b>${fmtMoeda(vc)}</b></span>
+      <span>Peso atual: <b>${peso.toLocaleString('pt-BR')} kg</b></span>
+      <span>Custo por kg: <b>${fmtMoeda(custoKg)} / kg</b></span>
+      <span>Custo por arroba: <b>${fmtMoeda(custoArr)} / @</b></span>
+      <span style="grid-column:1/-1;color:${corDif};font-weight:700;">Valorização estimada: ${seta} ${fmtMoeda(Math.abs(dif))}</span>`;
+  } else {
+    document.getElementById('fldCustoKg').value  = '';
+    document.getElementById('fldCustoArr').value = '';
+    box.style.display = 'none';
+    conteudo.innerHTML = '';
+  }
+}
+
+function atualizarAvisoOrigemCompra() {
+  const origem = document.getElementById('fldOrigem').value;
+  const aviso = document.getElementById('avisoOrigemCompra');
+  if (!aviso) return;
+  aviso.textContent = origem === 'NASCIMENTO'
+    ? 'Animal nascido na fazenda — custo de criação opcional.'
+    : 'Informe o valor pago para calcular custo por kg e por arroba.';
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+
+<!-- Modal Previsão Individual -->
+<div id="modalPrevisao"
+     x-data="{ aberto: false }" x-cloak
+     x-show="aberto"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 scale-95"
+     x-transition:enter-end="opacity-100 scale-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-end="opacity-0"
+     @click.self="aberto=false"
+     style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:90%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 id="prev-titulo" style="font-size:16px;font-weight:700;color:#1B5E20;"></h3>
+      <button @click="$el.closest('#modalPrevisao') ? Alpine.$data($el.closest('#modalPrevisao')).aberto=false : null; document.getElementById('modalPrevisao').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div id="prev-gmd-info" style="background:#f0fdf4;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;"></div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;">
+      <div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#555;">Peso Alvo (kg)</label>
+        <input id="prev-peso-alvo" type="number" placeholder="480" oninput="recalcPrevisao()"
+          style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px 10px;font-size:14px;box-sizing:border-box;">
+      </div>
+      <div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#555;">Preço Arroba R$</label>
+        <input id="prev-preco" type="number" step="0.01" placeholder="320.00" oninput="recalcPrevisao()"
+          style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px 10px;font-size:14px;box-sizing:border-box;">
+      </div>
+    </div>
+    <div id="prev-resultado" style="font-size:13px;color:#374151;margin-bottom:16px;display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:#f9fafb;border-radius:6px;padding:10px;"><div style="font-size:11px;color:#555;font-weight:600;">Dias restantes</div><div id="prev-dias" style="font-size:18px;font-weight:700;color:#1B5E20;"></div></div>
+        <div style="background:#f9fafb;border-radius:6px;padding:10px;"><div style="font-size:11px;color:#555;font-weight:600;">Data prevista</div><div id="prev-data" style="font-size:18px;font-weight:700;color:#1B5E20;"></div></div>
+        <div style="background:#f9fafb;border-radius:6px;padding:10px;"><div style="font-size:11px;color:#555;font-weight:600;">Range (otim—pess)</div><div id="prev-range" style="font-size:13px;font-weight:600;"></div></div>
+        <div style="background:#f9fafb;border-radius:6px;padding:10px;"><div style="font-size:11px;color:#555;font-weight:600;">Arrobas previstas</div><div id="prev-arrobas" style="font-size:18px;font-weight:700;color:#374151;"></div></div>
+        <div id="prev-receita-box" style="display:none;background:#eff6ff;border-radius:6px;padding:10px;"><div style="font-size:11px;color:#1e40af;font-weight:600;">Receita estimada</div><div id="prev-receita" style="font-size:16px;font-weight:700;color:#1e40af;"></div></div>
+      </div>
+    </div>
+    <div style="position:relative;height:180px;"><canvas id="chartPrevisaoAnimal"></canvas></div>
+  </div>
+</div>
+
+<script>
+let _prevBrinco = null, _prevPesoAtual = 0, _prevGmd = null, _prevChartAnimal = null;
+
+async function abrirModalPrevisao(brinco, pesoAtual) {
+  _prevBrinco = brinco;
+  _prevPesoAtual = pesoAtual || 0;
+  document.getElementById('prev-titulo').textContent = `📅 Previsão — ${brinco}`;
+  document.getElementById('prev-peso-alvo').value = 480;
+  document.getElementById('prev-preco').value = '';
+  document.getElementById('prev-resultado').style.display = 'none';
+  _alpineOpen('modalPrevisao', true);
+
+  // Buscar GMD via endpoint reutilizando previsao-saida com peso muito alto para não ser PRONTO
+  const data = await fetch(`/relatorios/previsao-saida?peso_alvo=99999&dias_gmd=90&status=ATIVO`).then(r=>r.json());
+  const animal = data.animais.find(a=>a.brinco===brinco);
+  _prevGmd = animal ? animal.gmd_real : null;
+  const qtdPes = animal ? animal.qtd_pesagens : 0;
+
+  const gmdInfo = document.getElementById('prev-gmd-info');
+  if (_prevGmd) {
+    gmdInfo.innerHTML = `GMD últimos 90 dias: <b>${_prevGmd.toFixed(3)} kg/dia</b> · Pesagens: ${qtdPes}`;
+  } else {
+    gmdInfo.innerHTML = '<span style="color:#b91c1c;">Sem pesagens suficientes para calcular GMD. <a href="/pesagem-page?brinco=' + brinco + '">Registrar pesagem</a></span>';
+  }
+  recalcPrevisao();
+}
+
+function recalcPrevisao() {
+  const pesoAlvo = parseFloat(document.getElementById('prev-peso-alvo').value);
+  const preco    = parseFloat(document.getElementById('prev-preco').value) || null;
+  if (!pesoAlvo || !_prevGmd) { document.getElementById('prev-resultado').style.display = 'none'; return; }
+  const hoje = new Date();
+
+  let diasR, dataP, dataO, dataPess;
+  if (_prevPesoAtual >= pesoAlvo) {
+    diasR = 0; dataP = hoje;
+  } else {
+    const diff = pesoAlvo - _prevPesoAtual;
+    diasR = Math.round(diff / _prevGmd);
+    dataP = new Date(hoje); dataP.setDate(dataP.getDate() + diasR);
+    const diasO = Math.round(diff / (_prevGmd * 1.15));
+    const diasPe = Math.round(diff / (_prevGmd * 0.85));
+    dataO = new Date(hoje); dataO.setDate(dataO.getDate() + diasO);
+    dataPess = new Date(hoje); dataPess.setDate(dataPess.getDate() + diasPe);
+  }
+
+  const fmtD = d => d ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : '—';
+  document.getElementById('prev-dias').textContent = diasR + ' dias';
+  document.getElementById('prev-data').textContent = fmtD(dataP);
+  document.getElementById('prev-range').textContent = dataO && dataPess ? `${fmtD(dataO)} — ${fmtD(dataPess)}` : '—';
+  const arrobas = (pesoAlvo / 15).toFixed(1);
+  document.getElementById('prev-arrobas').textContent = arrobas + ' @';
+
+  if (preco) {
+    const receita = (parseFloat(arrobas) * preco).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+    document.getElementById('prev-receita').textContent = receita;
+    document.getElementById('prev-receita-box').style.display = '';
+  } else {
+    document.getElementById('prev-receita-box').style.display = 'none';
+  }
+
+  document.getElementById('prev-resultado').style.display = '';
+
+  // Gráfico projeção
+  if (_prevChartAnimal) { _prevChartAnimal.destroy(); _prevChartAnimal = null; }
+  const labels = [], pesos = [], projecao = [];
+  // pontos passados (simular, apenas atual)
+  labels.push('Hoje'); pesos.push(_prevPesoAtual); projecao.push(null);
+  if (diasR > 0) {
+    const step = Math.max(1, Math.floor(diasR/5));
+    for (let d = step; d <= diasR; d += step) {
+      const dt = new Date(hoje); dt.setDate(dt.getDate()+d);
+      labels.push(fmtD(dt));
+      pesos.push(null);
+      projecao.push(Math.min(pesoAlvo, parseFloat((_prevPesoAtual + _prevGmd*d).toFixed(1))));
+    }
+    if (labels[labels.length-1] !== fmtD(dataP)) {
+      labels.push(fmtD(dataP)); pesos.push(null); projecao.push(pesoAlvo);
+    }
+  }
+  _prevChartAnimal = new Chart(document.getElementById('chartPrevisaoAnimal'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {label:'Peso real', data:pesos, borderColor:'#1B5E20', pointRadius:5, tension:0},
+        {label:'Projeção', data:projecao, borderColor:'#F9A825', borderDash:[5,5], pointRadius:3, tension:0},
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:11}}}},
+      scales:{y:{beginAtZero:false}} }
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1912 @@
+{% extends "base.html" %}
+{% block title %}Pastagem — Fazenda Ipanema{% endblock %}
+{% block page_title %}🌿 Manejo de Pastagem{% endblock %}
+
+{% block content %}
+<!-- Abas -->
+<div x-data class="past-tabs">
+  <button :class="$store.pastagAba==='semaforos'  ? 'past-tab ativo' : 'past-tab'" onclick="mudarAba('semaforos')">🗺️ Semáforos</button>
+  <button :class="$store.pastagAba==='cadastro'   ? 'past-tab ativo' : 'past-tab'" onclick="mudarAba('cadastro')">🌾 Piquetes</button>
+  <button :class="$store.pastagAba==='medicoes'   ? 'past-tab ativo' : 'past-tab'" onclick="mudarAba('medicoes')">📏 Medições</button>
+  <button :class="$store.pastagAba==='manejo'     ? 'past-tab ativo' : 'past-tab'" onclick="mudarAba('manejo')">🐄 Manejo</button>
+  <button :class="$store.pastagAba==='relatorios' ? 'past-tab ativo' : 'past-tab'" onclick="mudarAba('relatorios')">📊 Relatórios</button>
+  <button :class="$store.pastagAba==='lotes'      ? 'past-tab ativo' : 'past-tab'" onclick="mudarAba('lotes')">🐂 Lotes</button>
+  <button :class="$store.pastagAba==='mapa'       ? 'past-tab ativo' : 'past-tab'" onclick="mudarAba('mapa')">🗺️ Mapa</button>
+</div>
+
+<style>
+  .tab-btn{padding:8px 16px;border:none;background:transparent;cursor:pointer;
+           font-size:12.5px;color:#888;border-bottom:2px solid transparent;margin-bottom:-0.5px;
+           font-family:inherit;transition:all .15s;}
+  .tab-btn:hover{color:#1a1a1a;}
+  .tab-btn.ativo{color:#0a2e0a;border-bottom-color:#2e7d32;font-weight:600;}
+  .tab-panel{display:none;} .tab-panel.ativo{display:block;}
+  .card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+  .sem-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);
+            border-left:4px solid #ccc;position:relative;}
+  .sem-verde   {border-left-color:#2E7D32;}
+  .sem-amarelo {border-left-color:#F9A825;}
+  .sem-vermelho{border-left-color:#C62828;}
+  .sem-sair    {border-left-color:#B71C1C;animation:pulse 1.2s infinite;}
+  .sem-ocupado {border-left-color:#1565C0;}
+  .sem-dados   {border-left-color:#757575;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(183,28,28,.4);}50%{box-shadow:0 0 0 8px rgba(183,28,28,0);}}
+  .circulo{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;
+           justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;}
+  .c-verde   {background:#2E7D32;}
+  .c-amarelo {background:#F9A825;}
+  .c-vermelho{background:#C62828;}
+  .c-sair    {background:#B71C1C;}
+  .c-ocupado {background:#1565C0;}
+  .c-dados   {background:#757575;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;}
+  .kpi-box{background:#fff;border-radius:8px;padding:14px 18px;text-align:center;
+           box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  th{background:#f9fafb;font-size:13px;color:#374151;padding:10px 12px;text-align:left;}
+  td{padding:9px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;}
+  tr:hover td{background:#f9fafb;}
+  .btn-sm{padding:5px 11px;border-radius:7px;border:0.5px solid #e8e8e8;cursor:pointer;font-size:11.5px;font-family:inherit;transition:all .15s;}
+  .btn-verde{background:#0a2e0a;border-color:#0a2e0a;color:#fff;}
+  .btn-verde:hover{background:#1b5e20;}
+  .btn-azul{background:#1565C0;border-color:#1565C0;color:#fff;}
+  .btn-azul:hover{background:#1976d2;}
+  .btn-cinza{background:#fff;color:#444;}
+  .btn-cinza:hover{background:#f4f6f4;}
+  .btn-verm{background:#ffebee;border-color:#fca5a5;color:#c62828;}
+  .btn-verm:hover{background:#fee2e2;}
+  label{font-size:13px;color:#374151;display:block;margin-bottom:4px;}
+  input,select,textarea{width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;
+                        font-size:13px;box-sizing:border-box;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;
+                 display:none;align-items:center;justify-content:center;}
+  .modal-box{background:#fff;border-radius:10px;padding:28px;width:90%;max-width:540px;
+             max-height:90vh;overflow-y:auto;}
+  .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ua-leve    {background:#dbeafe;color:#1d4ed8;}
+  .ua-ideal   {background:#dcfce7;color:#15803d;}
+  .ua-alta    {background:#fef9c3;color:#a16207;}
+  .ua-critica {background:#fee2e2;color:#b91c1c;}
+  .ua-sem     {background:#f3f4f6;color:#6b7280;}
+</style>
+
+<!-- ═══════════════════ ABA 1: SEMÁFOROS ═══════════════════ -->
+<div id="aba-semaforos" class="tab-panel ativo">
+  <!-- Header escuro com KPIs -->
+  <div class="past-header">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.2px;">🌿 Visão de Pastagem</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:3px;">Status em tempo real · atualiza a cada 5 min</div>
+      </div>
+      <button onclick="carregarSemaforos()" style="background:rgba(255,255,255,0.1);border:0.5px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.8);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s;" onmouseover="this.style.background='rgba(255,255,255,0.18)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">↻ Atualizar</button>
+    </div>
+    <div class="past-kpi-bar">
+      <div class="past-kpi"><div class="past-kpi-num" id="kpi-verde"    style="color:#4ade80;">—</div><div class="past-kpi-lbl">Prontos</div></div>
+      <div class="past-kpi"><div class="past-kpi-num" id="kpi-amarelo"  style="color:#fbbf24;">—</div><div class="past-kpi-lbl">Quase prontos</div></div>
+      <div class="past-kpi"><div class="past-kpi-num" id="kpi-vermelho" style="color:#f87171;">—</div><div class="past-kpi-lbl">Não entrar</div></div>
+      <div class="past-kpi"><div class="past-kpi-num" id="kpi-sair"     style="color:#fca5a5;">—</div><div class="past-kpi-lbl">Sair agora</div></div>
+      <div class="past-kpi"><div class="past-kpi-num" id="kpi-chuva"    style="color:#60a5fa;">—</div><div class="past-kpi-lbl">mm/mês</div></div>
+      <div class="past-kpi"><div class="past-kpi-num" id="kpi-lotacao"  style="color:#a78bfa;">—</div><div class="past-kpi-lbl">UA/ha médio</div></div>
+    </div>
+  </div>
+
+  <!-- Alertas -->
+  <div id="bloco-alertas" style="display:none;margin-top:14px;"></div>
+
+  <!-- Grid de cards premium -->
+  <div id="grid-semaforos" class="past-grid"></div>
+
+  <!-- Bottom cards: Ranking · Chuva · Adubação -->
+  <div class="past-bottom" id="past-bottom-sem"></div>
+</div>
+
+<!-- ═══════════════════ ABA 2: CADASTRO ═══════════════════ -->
+<div id="aba-cadastro" class="tab-panel">
+  <!-- Pastos -->
+  <div class="card" style="margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="font-size:15px;font-weight:600;color:#1B5E20;">Pastos</h3>
+      <button class="btn-sm btn-verde" onclick="abrirModalPasto()">+ Novo Pasto</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th>Nome</th><th>Área (ha)</th><th>Capim</th><th>Sistema</th><th>Piquetes</th><th>Status</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="tb-pastos"></tbody>
+    </table>
+  </div>
+
+  <!-- Piquetes -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="font-size:15px;font-weight:600;color:#1B5E20;">Piquetes <span id="titulo-piquetes" style="font-weight:400;color:#6b7280;"></span></h3>
+      <div style="display:flex;gap:8px;">
+        <select id="filtro-pasto-piquetes" onchange="carregarPiquetesCadastro()" style="width:180px;padding:6px;">
+          <option value="">Todos os pastos</option>
+        </select>
+        <button class="btn-sm btn-verde" onclick="abrirModalPiquete()">+ Novo Piquete</button>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th>Nome</th><th>Pasto</th><th>Área (ha)</th><th>Alt. Entrada</th><th>Alt. Saída</th><th>Descanso</th><th>Semáforo</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="tb-piquetes-cad"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════ ABA 3: MEDIÇÕES ═══════════════════ -->
+<div id="aba-medicoes" class="tab-panel">
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+      <div><label>Piquete</label>
+        <select id="filtro-piquete-med" style="width:180px;" onchange="carregarMedicoes()">
+          <option value="">Todos</option></select></div>
+      <div><label>Data início</label><input type="date" id="filtro-med-ini" style="width:140px;"></div>
+      <div><label>Data fim</label><input type="date" id="filtro-med-fim" style="width:140px;"></div>
+      <button class="btn-sm btn-azul" onclick="carregarMedicoes()">Filtrar</button>
+      <button class="btn-sm btn-verde" onclick="abrirModalMedicao()" style="margin-left:auto;">📏 Nova Medição</button>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th>Data</th><th>Piquete</th><th>Altura (cm)</th><th>Cobertura %</th><th>Falhas %</th><th>Condição</th><th>Responsável</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="tb-medicoes"></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:12px;">Evolução de Altura — <span id="titulo-grafico-med">selecione um piquete acima</span></h3>
+    <canvas id="grafico-altura" height="100"></canvas>
+  </div>
+</div>
+
+<!-- ═══════════════════ ABA 4: MANEJO ═══════════════════ -->
+<div id="aba-manejo" class="tab-panel">
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+      <div><label>Piquete</label>
+        <select id="filtro-piquete-man" style="width:180px;" onchange="carregarManejo()">
+          <option value="">Todos</option></select></div>
+      <div><label>Lote</label><input type="text" id="filtro-lote-man" placeholder="Lote A..." style="width:140px;"></div>
+      <div><label>Data início</label><input type="date" id="filtro-man-ini" style="width:140px;"></div>
+      <div><label>Data fim</label><input type="date" id="filtro-man-fim" style="width:140px;"></div>
+      <button class="btn-sm btn-azul" onclick="carregarManejo()">Filtrar</button>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn-sm btn-verde" onclick="abrirModalEntrada()">🐄 Registrar Entrada</button>
+        <button class="btn-sm" style="background:#1565C0;color:#fff;" onclick="abrirModalSaida()">🚪 Registrar Saída</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th>Piquete</th><th>Lote</th><th>Entrada</th><th>Saída</th><th>Dias</th><th>Animais</th><th>UA</th><th>Alt. Ent.</th><th>Alt. Saí.</th><th>Condição</th><th>Ganho/ha</th>
+      </tr></thead>
+      <tbody id="tb-manejo"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════ ABA 5: RELATÓRIOS ═══════════════════ -->
+<div id="aba-relatorios" class="tab-panel">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <!-- Ranking -->
+    <div class="card" style="grid-column:1/-1;">
+      <h3 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:12px;">🏆 Ranking de Piquetes por Ganho/ha</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          <th>#</th><th>Piquete</th><th>Ciclos</th><th>Ganho médio/ha (kg)</th><th>Lotação média (UA/ha)</th><th>Custo adub./ha (R$)</th>
+        </tr></thead>
+        <tbody id="tb-ranking"></tbody>
+      </table>
+    </div>
+
+    <!-- Gráfico chuva -->
+    <div class="card">
+      <h3 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:12px;">🌧️ Chuva Mensal (mm)</h3>
+      <canvas id="grafico-chuva" height="180"></canvas>
+    </div>
+
+    <!-- Adubação -->
+    <div class="card">
+      <h3 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:12px;">🌱 Histórico de Adubação</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr><th>Piquete</th><th>Data</th><th>Produto</th><th>Dose (kg/ha)</th><th>Custo (R$)</th></tr></thead>
+        <tbody id="tb-adubacao-rel"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Comparativo -->
+  <div class="card">
+    <h3 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:12px;">📈 Comparativo Piquetes × Mês (Ganho/ha kg)</h3>
+    <div style="overflow-x:auto;"><table id="tb-comparativo" style="width:100%;border-collapse:collapse;min-width:600px;"></table></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="card" style="margin-top:16px;">
+    <h3 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:12px;">🌡️ Heatmap: Ganho/ha por Piquete × Mês</h3>
+    <div style="position:relative;height:220px;">
+      <canvas id="grafico-heatmap"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAIS ═══════════════ -->
+
+<!-- Modal Pasto -->
+<div id="modal-pasto" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;">🌾 Pasto</h3>
+    <input type="hidden" id="pasto-id">
+    <div class="form-grid-2">
+      <div style="grid-column:1/-1;"><label>Nome *</label><input id="pasto-nome"></div>
+      <div><label>Área (ha) *</label><input type="number" step="0.1" id="pasto-area"></div>
+      <div><label>Tipo de Capim</label><input id="pasto-capim" placeholder="Mombaça, Tifton..."></div>
+      <div><label>Sistema</label>
+        <select id="pasto-sistema">
+          <option value="ROTACIONADO">Rotacionado</option>
+          <option value="CONTÍNUO">Contínuo</option>
+          <option value="SEMI-INTENSIVO">Semi-intensivo</option>
+        </select>
+      </div>
+      <div><label>Status</label>
+        <select id="pasto-status">
+          <option value="ATIVO">Ativo</option>
+          <option value="INATIVO">Inativo</option>
+          <option value="EM REFORMA">Em Reforma</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1;"><label>Observação</label><textarea id="pasto-obs" rows="2"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn-sm btn-cinza" onclick="fecharModal('modal-pasto')">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="salvarPasto()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Piquete -->
+<div id="modal-piquete" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;">🌿 Piquete</h3>
+    <input type="hidden" id="piquete-id">
+    <div class="form-grid-2">
+      <div><label>Pasto *</label><select id="piquete-pasto-id"></select></div>
+      <div><label>Nome *</label><input id="piquete-nome"></div>
+      <div><label>Área (ha)</label><input type="number" step="0.1" id="piquete-area"></div>
+      <div><label>Tipo Capim</label><input id="piquete-capim"></div>
+      <div><label>Altura de Entrada (cm) *</label><input type="number" step="0.5" id="piquete-alt-ent"></div>
+      <div><label>Altura de Saída (cm) *</label><input type="number" step="0.5" id="piquete-alt-sai"></div>
+      <div><label>Dias Descanso Alvo *</label><input type="number" id="piquete-descanso"></div>
+      <div><label>Status</label>
+        <select id="piquete-status">
+          <option value="DISPONIVEL">Disponível</option>
+          <option value="OCUPADO">Ocupado</option>
+          <option value="EM_DESCANSO">Em Descanso</option>
+          <option value="EM_REFORMA">Em Reforma</option>
+          <option value="SUPERPASTEJADO">Superpastejado</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:16px;align-items:center;padding-top:20px;">
+        <label style="display:flex;gap:4px;margin:0;"><input type="checkbox" id="piquete-beb"> Bebedouro</label>
+        <label style="display:flex;gap:4px;margin:0;"><input type="checkbox" id="piquete-coch"> Cocho</label>
+        <label style="display:flex;gap:4px;margin:0;"><input type="checkbox" id="piquete-somb"> Sombra</label>
+      </div>
+      <div style="grid-column:1/-1;"><label>Observação</label><textarea id="piquete-obs" rows="2"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn-sm btn-cinza" onclick="fecharModal('modal-piquete')">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="salvarPiquete()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Medição -->
+<div id="modal-medicao" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;">📏 Registrar Medição</h3>
+    <input type="hidden" id="med-id">
+    <div class="form-grid-2">
+      <div><label>Piquete *</label><select id="med-piquete-id"></select></div>
+      <div><label>Data *</label><input type="date" id="med-data"></div>
+      <div><label>Altura (cm) *</label><input type="number" step="0.5" id="med-altura"></div>
+      <div><label>Massa estimada (kg MS/ha)</label><input type="number" step="0.1" id="med-massa"></div>
+      <div><label>Cobertura (%)</label><input type="number" min="0" max="100" id="med-cobertura"></div>
+      <div><label>Falhas (%)</label><input type="number" min="0" max="100" id="med-falhas"></div>
+      <div><label>Condição</label>
+        <select id="med-condicao">
+          <option value="">—</option>
+          <option value="NORMAL">Normal</option>
+          <option value="ÚMIDO">Úmido</option>
+          <option value="SECO">Seco</option>
+        </select>
+      </div>
+      <div><label>Responsável</label><input id="med-responsavel"></div>
+      <div style="grid-column:1/-1;"><label>Planta Invasora</label><input id="med-invasora"></div>
+      <div style="grid-column:1/-1;"><label>Observação</label><textarea id="med-obs" rows="2"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn-sm btn-cinza" onclick="fecharModal('modal-medicao')">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="salvarMedicao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Medição Rápida (card semáforo) -->
+<div id="modal-med-rapida" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;">📏 Medição Rápida — <span id="med-rapida-nome"></span></h3>
+    <input type="hidden" id="med-rapida-piquete-id">
+    <div class="form-grid-2">
+      <div><label>Data *</label><input type="date" id="med-rapida-data"></div>
+      <div><label>Altura (cm) *</label><input type="number" step="0.5" id="med-rapida-altura"></div>
+      <div><label>Cobertura (%)</label><input type="number" min="0" max="100" id="med-rapida-cob"></div>
+      <div><label>Observação</label><input id="med-rapida-obs"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn-sm btn-cinza" onclick="fecharModal('modal-med-rapida')">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="salvarMedRapida()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Entrada de Lote -->
+<div id="modal-entrada" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;">🐄 Registrar Entrada de Lote</h3>
+    <div class="form-grid-2">
+      <div><label>Piquete *</label><select id="ent-piquete-id"></select></div>
+      <div><label>Lote *</label><input id="ent-lote" placeholder="ex: Lote B"></div>
+      <div><label>Data de Entrada *</label><input type="date" id="ent-data"></div>
+      <div><label>Qtd de Animais *</label><input type="number" id="ent-qtd" oninput="calcUA()"></div>
+      <div><label>Peso Médio (kg)</label><input type="number" step="0.1" id="ent-peso" oninput="calcUA()"></div>
+      <div><label>UA Total (calculado)</label><input type="text" id="ent-ua" readonly style="background:#f3f4f6;"></div>
+      <div><label>Altura na Entrada (cm) *</label><input type="number" step="0.5" id="ent-altura"></div>
+      <div><label>Categoria</label>
+        <select id="ent-categoria">
+          <option value="VACAS">Vacas</option>
+          <option value="TOUROS">Touros</option>
+          <option value="BEZERROS">Bezerros</option>
+          <option value="GARROTES">Garrotes</option>
+          <option value="NOVILHAS">Novilhas</option>
+          <option value="MISTO">Misto</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1;"><label>Observação</label><textarea id="ent-obs" rows="2"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn-sm btn-cinza" onclick="fecharModal('modal-entrada')">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="salvarEntrada()">Registrar Entrada</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Saída de Lote -->
+<div id="modal-saida" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;">🚪 Registrar Saída de Lote</h3>
+    <div class="form-grid-2">
+      <div><label>Manejo (piquete/lote) *</label><select id="sai-manejo-id"></select></div>
+      <div><label>Data de Saída *</label><input type="date" id="sai-data"></div>
+      <div><label>Altura na Saída (cm) *</label><input type="number" step="0.5" id="sai-altura"></div>
+      <div><label>Condição do Pasto *</label>
+        <select id="sai-condicao">
+          <option value="EXCELENTE">Excelente</option>
+          <option value="BOA">Boa</option>
+          <option value="REGULAR">Regular</option>
+          <option value="RUIM">Ruim</option>
+          <option value="SUPERPASTEJADO">Superpastejado</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1;"><label>Observação</label><textarea id="sai-obs" rows="2"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn-sm btn-cinza" onclick="fecharModal('modal-saida')">Cancelar</button>
+      <button class="btn-sm btn-verm" onclick="salvarSaida()">Registrar Saída</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<!-- ═══════════════════ ABA 7: MAPA ═══════════════════ -->
+<style>
+  .piquete-pulsa { animation: piquete-pulse 1.2s ease-in-out infinite; }
+  @keyframes piquete-pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+  .mapa-tooltip-label {
+    background:rgba(0,0,0,.62);border:none;color:#fff;
+    font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;
+    box-shadow:0 1px 4px rgba(0,0,0,.3);
+  }
+  .mapa-tooltip-label::before { display:none; }
+  .leaflet-draw-toolbar a { font-size:13px !important; }
+</style>
+
+<div id="aba-mapa" class="tab-panel">
+
+  <!-- Card de ajuda -->
+  <div id="card-ajuda-mapa" class="card" style="display:none;margin-bottom:14px;background:#f0fdf4;border:1px solid #86efac;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#15803d;margin-bottom:8px;">🗺️ Como colocar sua fazenda no mapa</div>
+        <ol style="font-size:13px;color:#374151;padding-left:18px;margin:0 0 10px 0;line-height:1.8;">
+          <li>Clique em <b>✏️ Editar piquetes</b></li>
+          <li>Selecione o piquete na lista suspensa</li>
+          <li>Use a ferramenta <b>Polígono</b> para desenhar a área</li>
+          <li>Clique nos vértices e dê <b>duplo clique</b> para finalizar</li>
+          <li>O sistema salva automaticamente</li>
+        </ol>
+        <div style="font-size:12px;color:#6b7280;">💡 Use a camada <b>🛰️ Satélite</b> para ver as divisas reais dos piquetes.</div>
+      </div>
+      <button onclick="fecharAjudaMapa()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#6b7280;padding:0 6px;">✕</button>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:#6b7280;cursor:pointer;">
+      <input type="checkbox" id="chkAjudaMapa" onchange="if(this.checked)localStorage.setItem('mapa_ajuda_ok','1')">
+      Não mostrar novamente
+    </label>
+  </div>
+
+  <!-- Toolbar -->
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+    <button id="btnEditarMapa" onclick="toggleModoEdicao()"
+      style="background:#1565C0;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;">
+      ✏️ Editar piquetes
+    </button>
+    <select id="selPiqueteEditar"
+      style="display:none;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+      <option value="">— Selecionar piquete —</option>
+    </select>
+    <button id="btnSairEdicao" onclick="sairModoEdicao()"
+      style="display:none;background:#2E7D32;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;">
+      ✅ Sair do modo edição
+    </button>
+    <button onclick="exportarGeoJSON()"
+      style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;color:#374151;">
+      💾 Exportar GeoJSON
+    </button>
+    <button onclick="atualizarMapa()"
+      style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;color:#374151;">
+      🔄 Atualizar
+    </button>
+  </div>
+
+  <!-- Layout: mapa + painel -->
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start;">
+
+    <!-- Mapa Leaflet -->
+    <div style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+      <div id="mapa-fazenda" style="height:550px;"></div>
+    </div>
+
+    <!-- Painel lateral -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div class="card" style="padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Legenda</div>
+        <div id="mapa-legenda" style="font-size:13px;"></div>
+      </div>
+
+      <div class="card" style="padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Piquetes — clique para focar</div>
+        <div id="mapa-lista-piquetes" style="max-height:210px;overflow-y:auto;"></div>
+      </div>
+
+      <div class="card" style="padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Métricas</div>
+        <div id="mapa-metricas" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Mapa Leaflet ──────────────────────────────────────────────────────────
+let _mapaFazenda  = null;
+let _dadosMapa    = null;
+let _mapaLayers   = {};
+let _labelMarkers = [];
+let _modoEdicao   = false;
+let _drawControl  = null;
+let _drawnItems   = null;
+
+const COR_SEM_MAPA = {
+  VERDE:      '#2E7D32',
+  AMARELO:    '#F9A825',
+  VERMELHO:   '#C62828',
+  SAIR_AGORA: '#B71C1C',
+  OCUPADO:    '#1565C0',
+  SEM_DADOS:  '#757575',
+};
+
+async function initMapa() {
+  if (_mapaFazenda) {
+    setTimeout(() => _mapaFazenda.invalidateSize(), 80);
+    return;
+  }
+
+  _dadosMapa = await fetch('/pastagem/mapa').then(r => r.json());
+
+  // Preencher select de edição
+  const selEdit = document.getElementById('selPiqueteEditar');
+  _dadosMapa.piquetes.forEach(pq => {
+    const o = document.createElement('option');
+    o.value = pq.id;
+    o.textContent = `${pq.nome} (${pq.pasto || ''})`;
+    selEdit.appendChild(o);
+  });
+
+  // Sync _todosOsPiquetes para abrirMedRapida funcionar
+  _todosOsPiquetes = _dadosMapa.piquetes.map(p => ({
+    id: p.id, nome: p.nome, pasto_nome: p.pasto,
+    area_ha: p.area_ha, altura_entrada_cm: 35, altura_saida_cm: 15,
+  }));
+
+  _mapaFazenda = L.map('mapa-fazenda', {
+    center: [_dadosMapa.centro.lat, _dadosMapa.centro.lng],
+    zoom:   _dadosMapa.zoom_inicial || 15,
+  });
+
+  // Camadas
+  const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  });
+  const satLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri', maxZoom: 19,
+  });
+  osmLayer.addTo(_mapaFazenda);
+  L.control.layers({'🗺️ Mapa': osmLayer, '🛰️ Satélite': satLayer}, {}, {position: 'topright'}).addTo(_mapaFazenda);
+
+  // Botão centralizar
+  const btnCentro = L.control({position: 'topleft'});
+  btnCentro.onAdd = function() {
+    const d = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    d.innerHTML = '<a href="#" title="Centralizar fazenda" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;font-size:16px;text-decoration:none;">🎯</a>';
+    L.DomEvent.on(d, 'click', e => {
+      L.DomEvent.preventDefault(e);
+      _mapaFazenda.setView([_dadosMapa.centro.lat, _dadosMapa.centro.lng], _dadosMapa.zoom_inicial || 15);
+    });
+    return d;
+  };
+  btnCentro.addTo(_mapaFazenda);
+
+  // Marcador sede
+  const sedeIcon = L.divIcon({
+    html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(1px 1px 1px rgba(0,0,0,.5));">🏠</div>',
+    iconSize: [32, 32], iconAnchor: [16, 16], className: '',
+  });
+  L.marker([_dadosMapa.centro.lat, _dadosMapa.centro.lng], {icon: sedeIcon})
+    .bindPopup('<b>🏠 Sede da Fazenda Ipanema</b>')
+    .addTo(_mapaFazenda);
+
+  renderPoligonos();
+  renderPainelMapa();
+
+  if (!localStorage.getItem('mapa_ajuda_ok')) {
+    document.getElementById('card-ajuda-mapa').style.display = 'block';
+  }
+}
+
+function renderPoligonos() {
+  Object.values(_mapaLayers).forEach(l => { try { _mapaFazenda.removeLayer(l); } catch {} });
+  _labelMarkers.forEach(m => { try { _mapaFazenda.removeLayer(m); } catch {} });
+  _mapaLayers   = {};
+  _labelMarkers = [];
+
+  _dadosMapa.piquetes.forEach(pq => {
+    if (!pq.coordenadas || !pq.coordenadas.length) return;
+
+    const cor = COR_SEM_MAPA[pq.semaforo] || '#757575';
+    const poly = L.polygon(pq.coordenadas, {
+      color: cor, fillColor: cor,
+      fillOpacity: pq.semaforo === 'SEM_DADOS' ? 0.2 : 0.35,
+      weight: 2,
+    });
+
+    const ua     = pq.ua_ha != null ? `${pq.ua_ha} UA/ha` : '';
+    const clsBdg = pq.classificacao_ua
+      ? `<span style="background:${cor}22;color:${cor};border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">●${pq.classificacao_ua}</span>`
+      : '';
+    const loteSec = pq.lote_atual
+      ? `<div style="padding:6px 0 2px;border-top:1px solid #e5e7eb;margin-top:6px;">🐂 <b>${pq.lote_atual}</b>: ${pq.qtd_animais || '—'} animais${ua ? ' · ' + ua : ''} ${clsBdg}</div>`
+      : '';
+    const nSafe  = (pq.nome || '').replace(/'/g, "\\'");
+    const acoes  = `
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;">
+        <button onclick="abrirMedRapida(${pq.id},'${nSafe}');_mapaFazenda.closePopup();"
+          style="background:#e5e7eb;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;">📏 Medir</button>
+        ${['VERDE','AMARELO'].includes(pq.semaforo)
+          ? `<button onclick="preencherEntrada(${pq.id});_mapaFazenda.closePopup();"
+               style="background:#dcfce7;color:#15803d;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;">🐄 Entrada</button>` : ''}
+        ${['OCUPADO','SAIR_AGORA'].includes(pq.semaforo)
+          ? `<button onclick="preencherSaida(${pq.id});_mapaFazenda.closePopup();"
+               style="background:#fee2e2;color:#b91c1c;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;">🚪 Saída</button>` : ''}
+      </div>`;
+
+    poly.bindPopup(`
+      <div style="min-width:220px;font-size:13px;">
+        <div style="font-weight:700;font-size:14px;color:${cor};">${pq.nome}</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">${pq.pasto || ''}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12px;color:#374151;">
+          <span>📐 ${pq.area_ha || '—'} ha</span>
+          <span>🌿 ${pq.tipo_capim || '—'}</span>
+          ${pq.altura_atual != null ? `<span>📏 ${pq.altura_atual} cm</span>` : ''}
+          <span>💤 ${pq.dias_descanso || 0} dias</span>
+        </div>
+        ${loteSec}
+        <div style="padding-top:5px;border-top:1px solid #f3f4f6;margin-top:6px;font-size:11px;color:#6b7280;">${pq.mensagem || ''}</div>
+        ${acoes}
+      </div>`, {maxWidth: 290, minWidth: 220});
+
+    poly.addTo(_mapaFazenda);
+    _mapaLayers[pq.id] = poly;
+
+    // Pulsar SAIR_AGORA
+    if (pq.semaforo === 'SAIR_AGORA') {
+      poly.on('add', () => { if (poly._path) poly._path.classList.add('piquete-pulsa'); });
+    }
+
+    // Label centróide
+    const center = poly.getBounds().getCenter();
+    const semEmoji = {VERDE:'🟢',AMARELO:'🟡',VERMELHO:'🔴',SAIR_AGORA:'⚠️',OCUPADO:'🔵',SEM_DADOS:'⚫'}[pq.semaforo] || '⚫';
+    const lblIcon = L.divIcon({
+      html: `<div style="text-align:center;pointer-events:none;">
+               <div style="font-size:10px;font-weight:700;color:#fff;background:${cor};border-radius:4px;
+                    padding:2px 6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.35);">
+                 ${semEmoji} ${pq.nome}
+               </div>
+               ${pq.ua_ha ? `<div style="font-size:9px;color:#fff;background:${cor}bb;border-radius:3px;padding:1px 5px;margin-top:1px;">${pq.ua_ha} UA/ha</div>` : ''}
+             </div>`,
+      iconSize: [80, 32], iconAnchor: [40, 16], className: '',
+    });
+    const lbl = L.marker(center, {icon: lblIcon, interactive: false, zIndexOffset: -100});
+    lbl.addTo(_mapaFazenda);
+    _labelMarkers.push(lbl);
+  });
+}
+
+function renderPainelMapa() {
+  if (!_dadosMapa) return;
+  const pqs = _dadosMapa.piquetes;
+  const cnt = {};
+  pqs.forEach(p => { cnt[p.semaforo] = (cnt[p.semaforo] || 0) + 1; });
+
+  // Legenda
+  document.getElementById('mapa-legenda').innerHTML = [
+    {s:'VERDE',      emoji:'🟢', lbl:'Prontos'},
+    {s:'AMARELO',    emoji:'🟡', lbl:'Quase prontos'},
+    {s:'VERMELHO',   emoji:'🔴', lbl:'Não entrar'},
+    {s:'SAIR_AGORA', emoji:'⚠️', lbl:'Sair agora'},
+    {s:'OCUPADO',    emoji:'🔵', lbl:'Ocupados'},
+    {s:'SEM_DADOS',  emoji:'⚫', lbl:'Sem dados'},
+  ].filter(i => cnt[i.s]).map(i => `
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;">
+      <span>${i.emoji} ${i.lbl}</span>
+      <span style="font-weight:700;color:${COR_SEM_MAPA[i.s]};">${cnt[i.s]}</span>
+    </div>`).join('') || '<span style="color:#9ca3af;font-size:13px;">Nenhum piquete</span>';
+
+  // Lista clicável
+  document.getElementById('mapa-lista-piquetes').innerHTML = pqs.map(p => {
+    const cor     = COR_SEM_MAPA[p.semaforo] || '#757575';
+    const semPin  = p.coordenadas && p.coordenadas.length ? '' : ' <span title="Sem localização" style="color:#f59e0b;">📍</span>';
+    return `<div onclick="focarPiquete(${p.id})"
+      style="cursor:pointer;padding:5px 8px;border-radius:6px;border:1px solid #e5e7eb;
+             margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;
+             background:#fff;transition:background .12s;"
+      onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='#fff'">
+      <div>
+        <span style="font-weight:600;font-size:13px;">${p.nome}${semPin}</span>
+        <span style="font-size:11px;color:#9ca3af;margin-left:5px;">${p.area_ha || '—'}ha</span>
+      </div>
+      <span style="background:${cor}20;color:${cor};border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;">
+        ${p.semaforo.replace('_',' ')}
+      </span>
+    </div>`;
+  }).join('');
+
+  // Métricas
+  const m = _dadosMapa.metricas || {};
+  const metritems = [
+    {icon:'🐄', lbl:'UA/ha média geral',       val: m.ua_ha_media   != null ? m.ua_ha_media   + ' UA/ha' : '—', alerta: false},
+    {icon:'🌧️', lbl:'Chuva este mês',           val: m.chuva_mes_mm  != null ? m.chuva_mes_mm  + ' mm'    : '—', alerta: (m.chuva_mes_mm || 0) < 50},
+    {icon:'🏆', lbl:'Melhor ganho/ha',          val: m.melhor_piquete ? `${m.melhor_piquete.nome}: ${m.melhor_piquete.ganho_ha} kg/ha` : '—', alerta: false},
+    {icon:'⏳', lbl:'Próximo a ficar pronto',   val: m.proximo_pronto ? `${m.proximo_pronto.nome} (${m.proximo_pronto.dias_descanso}d)` : '—', alerta: false},
+  ];
+  document.getElementById('mapa-metricas').innerHTML = metritems.map(item => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
+         background:${item.alerta ? '#fef9c3' : '#f9fafb'};">
+      <span style="font-size:16px;">${item.icon}</span>
+      <div>
+        <div style="font-size:11px;color:#6b7280;">${item.lbl}</div>
+        <div style="font-size:13px;font-weight:600;color:${item.alerta ? '#92400e' : '#374151'};">${item.val}</div>
+      </div>
+    </div>`).join('');
+}
+
+function focarPiquete(id) {
+  if (!_mapaFazenda) return;
+  const layer = _mapaLayers[id];
+  if (!layer) {
+    showToast('Piquete sem coordenadas. Use ✏️ Editar para desenhar.', 'erro');
+    return;
+  }
+  _mapaFazenda.fitBounds(layer.getBounds(), {padding: [40, 40]});
+  setTimeout(() => layer.openPopup(), 350);
+}
+
+async function atualizarMapa() {
+  if (!_mapaFazenda) { await initMapa(); return; }
+  _dadosMapa = await fetch('/pastagem/mapa').then(r => r.json());
+  renderPoligonos();
+  renderPainelMapa();
+}
+
+// ── Modo Edição ────────────────────────────────────────────────────────────
+
+async function entrarModoEdicao() {
+  if (!_mapaFazenda) return;
+  _modoEdicao = true;
+  document.getElementById('btnEditarMapa').style.display  = 'none';
+  document.getElementById('selPiqueteEditar').style.display = 'inline-block';
+  document.getElementById('btnSairEdicao').style.display  = 'inline-block';
+
+  _drawnItems = new L.FeatureGroup();
+  _mapaFazenda.addLayer(_drawnItems);
+
+  // Mover polígonos existentes para drawnItems
+  Object.entries(_mapaLayers).forEach(([id, poly]) => {
+    const pq  = _dadosMapa.piquetes.find(p => p.id == id);
+    if (!pq)  return;
+    const cor = COR_SEM_MAPA[pq.semaforo] || '#757575';
+    const ep  = L.polygon(pq.coordenadas, {
+      color: cor, fillColor: cor, fillOpacity: 0.2, weight: 2, dashArray: '6 4',
+    });
+    ep._piqueteId   = parseInt(id);
+    ep._piqueteNome = pq.nome;
+    ep.bindTooltip(pq.nome, {permanent: true, direction: 'center', className: 'mapa-tooltip-label'});
+    _drawnItems.addLayer(ep);
+    _mapaFazenda.removeLayer(poly);
+  });
+  _labelMarkers.forEach(m => { try { _mapaFazenda.removeLayer(m); } catch {} });
+  _labelMarkers = [];
+
+  _drawControl = new L.Control.Draw({
+    edit: { featureGroup: _drawnItems, remove: true },
+    draw: {
+      polygon: {
+        allowIntersection: false, showArea: true,
+        shapeOptions: { color: '#1565C0', fillColor: '#1565C0', fillOpacity: 0.25, weight: 2 },
+      },
+      rectangle: false, circle: false, marker: false, polyline: false, circlemarker: false,
+    },
+  });
+  _mapaFazenda.addControl(_drawControl);
+
+  _mapaFazenda.on(L.Draw.Event.CREATED, async (e) => {
+    const pid = parseInt(document.getElementById('selPiqueteEditar').value);
+    if (!pid) { showToast('Selecione o piquete antes de desenhar.', 'erro'); return; }
+    const coords = e.layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]);
+    e.layer._piqueteId = pid;
+    const pq = _dadosMapa.piquetes.find(p => p.id === pid);
+    e.layer._piqueteNome = pq?.nome || '';
+    e.layer.bindTooltip(pq?.nome || '', {permanent: true, direction: 'center', className: 'mapa-tooltip-label'});
+    _drawnItems.addLayer(e.layer);
+    await _salvarCoords(pid, coords);
+  });
+
+  _mapaFazenda.on(L.Draw.Event.EDITED, async (e) => {
+    const saves = [];
+    e.layers.eachLayer(layer => {
+      if (layer._piqueteId) {
+        saves.push(_salvarCoords(layer._piqueteId, layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]), false));
+      }
+    });
+    await Promise.all(saves);
+    if (saves.length) showToast('Coordenadas atualizadas!', 'sucesso');
+  });
+
+  _mapaFazenda.on(L.Draw.Event.DELETED, async (e) => {
+    const saves = [];
+    e.layers.eachLayer(layer => {
+      if (layer._piqueteId) saves.push(_salvarCoords(layer._piqueteId, [], false));
+    });
+    await Promise.all(saves);
+    if (saves.length) showToast('Polígono(s) removido(s).', 'sucesso');
+  });
+}
+
+async function sairModoEdicao() {
+  _modoEdicao = false;
+  _mapaFazenda.off(L.Draw.Event.CREATED);
+  _mapaFazenda.off(L.Draw.Event.EDITED);
+  _mapaFazenda.off(L.Draw.Event.DELETED);
+  if (_drawControl) { _mapaFazenda.removeControl(_drawControl); _drawControl = null; }
+  if (_drawnItems)  { _mapaFazenda.removeLayer(_drawnItems);   _drawnItems  = null; }
+  document.getElementById('btnEditarMapa').style.display    = 'inline-block';
+  document.getElementById('selPiqueteEditar').style.display = 'none';
+  document.getElementById('btnSairEdicao').style.display    = 'none';
+  _dadosMapa = await fetch('/pastagem/mapa').then(r => r.json());
+  renderPoligonos();
+  renderPainelMapa();
+}
+
+function toggleModoEdicao() {
+  if (_modoEdicao) sairModoEdicao(); else entrarModoEdicao();
+}
+
+async function _salvarCoords(piqueteId, coords, showMsg = true) {
+  const r = await fetch(`/pastagem/piquetes/${piqueteId}/coordenadas`, {
+    method:  'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({coordenadas: coords.length ? coords : null}),
+  });
+  if (!r.ok) { showToast('Erro ao salvar coordenadas.', 'erro'); return; }
+  const pq = _dadosMapa.piquetes.find(p => p.id === piqueteId);
+  if (pq)   pq.coordenadas = coords.length ? coords : null;
+  if (showMsg) showToast(`Coordenadas de ${pq?.nome || ''} salvas!`, 'sucesso');
+}
+
+function fecharAjudaMapa() {
+  document.getElementById('card-ajuda-mapa').style.display = 'none';
+  if (document.getElementById('chkAjudaMapa').checked) localStorage.setItem('mapa_ajuda_ok', '1');
+}
+
+async function exportarGeoJSON() {
+  try {
+    const r = await fetch('/pastagem/mapa/exportar');
+    if (!r.ok) { showToast('Erro ao exportar.', 'erro'); return; }
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'fazenda-piquetes.geojson';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch { showToast('Erro ao exportar GeoJSON.', 'erro'); }
+}
+</script>
+
+<script>
+// ── Estado global ─────────────────────────────────────────────────────
+let _todosOsPiquetes = [];
+let _chartAltura  = null;
+let _chartChuva   = null;
+let _chartHeatmap = null;
+
+document.addEventListener('alpine:init', () => { Alpine.store('pastagAba', 'semaforos'); });
+
+// ── Abas ──────────────────────────────────────────────────────────────
+function mudarAba(nome) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('ativo'));
+  document.getElementById('aba-' + nome).classList.add('ativo');
+  if (window.Alpine) Alpine.store('pastagAba', nome);
+  if (nome === 'semaforos')  carregarSemaforos();
+  if (nome === 'cadastro')   carregarCadastro();
+  if (nome === 'medicoes')   { carregarPiquetesSelect('filtro-piquete-med'); carregarMedicoes(); }
+  if (nome === 'manejo')     { carregarPiquetesSelect('filtro-piquete-man'); carregarManejo(); carregarManejoAbertos(); }
+  if (nome === 'relatorios') carregarRelatorios();
+  if (nome === 'lotes')     carregarLotes();
+  if (nome === 'mapa')      initMapa();
+}
+
+function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
+
+// ── Semáforo ──────────────────────────────────────────────────────────
+const COR_MAP = {
+  VERDE:    {cls:'sem-verde',   circulo:'c-verde',   emoji:'🟢', label:'Pronto para entrada'},
+  AMARELO:  {cls:'sem-amarelo', circulo:'c-amarelo', emoji:'🟡', label:'Quase pronto'},
+  VERMELHO: {cls:'sem-vermelho',circulo:'c-vermelho',emoji:'🔴', label:'Não entrar'},
+  SAIR_AGORA:{cls:'sem-sair',  circulo:'c-sair',    emoji:'⚠️', label:'Retirar o lote agora!'},
+  OCUPADO:  {cls:'sem-ocupado',circulo:'c-ocupado', emoji:'🔵', label:'Ocupado'},
+  SEM_DADOS:{cls:'sem-dados',  circulo:'c-dados',   emoji:'⬜', label:'Sem dados'},
+};
+
+const _SEM_CONF = {
+  VERDE:     {bar:'psb-verde',    lbl:'sem-lbl-verde',    txt:'✅ Pronto para entrada'},
+  AMARELO:   {bar:'psb-amarelo',  lbl:'sem-lbl-amarelo',  txt:'🟡 Quase pronto'},
+  VERMELHO:  {bar:'psb-vermelho', lbl:'sem-lbl-vermelho', txt:'🔴 Não entrar'},
+  SAIR_AGORA:{bar:'psb-sair',    lbl:'sem-lbl-sair',     txt:'⚠️ Retirar agora!'},
+  OCUPADO:   {bar:'psb-ocupado', lbl:'sem-lbl-ocupado',  txt:'🔵 Ocupado'},
+  SEM_DADOS: {bar:'psb-dados',   lbl:'sem-lbl-dados',    txt:'⬜ Sem dados'},
+};
+
+let _miniChuvaChart = null;
+
+async function carregarSemaforos() {
+  const d90 = (() => { const d=new Date(); d.setDate(d.getDate()-90); return d.toISOString().slice(0,10); })();
+  const [dash, pqs, chuva, adub] = await Promise.all([
+    fetch('/pastagem/dashboard').then(r=>r.json()),
+    fetch('/pastagem/piquetes').then(r=>r.json()),
+    fetch('/pastagem/relatorios/chuva-mensal').then(r=>r.json()).catch(()=>({})),
+    fetch('/pastagem/relatorios/adubacao-historico').then(r=>r.json()).catch(()=>[]),
+  ]);
+
+  // KPIs
+  document.getElementById('kpi-verde').textContent    = dash.semaforos?.verde    ?? '—';
+  document.getElementById('kpi-amarelo').textContent  = dash.semaforos?.amarelo  ?? '—';
+  document.getElementById('kpi-vermelho').textContent = dash.semaforos?.vermelho ?? '—';
+  document.getElementById('kpi-sair').textContent     = dash.semaforos?.sair_agora ?? '—';
+  document.getElementById('kpi-chuva').textContent    = dash.chuva_mes_mm != null ? dash.chuva_mes_mm + ' mm' : '—';
+  document.getElementById('kpi-lotacao').textContent  = dash.taxa_lotacao_media != null ? dash.taxa_lotacao_media + ' UA/ha' : '—';
+
+  // Alertas
+  const bAlerta = document.getElementById('bloco-alertas');
+  if (dash.alertas && dash.alertas.length) {
+    bAlerta.style.display = 'block';
+    bAlerta.innerHTML = dash.alertas.map(a => `
+      <div style="background:${a.tipo==='SECA'?'#FFF3E0':'#FFEBEE'};border-left:4px solid ${a.tipo==='SECA'?'#E65100':'#B71C1C'};border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:12.5px;">
+        <b>${a.tipo}</b> — ${a.piquete}: ${a.mensagem}
+      </div>`).join('');
+  } else {
+    bAlerta.style.display = 'none';
+  }
+
+  // Ordenar por urgência
+  const ordemSem = ['SAIR_AGORA','VERMELHO','AMARELO','SEM_DADOS','VERDE','OCUPADO'];
+  pqs.sort((a,b) => {
+    const sa = a.semaforo?.semaforo || 'SEM_DADOS';
+    const sb = b.semaforo?.semaforo || 'SEM_DADOS';
+    const ia = ordemSem.indexOf(sa); const ib = ordemSem.indexOf(sb);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+
+  // Cards premium
+  const grid = document.getElementById('grid-semaforos');
+  grid.innerHTML = pqs.map(pq => {
+    const s   = pq.semaforo || {};
+    const sem = s.semaforo || 'SEM_DADOS';
+    const m   = _SEM_CONF[sem] || _SEM_CONF.SEM_DADOS;
+    const podeEntrada = ['VERDE','AMARELO'].includes(sem);
+    const podeSaida   = ['OCUPADO','SAIR_AGORA'].includes(sem);
+    const isOcupado   = sem === 'OCUPADO' || sem === 'SAIR_AGORA';
+
+    // Barra de altitude
+    const altAtual = s.altura_atual ?? 0;
+    const altEnt   = pq.alt_entrada ?? pq.altura_entrada ?? 1;
+    const altPct   = Math.min(100, altEnt > 0 ? Math.round((altAtual / altEnt) * 100) : 0);
+    const altColor = altPct >= 90 ? '#2e7d32' : altPct >= 55 ? '#f9a825' : '#c62828';
+
+    // Chips de infraestrutura
+    const chips = [
+      (pq.bebedouro || pq.tem_bebedouro) ? '<span class="piq-pill pill-beb">💧 Bebedouro</span>' : '',
+      (pq.cocho     || pq.tem_cocho)     ? '<span class="piq-pill pill-coch">🪣 Cocho</span>'     : '',
+      (pq.sombra    || pq.tem_sombra)    ? '<span class="piq-pill pill-somb">🌳 Sombra</span>'    : '',
+    ].filter(Boolean);
+
+    // Lote
+    const loteHtml = s.lote ? `
+      <div class="lote-blk">
+        <span class="lote-blk-icon">🐄</span>
+        <div>
+          <div class="lote-blk-name">${s.lote}</div>
+          <div class="lote-blk-sub">${s.dias_ocupacao || 0} dias${s.ua_ha != null ? ' · ' + s.ua_ha + ' UA/ha' : ''}</div>
+        </div>
+      </div>` : '';
+
+    const nomeSafe = (pq.nome||'').replace(/'/g, "\\'");
+
+    return `
+    <div class="piq-card">
+      <div class="piq-status-bar ${m.bar}"></div>
+      <div class="piq-body">
+        <div class="piq-name">${pq.nome}</div>
+        <div class="piq-pastoname">${pq.pasto_nome || ''}</div>
+        <span class="piq-sem-label ${m.lbl}">${m.txt}</span>
+        <div class="piq-metrics">
+          <div><span>📐 Altura</span><span class="piq-metric-val">${s.altura_atual != null ? s.altura_atual+' cm' : '—'}</span></div>
+          <div><span>${isOcupado ? '⏱ Ocupação' : '💤 Descanso'}</span><span class="piq-metric-val">${isOcupado ? (s.dias_ocupacao||0)+' d' : (s.dias_descanso||0)+' d'}</span></div>
+          ${pq.area_ha ? `<div><span>📏 Área</span><span class="piq-metric-val">${pq.area_ha} ha</span></div>` : ''}
+          ${pq.dias_descanso_alvo ? `<div><span>🎯 Alvo desc.</span><span class="piq-metric-val">${pq.dias_descanso_alvo} d</span></div>` : ''}
+        </div>
+        <div class="alt-wrap">
+          <div class="alt-label"><span>Nível de forragem</span><span>${altAtual} / ${altEnt} cm (${altPct}%)</span></div>
+          <div class="alt-bar"><div class="alt-fill" style="width:${altPct}%;background:${altColor};"></div></div>
+        </div>
+        ${loteHtml}
+        ${chips.length ? `<div class="piq-chips">${chips.join('')}</div>` : ''}
+        ${s.mensagem ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:6px;">${s.mensagem}</div>` : ''}
+      </div>
+      <div class="piq-actions">
+        <button class="btn-sm btn-cinza" onclick="abrirMedRapida(${pq.id},'${nomeSafe}')">📏 Medir</button>
+        ${podeEntrada ? `<button class="btn-sm btn-verde" onclick="preencherEntrada(${pq.id})">🐄 Entrada</button>` : ''}
+        ${podeSaida   ? `<button class="btn-sm btn-verm"  onclick="preencherSaida(${pq.id})">🚪 Saída</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  _renderBottomSem(dash, chuva, adub);
+}
+
+function _renderBottomSem(dash, chuva, adub) {
+  const el = document.getElementById('past-bottom-sem');
+  if (!el) return;
+
+  // Ranking
+  const ranking = dash.ranking || [];
+  const rkRows = ranking.slice(0, 5).map((r, i) => {
+    const pc = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    return `<div class="rk-row">
+      <div class="rk-pos ${pc}">${i+1}</div>
+      <div class="rk-name">${r.piquete || r.nome || '—'}</div>
+      <div class="rk-val">${r.ganho_ha_medio ?? r.ganho_ha ?? '—'} kg/ha</div>
+    </div>`;
+  }).join('') || '<div style="color:#9ca3af;font-size:12px;text-align:center;padding:12px;">Sem dados de ganho ainda.</div>';
+
+  // Adubação recente
+  const adubRows = adub.slice(0, 5).map(a => `
+    <div class="rk-row">
+      <div class="rk-name">${a.piquete || '—'}</div>
+      <div style="font-size:11px;color:#9ca3af;white-space:nowrap;">${a.produto || '—'}</div>
+      <div class="rk-val" style="white-space:nowrap;">${a.custo_total ? 'R$' + Number(a.custo_total).toFixed(0) : '—'}</div>
+    </div>`).join('') || '<div style="color:#9ca3af;font-size:12px;text-align:center;padding:12px;">Nenhuma adubação no período.</div>';
+
+  el.innerHTML = `
+    <div class="rk-card">
+      <div class="rk-header"><span style="font-size:16px;">🏆</span><span class="rk-title">Ranking — Ganho/ha</span></div>
+      <div class="rk-body">${rkRows}</div>
+    </div>
+    <div class="rk-card">
+      <div class="rk-header"><span style="font-size:16px;">🌧️</span><span class="rk-title">Chuva Mensal (mm)</span></div>
+      <div class="rk-body"><canvas id="mini-chuva-sem" height="130"></canvas></div>
+    </div>
+    <div class="rk-card">
+      <div class="rk-header"><span style="font-size:16px;">🌱</span><span class="rk-title">Adubações Recentes</span></div>
+      <div class="rk-body">${adubRows}</div>
+    </div>
+  `;
+
+  // Mini chart de chuva
+  const meses = Object.keys(chuva);
+  if (meses.length) {
+    const mms = Object.values(chuva);
+    if (_miniChuvaChart) { _miniChuvaChart.destroy(); _miniChuvaChart = null; }
+    const ctx = document.getElementById('mini-chuva-sem');
+    if (ctx) {
+      _miniChuvaChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: meses,
+          datasets: [{
+            data: mms,
+            backgroundColor: mms.map(v => v < 50 ? 'rgba(248,113,113,0.8)' : 'rgba(96,165,250,0.8)'),
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 9 } } },
+            x: { ticks: { font: { size: 9 }, maxRotation: 45 } }
+          }
+        }
+      });
+    }
+  }
+}
+
+// Atualizar a cada 5 minutos
+setInterval(carregarSemaforos, 5 * 60 * 1000);
+
+// ── Cadastro ──────────────────────────────────────────────────────────
+async function carregarCadastro() {
+  const [pastos, pqs] = await Promise.all([
+    fetch('/pastagem/pastos').then(r=>r.json()),
+    fetch('/pastagem/piquetes').then(r=>r.json()),
+  ]);
+  _todosOsPiquetes = pqs;
+
+  // Tabela pastos
+  const tbP = document.getElementById('tb-pastos');
+  tbP.innerHTML = pastos.map(p => `<tr>
+    <td><b>${p.nome}</b></td>
+    <td>${p.area_ha || '—'}</td>
+    <td>${p.tipo_capim || '—'}</td>
+    <td>${p.sistema || '—'}</td>
+    <td>${p.qtd_piquetes}</td>
+    <td><span class="badge" style="background:${p.status==='ATIVO'?'#e8f5e9':'#fce4ec'};
+        color:${p.status==='ATIVO'?'#2E7D32':'#c62828'}">${p.status}</span></td>
+    <td style="display:flex;gap:6px;">
+      <button class="btn-sm btn-azul" onclick='editarPasto(${JSON.stringify(p)})'>✏️</button>
+      <button class="btn-sm btn-verm" onclick="excluirPasto(${p.id})">🗑️</button>
+    </td>
+  </tr>`).join('');
+
+  // Select de pasto no filtro
+  const selFiltro = document.getElementById('filtro-pasto-piquetes');
+  const selPiquete = document.getElementById('piquete-pasto-id');
+  selFiltro.innerHTML = '<option value="">Todos os pastos</option>' +
+    pastos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+  selPiquete.innerHTML = pastos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+
+  renderizarPiquetesCad(pqs);
+}
+
+function renderizarPiquetesCad(pqs) {
+  const tb = document.getElementById('tb-piquetes-cad');
+  tb.innerHTML = pqs.map(pq => {
+    const s = pq.semaforo || {};
+    const cor = COR_MAP[s.semaforo] || COR_MAP.SEM_DADOS;
+    return `<tr>
+      <td><b>${pq.nome}</b></td>
+      <td>${pq.pasto_nome || '—'}</td>
+      <td>${pq.area_ha || '—'}</td>
+      <td>${pq.altura_entrada_cm || '—'} cm</td>
+      <td>${pq.altura_saida_cm || '—'} cm</td>
+      <td>${pq.dias_descanso_alvo || '—'} dias</td>
+      <td><span class="badge" style="background:${cor.circulo==='c-verde'?'#e8f5e9':cor.circulo==='c-amarelo'?'#FFF8E1':cor.circulo==='c-vermelho'?'#FFEBEE':'#e3f2fd'};
+          color:${cor.circulo==='c-verde'?'#2E7D32':cor.circulo==='c-amarelo'?'#F57F17':cor.circulo==='c-vermelho'?'#C62828':'#1565C0'};">${s.semaforo || '—'}</span></td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn-sm btn-azul" onclick='editarPiquete(${JSON.stringify(pq)})'>✏️</button>
+        <button class="btn-sm btn-verm" onclick="excluirPiquete(${pq.id})">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function carregarPiquetesCadastro() {
+  const pastoId = document.getElementById('filtro-pasto-piquetes').value;
+  const filtrados = pastoId ? _todosOsPiquetes.filter(p => p.pasto_id == pastoId) : _todosOsPiquetes;
+  renderizarPiquetesCad(filtrados);
+}
+
+// Modal pasto
+function abrirModalPasto() {
+  document.getElementById('pasto-id').value = '';
+  document.getElementById('pasto-nome').value = '';
+  document.getElementById('pasto-area').value = '';
+  document.getElementById('pasto-capim').value = '';
+  document.getElementById('pasto-obs').value = '';
+  document.getElementById('modal-pasto').style.display = 'flex';
+}
+
+function editarPasto(p) {
+  document.getElementById('pasto-id').value   = p.id;
+  document.getElementById('pasto-nome').value  = p.nome || '';
+  document.getElementById('pasto-area').value  = p.area_ha || '';
+  document.getElementById('pasto-capim').value = p.tipo_capim || '';
+  document.getElementById('pasto-sistema').value = p.sistema || 'ROTACIONADO';
+  document.getElementById('pasto-status').value  = p.status || 'ATIVO';
+  document.getElementById('pasto-obs').value   = p.obs || '';
+  document.getElementById('modal-pasto').style.display = 'flex';
+}
+
+async function salvarPasto() {
+  const id = document.getElementById('pasto-id').value;
+  const body = {
+    nome: document.getElementById('pasto-nome').value,
+    area_ha: parseFloat(document.getElementById('pasto-area').value) || null,
+    tipo_capim: document.getElementById('pasto-capim').value,
+    sistema: document.getElementById('pasto-sistema').value,
+    status: document.getElementById('pasto-status').value,
+    obs: document.getElementById('pasto-obs').value,
+  };
+  const url    = id ? `/pastagem/pastos/${id}` : '/pastagem/pastos';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) { showToast(d.detail || 'Erro ao salvar.', 'erro'); return; }
+  fecharModal('modal-pasto');
+  showToast('Pasto salvo!', 'sucesso');
+  carregarCadastro();
+}
+
+async function excluirPasto(id) {
+  confirmarExclusao(`/pastagem/pastos/${id}`, carregarCadastro);
+}
+
+// Modal piquete
+function abrirModalPiquete() {
+  document.getElementById('piquete-id').value = '';
+  ['nome','area','capim','alt-ent','alt-sai','descanso','obs'].forEach(k =>
+    document.getElementById('piquete-'+k).value = '');
+  document.getElementById('piquete-beb').checked  = false;
+  document.getElementById('piquete-coch').checked = false;
+  document.getElementById('piquete-somb').checked = false;
+  document.getElementById('modal-piquete').style.display = 'flex';
+}
+
+function editarPiquete(pq) {
+  document.getElementById('piquete-id').value       = pq.id;
+  document.getElementById('piquete-pasto-id').value = pq.pasto_id || '';
+  document.getElementById('piquete-nome').value     = pq.nome || '';
+  document.getElementById('piquete-area').value     = pq.area_ha || '';
+  document.getElementById('piquete-capim').value    = pq.tipo_capim || '';
+  document.getElementById('piquete-alt-ent').value  = pq.altura_entrada_cm || '';
+  document.getElementById('piquete-alt-sai').value  = pq.altura_saida_cm || '';
+  document.getElementById('piquete-descanso').value = pq.dias_descanso_alvo || '';
+  document.getElementById('piquete-status').value   = pq.status || 'DISPONIVEL';
+  document.getElementById('piquete-obs').value      = pq.obs || '';
+  document.getElementById('piquete-beb').checked    = !!pq.tem_bebedouro;
+  document.getElementById('piquete-coch').checked   = !!pq.tem_cocho;
+  document.getElementById('piquete-somb').checked   = !!pq.tem_sombra;
+  document.getElementById('modal-piquete').style.display = 'flex';
+}
+
+async function salvarPiquete() {
+  const id = document.getElementById('piquete-id').value;
+  const body = {
+    pasto_id: parseInt(document.getElementById('piquete-pasto-id').value) || null,
+    nome: document.getElementById('piquete-nome').value,
+    area_ha: parseFloat(document.getElementById('piquete-area').value) || null,
+    tipo_capim: document.getElementById('piquete-capim').value,
+    altura_entrada_cm: parseFloat(document.getElementById('piquete-alt-ent').value) || null,
+    altura_saida_cm:   parseFloat(document.getElementById('piquete-alt-sai').value) || null,
+    dias_descanso_alvo: parseInt(document.getElementById('piquete-descanso').value) || null,
+    status: document.getElementById('piquete-status').value,
+    obs: document.getElementById('piquete-obs').value,
+    tem_bebedouro: document.getElementById('piquete-beb').checked,
+    tem_cocho:     document.getElementById('piquete-coch').checked,
+    tem_sombra:    document.getElementById('piquete-somb').checked,
+  };
+  const url    = id ? `/pastagem/piquetes/${id}` : '/pastagem/piquetes';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) { showToast(d.detail || 'Erro ao salvar.', 'erro'); return; }
+  fecharModal('modal-piquete');
+  showToast('Piquete salvo!', 'sucesso');
+  carregarCadastro();
+}
+
+async function excluirPiquete(id) {
+  confirmarExclusao(`/pastagem/piquetes/${id}`, carregarCadastro);
+}
+
+// ── Medições ──────────────────────────────────────────────────────────
+async function carregarPiquetesSelect(selectId) {
+  const pqs = await fetch('/pastagem/piquetes').then(r=>r.json());
+  _todosOsPiquetes = pqs;
+  const sel = document.getElementById(selectId);
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' +
+    pqs.map(p => `<option value="${p.id}">${p.nome} (${p.pasto_nome})</option>`).join('');
+  sel.value = val;
+}
+
+async function carregarMedicoes() {
+  const piqId  = document.getElementById('filtro-piquete-med').value;
+  const dtIni  = document.getElementById('filtro-med-ini').value;
+  const dtFim  = document.getElementById('filtro-med-fim').value;
+  let url = '/pastagem/medicoes?';
+  if (piqId)  url += `piquete_id=${piqId}&`;
+  if (dtIni)  url += `data_ini=${dtIni}&`;
+  if (dtFim)  url += `data_fim=${dtFim}&`;
+  const rows = await fetch(url).then(r=>r.json());
+
+  document.getElementById('tb-medicoes').innerHTML = rows.map(m => `<tr>
+    <td>${fmtData(m.data)}</td>
+    <td>${m.piquete_nome}</td>
+    <td><b>${m.altura_cm} cm</b></td>
+    <td>${m.cobertura_pct != null ? m.cobertura_pct+'%' : '—'}</td>
+    <td>${m.falhas_pct != null ? m.falhas_pct+'%' : '—'}</td>
+    <td>${m.condicao || '—'}</td>
+    <td>${m.responsavel || '—'}</td>
+    <td><button class="btn-sm btn-verm" onclick="excluirMedicao(${m.id})">🗑️</button></td>
+  </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;color:#9ca3af;">Nenhuma medição encontrada.</td></tr>';
+
+  // Gráfico de altura
+  if (piqId && rows.length) {
+    const pq = _todosOsPiquetes.find(p => p.id == piqId) || {};
+    document.getElementById('titulo-grafico-med').textContent = pq.nome || '';
+    const datas  = [...rows].reverse().map(m => fmtData(m.data));
+    const alturas = [...rows].reverse().map(m => m.altura_cm);
+    const altEnt = pq.altura_entrada_cm || 35;
+    const altSai = pq.altura_saida_cm || 15;
+    if (_chartAltura) _chartAltura.destroy();
+    _chartAltura = new Chart(document.getElementById('grafico-altura'), {
+      type: 'line',
+      data: {
+        labels: datas,
+        datasets: [
+          {label:'Altura (cm)', data: alturas, borderColor:'#2E7D32',
+           backgroundColor:'rgba(46,125,50,.1)', fill:true, tension:.3, pointRadius:5},
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' },
+          annotation: {
+            annotations: {
+              zonaIdeal: {
+                type: 'box', yMin: altSai, yMax: altEnt,
+                backgroundColor: 'rgba(46,125,50,.07)',
+                borderColor: 'rgba(46,125,50,.25)', borderWidth: 1,
+              },
+              linhaEntrada: {
+                type: 'line', yMin: altEnt, yMax: altEnt,
+                borderColor: '#1565C0', borderWidth: 1.5, borderDash: [6,4],
+                label: { content: `Entrada: ${altEnt} cm`, display: true,
+                         position: 'start', backgroundColor: 'rgba(21,101,192,.85)',
+                         color: '#fff', font: { size: 10 }, padding: 3 }
+              },
+              linhaSaida: {
+                type: 'line', yMin: altSai, yMax: altSai,
+                borderColor: '#C62828', borderWidth: 1.5, borderDash: [6,4],
+                label: { content: `Saída: ${altSai} cm`, display: true,
+                         position: 'start', backgroundColor: 'rgba(198,40,40,.85)',
+                         color: '#fff', font: { size: 10 }, padding: 3 }
+              }
+            }
+          }
+        },
+        scales: { y: { beginAtZero: false, title: { display: true, text: 'Altura (cm)' } } }
+      }
+    });
+  }
+}
+
+function abrirModalMedicao() {
+  document.getElementById('med-id').value = '';
+  document.getElementById('med-data').value = new Date().toISOString().slice(0,10);
+  ['altura','massa','cobertura','falhas','responsavel','invasora','obs'].forEach(k =>
+    document.getElementById('med-'+k).value = '');
+  // preencher select de piquetes
+  const sel = document.getElementById('med-piquete-id');
+  sel.innerHTML = _todosOsPiquetes.map(p => `<option value="${p.id}">${p.nome} (${p.pasto_nome})</option>`).join('');
+  document.getElementById('modal-medicao').style.display = 'flex';
+}
+
+async function salvarMedicao() {
+  const id = document.getElementById('med-id').value;
+  const body = {
+    piquete_id: parseInt(document.getElementById('med-piquete-id').value),
+    data: document.getElementById('med-data').value,
+    altura_cm: parseFloat(document.getElementById('med-altura').value),
+    massa_estimada: parseFloat(document.getElementById('med-massa').value) || null,
+    cobertura_pct: parseFloat(document.getElementById('med-cobertura').value) || null,
+    falhas_pct: parseFloat(document.getElementById('med-falhas').value) || null,
+    planta_invasora: document.getElementById('med-invasora').value,
+    condicao: document.getElementById('med-condicao').value,
+    responsavel: document.getElementById('med-responsavel').value,
+    obs: document.getElementById('med-obs').value,
+  };
+  const url    = id ? `/pastagem/medicoes/${id}` : '/pastagem/medicoes';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if (!r.ok) { const d=await r.json(); showToast(d.detail||'Erro.','erro'); return; }
+  fecharModal('modal-medicao');
+  showToast('Medição salva!','sucesso');
+  carregarMedicoes();
+}
+
+async function excluirMedicao(id) {
+  confirmarExclusao(`/pastagem/medicoes/${id}`, carregarMedicoes);
+}
+
+// Medição rápida via card do semáforo
+function abrirMedRapida(piqueteId, nome) {
+  document.getElementById('med-rapida-piquete-id').value = piqueteId;
+  document.getElementById('med-rapida-nome').textContent = nome;
+  document.getElementById('med-rapida-data').value = new Date().toISOString().slice(0,10);
+  document.getElementById('med-rapida-altura').value = '';
+  document.getElementById('med-rapida-cob').value = '';
+  document.getElementById('med-rapida-obs').value = '';
+  document.getElementById('modal-med-rapida').style.display = 'flex';
+}
+
+async function salvarMedRapida() {
+  const body = {
+    piquete_id: parseInt(document.getElementById('med-rapida-piquete-id').value),
+    data: document.getElementById('med-rapida-data').value,
+    altura_cm: parseFloat(document.getElementById('med-rapida-altura').value),
+    cobertura_pct: parseFloat(document.getElementById('med-rapida-cob').value) || null,
+    obs: document.getElementById('med-rapida-obs').value,
+  };
+  const r = await fetch('/pastagem/medicoes', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!r.ok) { const d=await r.json(); showToast(d.detail||'Erro.','erro'); return; }
+  fecharModal('modal-med-rapida');
+  showToast('Medição registrada!','sucesso');
+  carregarSemaforos();
+}
+
+// ── Manejo ────────────────────────────────────────────────────────────
+async function carregarManejo() {
+  const piqId = document.getElementById('filtro-piquete-man').value;
+  const lote  = document.getElementById('filtro-lote-man').value;
+  const dtIni = document.getElementById('filtro-man-ini').value;
+  const dtFim = document.getElementById('filtro-man-fim').value;
+  let url = '/pastagem/manejo?';
+  if (piqId) url += `piquete_id=${piqId}&`;
+  if (lote)  url += `lote=${encodeURIComponent(lote)}&`;
+  if (dtIni) url += `data_ini=${dtIni}&`;
+  if (dtFim) url += `data_fim=${dtFim}&`;
+  const rows = await fetch(url).then(r=>r.json());
+
+  document.getElementById('tb-manejo').innerHTML = rows.map(m => `<tr>
+    <td>${m.piquete_nome}</td>
+    <td>${m.lote || '—'}</td>
+    <td>${fmtData(m.data_entrada)}</td>
+    <td>${m.data_saida ? fmtData(m.data_saida) : '<span style="color:#F9A825;">Em curso</span>'}</td>
+    <td>${m.dias_ocupacao || '—'}</td>
+    <td>${m.qtd_animais || '—'}</td>
+    <td>${m.ua_total || '—'}</td>
+    <td>${m.altura_entrada != null ? m.altura_entrada+' cm' : '—'}</td>
+    <td>${m.altura_saida  != null ? m.altura_saida +' cm' : '—'}</td>
+    <td>${m.condicao_pasto || '—'}</td>
+    <td>${m.ganho_ha_kg != null ? '<b>'+m.ganho_ha_kg+' kg</b>' : '—'}</td>
+  </tr>`).join('') || '<tr><td colspan="11" style="text-align:center;color:#9ca3af;">Nenhum registro.</td></tr>';
+}
+
+async function carregarManejoAbertos() {
+  const todos = await fetch('/pastagem/manejo').then(r=>r.json());
+  const abertos = todos.filter(m => !m.data_saida);
+  const sel = document.getElementById('sai-manejo-id');
+  sel.innerHTML = abertos.length
+    ? abertos.map(m => `<option value="${m.id}">${m.piquete_nome} — ${m.lote} (${fmtData(m.data_entrada)})</option>`).join('')
+    : '<option value="">Nenhum lote ativo</option>';
+}
+
+function abrirModalEntrada() {
+  const sel = document.getElementById('ent-piquete-id');
+  const pqsDisp = _todosOsPiquetes.filter(p => ['DISPONIVEL','EM_DESCANSO','VERDE','AMARELO'].includes(p.status) || ['VERDE','AMARELO'].includes(p.semaforo?.semaforo));
+  sel.innerHTML = _todosOsPiquetes.map(p=>`<option value="${p.id}">${p.nome} (${p.pasto_nome})</option>`).join('');
+  document.getElementById('ent-data').value = new Date().toISOString().slice(0,10);
+  ['lote','qtd','peso','ua','altura','obs'].forEach(k => { const el=document.getElementById('ent-'+k); if(el) el.value=''; });
+  document.getElementById('modal-entrada').style.display = 'flex';
+}
+
+function preencherEntrada(piqueteId) {
+  abrirModalEntrada();
+  document.getElementById('ent-piquete-id').value = piqueteId;
+}
+
+function calcUA() {
+  const peso = parseFloat(document.getElementById('ent-peso').value) || 0;
+  const qtd  = parseInt(document.getElementById('ent-qtd').value) || 0;
+  const ua   = peso && qtd ? Math.round((peso/450)*qtd*10)/10 : '';
+  document.getElementById('ent-ua').value = ua;
+}
+
+async function salvarEntrada() {
+  const body = {
+    piquete_id:   parseInt(document.getElementById('ent-piquete-id').value),
+    lote:         document.getElementById('ent-lote').value,
+    data_entrada: document.getElementById('ent-data').value,
+    qtd_animais:  parseInt(document.getElementById('ent-qtd').value) || 0,
+    peso_medio_kg:parseFloat(document.getElementById('ent-peso').value) || 0,
+    altura_entrada:parseFloat(document.getElementById('ent-altura').value) || null,
+    categoria:    document.getElementById('ent-categoria').value,
+    obs:          document.getElementById('ent-obs').value,
+  };
+  const r = await fetch('/pastagem/manejo/entrada', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) { showToast(d.detail||'Erro.','erro'); return; }
+  fecharModal('modal-entrada');
+  showToast(`Entrada registrada! UA total: ${d.ua_total}. Previsão saída: ${fmtData(d.previsao_saida)}`,'sucesso');
+  carregarManejo(); carregarSemaforos();
+}
+
+function abrirModalSaida() {
+  carregarManejoAbertos();
+  document.getElementById('sai-data').value = new Date().toISOString().slice(0,10);
+  document.getElementById('sai-altura').value = '';
+  document.getElementById('sai-obs').value = '';
+  document.getElementById('modal-saida').style.display = 'flex';
+}
+
+function preencherSaida(piqueteId) {
+  abrirModalSaida();
+}
+
+async function salvarSaida() {
+  const body = {
+    manejo_id:    parseInt(document.getElementById('sai-manejo-id').value),
+    data_saida:   document.getElementById('sai-data').value,
+    altura_saida: parseFloat(document.getElementById('sai-altura').value) || null,
+    condicao_pasto: document.getElementById('sai-condicao').value,
+    obs:          document.getElementById('sai-obs').value,
+  };
+  const r = await fetch('/pastagem/manejo/saida', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) { showToast(d.detail||'Erro.','erro'); return; }
+  fecharModal('modal-saida');
+  showToast(`Saída registrada! Dias: ${d.dias_ocupacao}. Ganho/ha: ${d.ganho_ha_kg} kg.`,'sucesso');
+  carregarManejo(); carregarSemaforos();
+}
+
+// ── Relatórios ────────────────────────────────────────────────────────
+async function carregarRelatorios() {
+  const [ranking, chuva, adubacao, comp] = await Promise.all([
+    fetch('/pastagem/relatorios/ranking').then(r=>r.json()),
+    fetch('/pastagem/relatorios/chuva-mensal').then(r=>r.json()),
+    fetch('/pastagem/relatorios/adubacao-historico').then(r=>r.json()),
+    fetch('/pastagem/relatorios/comparativo').then(r=>r.json()),
+  ]);
+
+  // Ranking
+  const cores = ['#FFF9C4','#F3E5F5','#E8F5E9'];
+  document.getElementById('tb-ranking').innerHTML = ranking.map((row, i) => `<tr style="background:${i<3?cores[i]:''}">
+    <td><b>${i+1}º</b></td>
+    <td>${row.piquete}</td>
+    <td>${row.ciclos}</td>
+    <td><b>${row.ganho_ha_medio} kg</b></td>
+    <td>${row.lotacao_media} UA/ha</td>
+    <td>R$ ${row.custo_adubacao_ha}</td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;">Sem dados ainda.</td></tr>';
+
+  // Gráfico chuva
+  const meses = Object.keys(chuva);
+  const mms   = Object.values(chuva);
+  const bgCores = mms.map(v => v < 50 ? '#EF5350' : '#42A5F5');
+  if (_chartChuva) _chartChuva.destroy();
+  _chartChuva = new Chart(document.getElementById('grafico-chuva'), {
+    type: 'bar',
+    data: {
+      labels: meses,
+      datasets: [
+        {label:'Chuva (mm)', data: mms, backgroundColor: bgCores},
+        {label:'Mínimo recomendado (50mm)', data: meses.map(()=>50),
+         type:'line', borderColor:'#C62828', borderDash:[6,4], pointRadius:0, fill:false},
+      ]
+    },
+    options: {responsive:true, plugins:{legend:{position:'bottom'}},
+      scales:{y:{beginAtZero:true, title:{display:true,text:'mm'}}}}
+  });
+
+  // Adubação
+  document.getElementById('tb-adubacao-rel').innerHTML = adubacao.map(a => `<tr>
+    <td>${a.piquete}</td>
+    <td>${fmtData(a.data)}</td>
+    <td>${a.produto}</td>
+    <td>${a.dose_kg_ha || '—'} kg/ha</td>
+    <td>R$ ${(a.custo_total||0).toFixed(2)}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:#9ca3af;">Sem dados.</td></tr>';
+
+  // Comparativo
+  if (comp && comp.tabela) {
+    const tb = document.getElementById('tb-comparativo');
+    const maxGanho = Math.max(...comp.tabela.flatMap(r => comp.meses.map(m => r[m] || 0)), 1);
+    let html = '<thead><tr><th>Piquete</th>' + comp.meses.map(m=>`<th>${m}</th>`).join('') + '</tr></thead><tbody>';
+    html += comp.tabela.map(row => {
+      const cells = comp.meses.map(m => {
+        const v = row[m] || 0;
+        const pct = v / maxGanho;
+        const bg = v === 0 ? '#f3f4f6'
+          : pct > 0.7 ? '#1B5E20' : pct > 0.4 ? '#43A047' : pct > 0.1 ? '#A5D6A7' : '#FFCDD2';
+        const fg = pct > 0.4 && v > 0 ? '#fff' : '#374151';
+        return `<td style="background:${bg};color:${fg};text-align:center;font-weight:600;">${v||'—'}</td>`;
+      }).join('');
+      return `<tr><td><b>${row.piquete}</b></td>${cells}</tr>`;
+    }).join('');
+    html += '</tbody>';
+    tb.innerHTML = html;
+  }
+
+  renderHeatmap(comp);
+}
+
+function renderHeatmap(comp) {
+  if (!comp || !comp.tabela || !comp.meses || !comp.tabela.length) return;
+  const piquetes = comp.tabela.map(r => r.piquete);
+  const meses    = comp.meses;
+  const dados    = [];
+  comp.tabela.forEach(row => {
+    meses.forEach(m => { dados.push({ x: m, y: row.piquete, v: row[m] || 0 }); });
+  });
+  const maxVal = Math.max(...dados.map(d => d.v), 1);
+  if (_chartHeatmap) _chartHeatmap.destroy();
+  _chartHeatmap = new Chart(document.getElementById('grafico-heatmap'), {
+    type: 'matrix',
+    data: {
+      datasets: [{
+        label: 'Ganho/ha (kg)',
+        data: dados,
+        backgroundColor(ctx) {
+          const v = ctx.dataset.data[ctx.dataIndex].v;
+          if (!v) return '#f3f4f6';
+          const r = v / maxVal;
+          return r > 0.7 ? '#1B5E20' : r > 0.4 ? '#43A047' : r > 0.1 ? '#A5D6A7' : '#FFCDD2';
+        },
+        borderWidth: 1, borderColor: '#fff',
+        width(ctx)  { const a = ctx.chart.chartArea; return a ? (a.right - a.left)  / meses.length    - 2 : 0; },
+        height(ctx) { const a = ctx.chart.chartArea; return a ? (a.bottom - a.top)  / piquetes.length - 2 : 0; },
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          title() { return ''; },
+          label(ctx) { const d = ctx.dataset.data[ctx.dataIndex]; return `${d.y} / ${d.x}: ${d.v} kg/ha`; }
+        }}
+      },
+      scales: {
+        x: { type: 'category', labels: meses, offset: true, grid: { display: false } },
+        y: { type: 'category', labels: piquetes, offset: true, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+carregarSemaforos();
+</script>
+
+<!-- ═══════════════════ ABA 6: LOTES ═══════════════════ -->
+<div id="aba-lotes" class="tab-panel">
+  <div class="card" style="margin-bottom:20px;">
+    <!-- KPIs de Lotes -->
+    <div id="lotes-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="font-size:15px;font-weight:600;color:#1B5E20;">Lotes de Animais</h3>
+      <button class="btn-sm btn-verde" onclick="abrirModalNovoLote()">+ Novo Lote</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th>Nome</th><th>Categoria</th><th>Animais</th><th>UA Total</th><th>UA/ha</th><th>Lotação</th><th>Piquete</th><th>Status</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="tb-lotes"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Lote -->
+<div id="modal-lote" class="modal-overlay">
+  <div class="modal-box">
+    <h3 id="modal-lote-titulo" style="font-size:16px;font-weight:700;color:#1B5E20;margin-bottom:18px;">Novo Lote</h3>
+    <input type="hidden" id="lote-edit-id">
+    <div class="form-grid-2" style="margin-bottom:12px;">
+      <div><label>Nome *</label><input id="lote-nome" placeholder="Ex: Garrotes Engorda"></div>
+      <div><label>Categoria</label>
+        <select id="lote-categoria">
+          <option value="">Selecionar</option>
+          <option>TOUROS</option><option>VACAS</option><option>BOIS</option>
+          <option>GARROTES</option><option>NOVILHAS</option><option>BEZERROS</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;"><label>Descrição</label><input id="lote-descricao"></div>
+    <div style="margin-bottom:12px;"><label>Status</label>
+      <select id="lote-status"><option>ATIVO</option><option>INATIVO</option></select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn-sm btn-cinza" onclick="fecharModalLote()">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="salvarLote()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Animais do Lote -->
+<div id="modal-lote-animais" class="modal-overlay">
+  <div class="modal-box" style="max-width:700px;">
+    <h3 id="modal-animais-titulo" style="font-size:16px;font-weight:700;color:#1B5E20;margin-bottom:14px;">Animais do Lote</h3>
+    <!-- Simulador UA/ha -->
+    <div style="background:#f0fdf4;border-radius:8px;padding:14px;margin-bottom:16px;">
+      <p style="font-size:13px;font-weight:600;color:#15803d;margin-bottom:8px;">Adicionar animal</p>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="flex:1;"><label>Brinco</label><input id="add-brinco" placeholder="Ex: BOI-001"></div>
+        <button class="btn-sm btn-verde" style="margin-bottom:0;height:36px;" onclick="adicionarAnimalLote()">Adicionar</button>
+      </div>
+    </div>
+    <!-- Simulador de piquete -->
+    <div style="background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:16px;">
+      <p style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">Alocar em Piquete</p>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="flex:1;"><label>Piquete</label>
+          <select id="sel-piquete-alocar" style="width:100%;"><option value="">Selecionar piquete</option></select>
+        </div>
+        <button class="btn-sm btn-azul" style="height:36px;" onclick="alocarLote()">Alocar</button>
+        <button class="btn-sm btn-cinza" style="height:36px;" onclick="desalocarLote()">Desalocar</button>
+      </div>
+      <div id="simulador-resultado" style="margin-top:10px;font-size:13px;display:none;"></div>
+    </div>
+    <!-- Tabela de animais -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead><tr>
+        <th>Brinco</th><th>Nome</th><th>Tipo</th><th>Peso Atual</th><th>UA</th><th>Entrada</th><th></th>
+      </tr></thead>
+      <tbody id="tb-animais-lote"></tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;">
+      <button class="btn-sm btn-cinza" onclick="fecharModalAnimaisLote()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Lotes JS ──────────────────────────────────────────────────────────────
+let _loteAtualId = null;
+
+function uaHaBadge(cls, val) {
+  const labels = {LEVE:'Leve',IDEAL:'Ideal',ALTA:'Alta',CRITICA:'Crítica',SEM_DADOS:'—'};
+  const css = {LEVE:'ua-leve',IDEAL:'ua-ideal',ALTA:'ua-alta',CRITICA:'ua-critica',SEM_DADOS:'ua-sem'};
+  return `<span class="badge ${css[cls]||'ua-sem'}">${val!=null?val.toFixed(2)+' UA/ha':''} ${labels[cls]||cls}</span>`;
+}
+
+async function carregarLotes() {
+  const lotes = await fetch('/pastagem/lotes').then(r=>r.json());
+  const tb = document.getElementById('tb-lotes');
+  if (!lotes.length) {
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:16px;">Nenhum lote cadastrado</td></tr>';
+    return;
+  }
+  tb.innerHTML = lotes.map(lt => `
+    <tr>
+      <td style="font-weight:600;color:#1B5E20;">${lt.nome}</td>
+      <td>${lt.categoria||'—'}</td>
+      <td style="text-align:center;">${lt.qtd_animais}</td>
+      <td style="text-align:center;">${lt.ua_total?.toFixed(2)||'0.00'}</td>
+      <td style="text-align:center;">${lt.ua_ha!=null?lt.ua_ha.toFixed(2):'—'}</td>
+      <td>${uaHaBadge(lt.classificacao, lt.ua_ha)}</td>
+      <td>${lt.piquete_nome||'<span style="color:#9ca3af;">Sem piquete</span>'}</td>
+      <td><span class="badge" style="${lt.status==='ATIVO'?'background:#dcfce7;color:#15803d;':'background:#f3f4f6;color:#6b7280;'}">${lt.status}</span></td>
+      <td style="white-space:nowrap;">
+        <button class="btn-sm btn-azul" onclick="abrirAnimaisLote(${lt.id},'${lt.nome.replace(/'/g,"\\'")}')">Animais</button>
+        <button class="btn-sm btn-cinza" onclick="editarLote(${lt.id})">✏️</button>
+        <button class="btn-sm btn-verm" onclick="excluirLote(${lt.id},'${lt.nome.replace(/'/g,"\\'")}')">🗑️</button>
+      </td>
+    </tr>`).join('');
+
+  // KPIs
+  const ativos = lotes.filter(l=>l.status==='ATIVO').length;
+  const emPiquete = lotes.filter(l=>l.piquete_id).length;
+  const criticos = lotes.filter(l=>l.classificacao==='CRITICA').length;
+  const medUaHa = lotes.filter(l=>l.ua_ha!=null);
+  const mediaUaHa = medUaHa.length ? (medUaHa.reduce((s,l)=>s+l.ua_ha,0)/medUaHa.length).toFixed(2) : '—';
+  document.getElementById('lotes-kpis').innerHTML = `
+    <div class="kpi-box"><div style="font-size:20px;font-weight:700;color:#1B5E20;">${ativos}</div><div style="font-size:12px;color:#6b7280;">Lotes ativos</div></div>
+    <div class="kpi-box"><div style="font-size:20px;font-weight:700;color:#1565C0;">${emPiquete}</div><div style="font-size:12px;color:#6b7280;">Em piquete</div></div>
+    <div class="kpi-box"><div style="font-size:20px;font-weight:700;color:#b91c1c;">${criticos}</div><div style="font-size:12px;color:#6b7280;">Lotação crítica</div></div>
+    <div class="kpi-box"><div style="font-size:20px;font-weight:700;color:#374151;">${mediaUaHa}</div><div style="font-size:12px;color:#6b7280;">UA/ha médio</div></div>`;
+}
+
+function abrirModalNovoLote() {
+  document.getElementById('lote-edit-id').value = '';
+  document.getElementById('lote-nome').value = '';
+  document.getElementById('lote-categoria').value = '';
+  document.getElementById('lote-descricao').value = '';
+  document.getElementById('lote-status').value = 'ATIVO';
+  document.getElementById('modal-lote-titulo').textContent = 'Novo Lote';
+  document.getElementById('modal-lote').style.display = 'flex';
+}
+
+function fecharModalLote() { document.getElementById('modal-lote').style.display = 'none'; }
+
+async function editarLote(id) {
+  const lt = await fetch(`/pastagem/lotes/${id}`).then(r=>r.json());
+  document.getElementById('lote-edit-id').value = lt.id;
+  document.getElementById('lote-nome').value = lt.nome;
+  document.getElementById('lote-categoria').value = lt.categoria||'';
+  document.getElementById('lote-descricao').value = lt.descricao||'';
+  document.getElementById('lote-status').value = lt.status;
+  document.getElementById('modal-lote-titulo').textContent = 'Editar Lote';
+  document.getElementById('modal-lote').style.display = 'flex';
+}
+
+async function salvarLote() {
+  const id = document.getElementById('lote-edit-id').value;
+  const payload = {
+    nome: document.getElementById('lote-nome').value.trim(),
+    categoria: document.getElementById('lote-categoria').value,
+    descricao: document.getElementById('lote-descricao').value.trim(),
+    status: document.getElementById('lote-status').value,
+  };
+  if (!payload.nome) { alert('Nome é obrigatório'); return; }
+  const url = id ? `/pastagem/lotes/${id}` : '/pastagem/lotes';
+  const method = id ? 'PUT' : 'POST';
+  const resp = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  if (!resp.ok) { const e=await resp.json(); alert(e.detail||'Erro'); return; }
+  fecharModalLote();
+  carregarLotes();
+}
+
+async function excluirLote(id, nome) {
+  if (!confirm(`Excluir lote "${nome}"?`)) return;
+  const resp = await fetch(`/pastagem/lotes/${id}`, {method:'DELETE'});
+  if (!resp.ok) { const e=await resp.json(); alert(e.detail||'Erro'); return; }
+  carregarLotes();
+}
+
+async function abrirAnimaisLote(id, nome) {
+  _loteAtualId = id;
+  document.getElementById('modal-animais-titulo').textContent = `Animais — ${nome}`;
+  document.getElementById('add-brinco').value = '';
+  document.getElementById('simulador-resultado').style.display = 'none';
+
+  // Carregar piquetes disponíveis
+  const piquetes = await fetch('/pastagem/piquetes').then(r=>r.json());
+  const sel = document.getElementById('sel-piquete-alocar');
+  sel.innerHTML = '<option value="">Selecionar piquete</option>' +
+    piquetes.map(p=>`<option value="${p.id}">${p.nome} (${p.area_ha||0}ha)</option>`).join('');
+
+  await recarregarAnimaisLote();
+  document.getElementById('modal-lote-animais').style.display = 'flex';
+}
+
+function fecharModalAnimaisLote() {
+  document.getElementById('modal-lote-animais').style.display = 'none';
+  _loteAtualId = null;
+  carregarLotes();
+}
+
+async function recarregarAnimaisLote() {
+  const animais = await fetch(`/pastagem/lotes/${_loteAtualId}/animais`).then(r=>r.json());
+  const tb = document.getElementById('tb-animais-lote');
+  if (!animais.length) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:12px;">Nenhum animal</td></tr>';
+    return;
+  }
+  tb.innerHTML = animais.map(a => `
+    <tr>
+      <td style="font-weight:600;">${a.brinco}</td>
+      <td>${a.nome||'—'}</td>
+      <td>${a.tipo||'—'}</td>
+      <td style="text-align:right;">${a.peso_atual!=null?a.peso_atual+' kg':'—'}</td>
+      <td style="text-align:right;">${a.ua?.toFixed(3)||'—'}</td>
+      <td>${a.data_entrada||'—'}</td>
+      <td><button class="btn-sm btn-verm" onclick="removerAnimalLote('${a.brinco}')">Remover</button></td>
+    </tr>`).join('');
+}
+
+async function adicionarAnimalLote() {
+  const brinco = document.getElementById('add-brinco').value.trim().toUpperCase();
+  if (!brinco) { alert('Informe o brinco'); return; }
+  const resp = await fetch(`/pastagem/lotes/${_loteAtualId}/animais`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({brinco, data_entrada: new Date().toISOString().slice(0,10)})
+  });
+  if (!resp.ok) { const e=await resp.json(); alert(e.detail||'Erro'); return; }
+  document.getElementById('add-brinco').value = '';
+  await recarregarAnimaisLote();
+  await atualizarSimulador();
+}
+
+async function removerAnimalLote(brinco) {
+  if (!confirm(`Remover ${brinco} do lote?`)) return;
+  const resp = await fetch(`/pastagem/lotes/${_loteAtualId}/animais/${brinco}`, {method:'DELETE'});
+  if (!resp.ok) { const e=await resp.json(); alert(e.detail||'Erro'); return; }
+  await recarregarAnimaisLote();
+  await atualizarSimulador();
+}
+
+async function alocarLote() {
+  const piqueteId = document.getElementById('sel-piquete-alocar').value;
+  if (!piqueteId) { alert('Selecione um piquete'); return; }
+  const resp = await fetch(`/pastagem/lotes/${_loteAtualId}/alocar`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({piquete_id: parseInt(piqueteId)})
+  });
+  if (!resp.ok) { const e=await resp.json(); alert(e.detail||'Erro'); return; }
+  await atualizarSimulador();
+  carregarLotes();
+}
+
+async function desalocarLote() {
+  if (!confirm('Desalocar lote do piquete atual?')) return;
+  const resp = await fetch(`/pastagem/lotes/${_loteAtualId}/desalocar`, {method:'POST'});
+  if (!resp.ok) { const e=await resp.json(); alert(e.detail||'Erro'); return; }
+  document.getElementById('simulador-resultado').style.display = 'none';
+  carregarLotes();
+}
+
+async function atualizarSimulador() {
+  const piqueteId = document.getElementById('sel-piquete-alocar').value;
+  if (!piqueteId) return;
+  const animais = await fetch(`/pastagem/lotes/${_loteAtualId}/animais`).then(r=>r.json());
+  if (!animais.length) return;
+  const brincos = animais.map(a=>a.brinco).join(',');
+  const data = await fetch(`/pastagem/lotes/simular?piquete_id=${piqueteId}&brincos=${encodeURIComponent(brincos)}`).then(r=>r.json());
+  const cores = {LEVE:'#dbeafe',IDEAL:'#dcfce7',ALTA:'#fef9c3',CRITICA:'#fee2e2',SEM_DADOS:'#f3f4f6'};
+  const div = document.getElementById('simulador-resultado');
+  div.style.display = 'block';
+  div.style.background = cores[data.classificacao]||'#f3f4f6';
+  div.style.padding = '8px 12px';
+  div.style.borderRadius = '6px';
+  div.innerHTML = `Simulação: <b>${data.qtd_animais} animais</b> | UA total: <b>${data.ua_total}</b> | UA/ha: <b>${data.ua_ha||'—'}</b> | Lotação: <b>${data.classificacao}</b>`;
+}
+
+document.getElementById('sel-piquete-alocar').addEventListener('change', atualizarSimulador);
+</script>
+{% endblock %}

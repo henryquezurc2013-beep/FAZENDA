@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Fazenda Ipanema{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2/dist/chartjs-chart-matrix.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    /* ── Semáforo legacy (pastagem) ── */
+    .sem-VERDE     { background:#d1fae5; color:#065f46; }
+    .sem-AMARELO   { background:#fef9c3; color:#78350f; }
+    .sem-VERMELHO  { background:#fee2e2; color:#991b1b; }
+    .sem-SAIR_AGORA{ background:#fca5a5; color:#7f1d1d; }
+    .sem-OCUPADO   { background:#dbeafe; color:#1e40af; }
+    .sem-SEM_DADOS { background:#f3f4f6; color:#6b7280; }
+    /* ── Situação previsão ── */
+    .sit-PRONTO     { color:#065f46; font-weight:700; }
+    .sit-NO_PRAZO   { color:#1d4ed8; }
+    .sit-MEDIO_PRAZO{ color:#92400e; }
+    .sit-LONGO_PRAZO{ color:#6b7280; }
+    .sit-SEM_DADOS  { color:#9ca3af; }
+    /* ── Mapa Leaflet ── */
+    .piquete-pulsa { animation: piquete-pulse 1.4s ease-in-out infinite; }
+    @keyframes piquete-pulse {
+      0%,100% { opacity:1; }
+      50%      { opacity:.55; }
+    }
+    .mapa-tooltip-label {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      font-weight: 700;
+      font-size: 11px;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,.7);
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-mark">🐄</div>
+      <div>
+        <div class="sidebar-logo-name">Fazenda Ipanema</div>
+        <div class="sidebar-logo-sub">Gestão de Rebanho</div>
+      </div>
+    </div>
+
+    <nav class="nav-wrap">
+      <div class="nav-group">
+        <div class="nav-group-label">Principal</div>
+        <a href="/dashboard" class="nav-item {% if pagina=='dashboard' %}active{% endif %}">
+          <span class="nav-icon">🏠</span> Dashboard
+        </a>
+        <a href="/animais-page" class="nav-item {% if pagina=='animais' %}active{% endif %}">
+          <span class="nav-icon">🐄</span> Animais
+          {% if total_animais %}<span class="nav-pill">{{ total_animais }}</span>{% endif %}
+        </a>
+        <a href="/pesagem-page" class="nav-item {% if pagina=='pesagem' %}active{% endif %}">
+          <span class="nav-icon">⚖️</span> Pesagem
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Saúde</div>
+        <a href="/sanidade-page" class="nav-item {% if pagina=='sanidade' %}active{% endif %}">
+          <span class="nav-icon">💉</span> Sanidade
+        </a>
+        <a href="/nutricao-page" class="nav-item {% if pagina=='nutricao' %}active{% endif %}">
+          <span class="nav-icon">🌾</span> Nutrição
+        </a>
+        <a href="/inseminacao-page" class="nav-item {% if pagina=='inseminacao' %}active{% endif %}">
+          <span class="nav-icon">🔬</span> Inseminação
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Campo</div>
+        <a href="/pastagem-page" class="nav-item {% if pagina=='pastagem' %}active{% endif %}">
+          <span class="nav-icon">🌿</span> Pastagem
+        </a>
+        <a href="/balanca-page" class="nav-item {% if pagina=='balanca' %}active{% endif %}">
+          <span class="nav-icon">⚡</span> Balança S3
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Gestão</div>
+        <a href="/financeiro-page" class="nav-item {% if pagina=='financeiro' %}active{% endif %}">
+          <span class="nav-icon">💰</span> Financeiro
+          {% if alertas_financeiro %}<span class="nav-pill alert">!</span>{% endif %}
+        </a>
+        <a href="/relatorios-page" class="nav-item {% if pagina=='relatorios' %}active{% endif %}">
+          <span class="nav-icon">📊</span> Relatórios
+        </a>
+        <a href="/pessoas-page" class="nav-item {% if pagina=='pessoas' %}active{% endif %}">
+          <span class="nav-icon">👥</span> Pessoas
+        </a>
+      </div>
+
+      <!-- ── Ações Rápidas ── -->
+      <div class="sidebar-divider"></div>
+      <div class="nav-group-label">Ações rápidas</div>
+
+      <button class="nav-item nav-action {% if alertas_sanidade %}nav-urgent{% endif %}"
+              onclick="CadastroMedicamentos()">
+        <span class="nav-icon">💉</span>
+        <span>Sanidade</span>
+        {% if alertas_sanidade %}
+        <span class="nav-pill alert">{{ alertas_sanidade }}</span>
+        {% endif %}
+      </button>
+
+      <button class="nav-item nav-action {% if alertas_despesas %}nav-urgent{% endif %}"
+              onclick="CADASTRODESPESA()">
+        <span class="nav-icon">💰</span>
+        <span>Nova Despesa</span>
+        {% if alertas_despesas %}
+        <span class="nav-pill alert">!</span>
+        {% endif %}
+      </button>
+
+      <button class="nav-item nav-action highlight" onclick="irPesagem()">
+        <span class="nav-icon">⚖️</span>
+        <span>Pesagem</span>
+      </button>
+
+      <button class="nav-item nav-action" onclick="CadastroAnimal()">
+        <span class="nav-icon">🐄</span>
+        <span>Novo Animal</span>
+      </button>
+
+      <button class="nav-item nav-action highlight" onclick="irPastagem()">
+        <span class="nav-icon">🌿</span>
+        <span>Medir Pasto</span>
+      </button>
+
+      <button class="nav-item nav-action" onclick="irBalanca()">
+        <span class="nav-icon">⚡</span>
+        <span>Importar S3</span>
+      </button>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-dot"></div>
+      <span>Sistema ativo · rebanho.db</span>
+    </div>
+  </aside>
+
+  <!-- ── ÁREA PRINCIPAL ── -->
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title">{% block page_title %}{% endblock %}</h1>
+        <span class="topbar-sub">{% block page_sub %}{% endblock %}</span>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-badge">{{ hora_atual }}</span>
+        <button class="topbar-btn" onclick="location.reload()" title="Atualizar">🔄</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+</div><!-- /app-layout -->
+
+<!-- ── TOAST (Alpine) ── -->
+<div id="toast-alpine"
+     x-data="{ visivel: false, mensagem: '', tipo: 'sucesso', _t: null }"
+     x-cloak
+     x-show="visivel"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 -translate-y-1"
+     x-transition:enter-end="opacity-100 translate-y-0"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     x-on:mostrar-toast.window="mensagem=$event.detail.mensagem; tipo=$event.detail.tipo||'sucesso'; visivel=true; clearTimeout(_t); _t=setTimeout(()=>visivel=false,3000);"
+     :class="'toast ' + tipo"
+     style="display:block;">
+  <span x-text="mensagem"></span>
+</div>
+
+<!-- ── TOAST fallback (sem Alpine) ── -->
+<div id="toast" class="toast" style="display:none;"></div>
+
+<!-- ── MODAL DE CONFIRMAÇÃO ── -->
+<div id="modalConfirm" style="display:none;position:fixed;inset:0;background:rgba(7,26,7,.5);
+     z-index:9998;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:380px;width:90%;
+              box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <p style="font-size:14px;color:#374151;margin-bottom:20px;">⚠️ Tem certeza? Esta ação não pode ser desfeita.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="fecharModal()"
+        class="btn">Cancelar</button>
+      <button id="btnConfirmarExclusao"
+        class="btn btn-danger" style="font-weight:600;">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Toast ──────────────────────────────────────────────────────────────
+function showToast(msg, tipo) {
+  window.dispatchEvent(new CustomEvent('mostrar-toast', {
+    detail: { mensagem: msg, tipo: tipo || 'sucesso' }
+  }));
+  const t = document.getElementById('toast');
+  if (t) {
+    t.className = 'toast ' + (tipo || 'sucesso');
+    t.textContent = msg;
+    t.style.display = 'flex';
+    setTimeout(() => { t.style.display = 'none'; }, 3000);
+  }
+}
+
+// ── Alpine helpers ─────────────────────────────────────────────────────
+function _alpineData(id) {
+  const el = document.getElementById(id);
+  return (el && window.Alpine) ? Alpine.$data(el) : null;
+}
+function _alpineOpen(id, aberto) {
+  const d = _alpineData(id);
+  if (d && 'aberto' in d) { d.aberto = aberto; return; }
+  const el = document.getElementById(id);
+  if (el) el.style.display = aberto ? 'flex' : 'none';
+}
+
+// ── Modal de confirmação ───────────────────────────────────────────────
+let _excluirCallback = null;
+
+function confirmarExclusao(url, callback) {
+  const modal = document.getElementById('modalConfirm');
+  modal.style.display = 'flex';
+  _excluirCallback = async () => {
+    fecharModal();
+    try {
+      const r = await fetch(url, { method: 'DELETE' });
+      if (r.ok) {
+        showToast('Removido com sucesso!', 'sucesso');
+        if (callback) callback();
+      } else {
+        const d = await r.json();
+        showToast(d.detail || 'Erro ao remover.', 'erro');
+      }
+    } catch { showToast('Erro de conexão.', 'erro'); }
+  };
+  document.getElementById('btnConfirmarExclusao').onclick = _excluirCallback;
+}
+
+function fecharModal() {
+  document.getElementById('modalConfirm').style.display = 'none';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function fmtMoeda(v) {
+  return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtData(str) {
+  if (!str) return '';
+  const [y, m, d] = str.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : str;
+}
+
+// ── Navegação ──────────────────────────────────────────────────────────
+function CadastroAnimal()      { window.location.href = '/animais-page'; }
+function irPesagem()           { window.location.href = '/pesagem-page'; }
+function irPastagem()          { window.location.href = '/pastagem-page'; }
+function irBalanca()           { window.location.href = '/balanca-page'; }
+function irNutricao()          { window.location.href = '/nutricao-page'; }
+function CadastroMedicamentos(){ window.location.href = '/sanidade-page'; }
+function CadastroInseminacao() { window.location.href = '/inseminacao-page'; }
+function CADASTRODESPESA()     { window.location.href = '/financeiro-page'; }
+function CadastroCompra()      { window.location.href = '/financeiro-page'; }
+function CadastroVenda()       { window.location.href = '/financeiro-page'; }
+function CadastroPessoas()     { window.location.href = '/pessoas-page'; }
+function abrirConfiguracoes() {
+  if (typeof abrirConfig === 'function') { abrirConfig(); }
+  else { window.location.href = '/dashboard'; }
+}
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

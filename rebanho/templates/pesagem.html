@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+{% block title %}Registro de Pesagem — Fazenda Ipanema{% endblock %}
+{% block page_title %}Registro de Pesagem{% endblock %}
+
+{% block content %}
+
+<!-- ── Formulário de registro ────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <h2 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:16px;">⚖️ Nova Pesagem</h2>
+
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;align-items:end;">
+    <div>
+      <label class="lbl">Animal (Brinco)</label>
+      <select id="selBrinco" class="inp sel" onchange="selecionarAnimal(this.value)">
+        <option value="">Selecione um animal ativo...</option>
+      </select>
+    </div>
+    <div>
+      <label class="lbl">Data da Pesagem</label>
+      <input id="inpData" type="date" class="inp" oninput="calcPrevia()" />
+    </div>
+    <div>
+      <label class="lbl">Peso Atual (kg)</label>
+      <input id="inpPeso" type="number" step="0.1" min="0" class="inp" placeholder="0.0" oninput="calcPrevia()" />
+    </div>
+  </div>
+
+  <!-- Cards de última pesagem — Alpine para cálculo em tempo real -->
+  <div id="cardsAnterior"
+       x-data="{
+         pesoAnterior: 0, dataAnterior: '',
+         pesoAtual: 0, dataAtual: '',
+         get ganhoKg() {
+           if (!this.pesoAtual) return '—';
+           const g = this.pesoAtual - this.pesoAnterior;
+           return (g >= 0 ? '+' : '') + g.toFixed(1) + ' kg';
+         },
+         get ganhoPct() {
+           if (!this.pesoAtual || !this.pesoAnterior) return '—';
+           const g = this.pesoAtual - this.pesoAnterior;
+           return ((g / this.pesoAnterior) * 100).toFixed(1) + '%';
+         },
+         get mediaDia() {
+           if (!this.dataAnterior || !this.dataAtual || !this.pesoAtual) return '—';
+           const dias = (new Date(this.dataAtual) - new Date(this.dataAnterior)) / 86400000;
+           if (dias <= 0) return '—';
+           return ((this.pesoAtual - this.pesoAnterior) / dias).toFixed(1) + ' kg/dia';
+         },
+         get corGanho() {
+           if (!this.pesoAtual) return '#E65100';
+           return (this.pesoAtual - this.pesoAnterior) >= 0 ? '#2E7D32' : '#dc2626';
+         }
+       }"
+       style="display:none;margin-top:14px;gap:12px;flex-wrap:wrap;" class="flex">
+    <div style="background:#F1F8E9;border:1px solid #C8E6C9;border-radius:8px;padding:10px 16px;">
+      <div style="font-size:11px;color:#555;font-weight:600;">ÚLTIMA PESAGEM</div>
+      <div id="infoUltimaData" style="font-size:15px;font-weight:700;color:#1B5E20;">—</div>
+    </div>
+    <div style="background:#F1F8E9;border:1px solid #C8E6C9;border-radius:8px;padding:10px 16px;">
+      <div style="font-size:11px;color:#555;font-weight:600;">PESO ANTERIOR</div>
+      <div id="infoUltimoPeso" style="font-size:15px;font-weight:700;color:#1B5E20;">—</div>
+    </div>
+    <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 16px;">
+      <div style="font-size:11px;color:#555;font-weight:600;">GANHO (kg)</div>
+      <div id="prevGanhoKg" x-text="ganhoKg" :style="'font-size:15px;font-weight:700;color:' + corGanho">—</div>
+    </div>
+    <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 16px;">
+      <div style="font-size:11px;color:#555;font-weight:600;">GANHO (%)</div>
+      <div id="prevGanhoPct" x-text="ganhoPct" :style="'font-size:15px;font-weight:700;color:' + corGanho">—</div>
+    </div>
+    <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 16px;">
+      <div style="font-size:11px;color:#555;font-weight:600;">MÉDIA/DIA</div>
+      <div id="prevMedia" x-text="mediaDia" :style="'font-size:15px;font-weight:700;color:' + corGanho">—</div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;">
+    <button onclick="registrarPesagem()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:9px 22px;cursor:pointer;font-size:14px;font-weight:600;">💾 Registrar Pesagem</button>
+  </div>
+</div>
+
+<!-- ── Timeline de Peso ──────────────────────────────────────────── -->
+<div id="secaoTimeline" style="display:none;margin-bottom:20px;">
+  <div style="background:#fff;border-radius:10px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <h2 style="font-size:14px;font-weight:600;color:#1B5E20;">📈 Timeline de Peso</h2>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label class="lbl" style="margin:0;">Peso alvo (kg):</label>
+        <input id="inpPesoAlvoTimeline" type="number" step="1" min="0" value="480"
+          style="width:80px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;"
+          oninput="atualizarPesoAlvoGrafico()">
+      </div>
+    </div>
+    <div style="position:relative;height:200px;">
+      <canvas id="timelinePesagem"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ── Histórico ──────────────────────────────────────────────────── -->
+<div id="secaoHistorico" style="display:none;">
+  <div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">
+    <div style="padding:14px 20px;border-bottom:1px solid #e5e7eb;">
+      <h2 id="tituloHistorico" style="font-size:14px;font-weight:600;color:#1B5E20;"></h2>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#F1F8E9;color:#33691e;">
+            <th style="padding:10px 14px;text-align:center;border-bottom:2px solid #C8E6C9;">Data</th>
+            <th style="padding:10px 14px;text-align:right;border-bottom:2px solid #C8E6C9;">Peso (kg)</th>
+            <th style="padding:10px 14px;text-align:right;border-bottom:2px solid #C8E6C9;">Ganho (kg)</th>
+            <th style="padding:10px 14px;text-align:right;border-bottom:2px solid #C8E6C9;">Ganho (%)</th>
+            <th style="padding:10px 14px;text-align:right;border-bottom:2px solid #C8E6C9;">Média/dia</th>
+            <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #C8E6C9;">Pasto</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyHistorico"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .lbl { display:block; font-size:10.5px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+  .inp { width:100%; border:0.5px solid #e8e8e8; border-radius:7px; padding:7px 10px; font-size:12.5px; box-sizing:border-box; font-family:inherit; }
+  .inp:focus { outline:none; border-color:#4caf50; box-shadow:0 0 0 3px rgba(76,175,80,.1); }
+  .sel { background:#fff; }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pesoAnterior  = null;
+let dataAnterior  = null;
+let brincoAtual   = null;
+let _chartTimeline = null;
+
+async function init() {
+  // Carrega animais ativos
+  const animais = await fetch('/animais?status=ATIVO').then(r => r.json());
+  const sel = document.getElementById('selBrinco');
+  animais.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.brinco;
+    opt.textContent = `${a.brinco}${a.nome ? ' — ' + a.nome : ''} (${a.tipo || ''})`;
+    sel.appendChild(opt);
+  });
+
+  // Pré-selecionar brinco da URL
+  const params = new URLSearchParams(window.location.search);
+  const brincoUrl = params.get('brinco');
+  if (brincoUrl) {
+    sel.value = brincoUrl;
+    if (sel.value) await selecionarAnimal(brincoUrl);
+  }
+
+  // Data padrão: hoje
+  const hoje = new Date().toISOString().split('T')[0];
+  document.getElementById('inpData').value = hoje;
+}
+
+async function selecionarAnimal(brinco) {
+  brincoAtual = brinco;
+  pesoAnterior = null;
+  dataAnterior = null;
+
+  if (!brinco) {
+    document.getElementById('cardsAnterior').style.display = 'none';
+    document.getElementById('secaoHistorico').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('cardsAnterior').style.display = 'flex';
+  document.getElementById('secaoHistorico').style.display = 'block';
+  document.getElementById('tituloHistorico').textContent = `Histórico de Pesagens — ${brinco}`;
+
+  await carregarHistorico(brinco);
+
+  // Sync Alpine calc state
+  const d = _alpineData('cardsAnterior');
+  if (d) {
+    d.pesoAnterior = pesoAnterior || 0;
+    d.dataAnterior = dataAnterior || '';
+    d.dataAtual = document.getElementById('inpData').value || '';
+  }
+}
+
+async function carregarHistorico(brinco) {
+  const pesagens = await fetch(`/animais/${brinco}/pesagens`).then(r => r.json());
+  const tbody = document.getElementById('tbodyHistorico');
+
+  if (pesagens.length > 0) {
+    pesoAnterior = pesagens[0].peso;
+    dataAnterior = pesagens[0].data_pesagem;
+    document.getElementById('infoUltimaData').textContent = fmtData(dataAnterior);
+    document.getElementById('infoUltimoPeso').textContent = `${pesoAnterior} kg`;
+  } else {
+    document.getElementById('infoUltimaData').textContent = 'Sem pesagem';
+    document.getElementById('infoUltimoPeso').textContent = '—';
+  }
+
+  calcPrevia();
+  renderTimeline(pesagens);
+
+  if (pesagens.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#9ca3af;">Nenhuma pesagem registrada.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = pesagens.map((p, i) => {
+    const ganhoKg  = p.ganho_kg  != null ? p.ganho_kg  : 0;
+    const ganhoPct = p.ganho_pct != null ? p.ganho_pct : 0;
+    const media    = p.media_dia_kg != null ? p.media_dia_kg : 0;
+    const corGanho = ganhoKg >= 0 ? '#2E7D32' : '#dc2626';
+    return `<tr style="background:${i%2===0?'#fff':'#fafafa'};border-bottom:1px solid #f3f4f6;">
+      <td style="padding:8px 14px;text-align:center;">${fmtData(p.data_pesagem)}</td>
+      <td style="padding:8px 14px;text-align:right;font-weight:600;">${p.peso} kg</td>
+      <td style="padding:8px 14px;text-align:right;color:${corGanho};">${ganhoKg >= 0 ? '+' : ''}${ganhoKg} kg</td>
+      <td style="padding:8px 14px;text-align:right;color:${corGanho};">${ganhoPct}%</td>
+      <td style="padding:8px 14px;text-align:right;">${media} kg/d</td>
+      <td style="padding:8px 14px;">${p.pasto || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function calcPrevia() {
+  // Update Alpine reactive state — computed getters handle the display
+  const d = _alpineData('cardsAnterior');
+  if (d) {
+    d.pesoAtual = parseFloat(document.getElementById('inpPeso').value) || 0;
+    d.dataAtual = document.getElementById('inpData').value || '';
+  }
+}
+
+async function registrarPesagem() {
+  const brinco = document.getElementById('selBrinco').value;
+  const data   = document.getElementById('inpData').value;
+  const peso   = parseFloat(document.getElementById('inpPeso').value);
+
+  if (!brinco) { showToast('Selecione um animal.', 'erro'); return; }
+  if (!data)   { showToast('Informe a data da pesagem.', 'erro'); return; }
+  if (!peso)   { showToast('Informe o peso.', 'erro'); return; }
+
+  try {
+    const r = await fetch('/pesagens', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ brinco, data_pesagem: data, peso }),
+    });
+    const d = await r.json();
+    if (!r.ok) { showToast(d.detail || 'Erro ao registrar.', 'erro'); return; }
+    showToast('Pesagem registrada!', 'sucesso');
+    document.getElementById('inpPeso').value = '';
+    await carregarHistorico(brinco);
+  } catch { showToast('Erro de conexão.', 'erro'); }
+}
+
+function renderTimeline(pesagens) {
+  const secao = document.getElementById('secaoTimeline');
+  if (!pesagens || pesagens.length < 2) { secao.style.display = 'none'; return; }
+  secao.style.display = 'block';
+
+  const pesoAlvo = parseFloat(document.getElementById('inpPesoAlvoTimeline').value) || 480;
+  const rows = [...pesagens].reverse(); // cronológico
+
+  const labels = rows.map(p => fmtData(p.data_pesagem));
+  const pesos  = rows.map(p => p.peso);
+
+  // GMD dos últimos 3 pontos para projeção
+  const rec = rows.slice(-3);
+  let gmdProj = 0.7;
+  if (rec.length >= 2) {
+    const dias = (new Date(rec[rec.length-1].data_pesagem) - new Date(rec[0].data_pesagem)) / 86400000;
+    if (dias > 0) gmdProj = (rec[rec.length-1].peso - rec[0].peso) / dias;
+  }
+
+  // Projeção mensal até atingir alvo (máx 24 meses)
+  const projLabels = [];
+  const projData   = [];
+  let pProj = pesos[pesos.length - 1];
+  const dateProj   = new Date(rows[rows.length - 1].data_pesagem);
+  while (pProj < pesoAlvo && projLabels.length < 24) {
+    dateProj.setMonth(dateProj.getMonth() + 1);
+    pProj += gmdProj * 30;
+    const [y, m, d] = dateProj.toISOString().split('T')[0].split('-');
+    projLabels.push(`${d}/${m}/${y}`);
+    projData.push(parseFloat(pProj.toFixed(1)));
+  }
+
+  const allLabels = [...labels, ...projLabels];
+  const realDs    = [...pesos, ...projLabels.map(() => null)];
+  const projDs    = [...pesos.map(() => null), ...projData];
+  if (projData.length > 0) projDs[labels.length - 1] = pesos[pesos.length - 1];
+
+  if (_chartTimeline) _chartTimeline.destroy();
+  _chartTimeline = new Chart(document.getElementById('timelinePesagem'), {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [
+        { label: 'Peso real (kg)', data: realDs,
+          borderColor: '#1B5E20', backgroundColor: 'rgba(27,94,32,.1)',
+          fill: true, tension: 0.3, pointRadius: 4, spanGaps: false },
+        { label: `Projeção (${gmdProj.toFixed(2)} kg/d)`, data: projDs,
+          borderColor: '#1565C0', borderDash: [6,4],
+          fill: false, tension: 0.3, pointRadius: 3, spanGaps: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 } } },
+        annotation: {
+          annotations: {
+            alvoLine: {
+              type: 'line', yMin: pesoAlvo, yMax: pesoAlvo,
+              borderColor: '#dc2626', borderWidth: 2, borderDash: [4,4],
+              label: { content: `Alvo: ${pesoAlvo} kg`, display: true,
+                       position: 'end', backgroundColor: '#dc2626',
+                       font: { size: 11 }, color: '#fff', padding: 4 }
+            }
+          }
+        }
+      },
+      scales: { y: { title: { display: true, text: 'Peso (kg)' } } }
+    }
+  });
+}
+
+function atualizarPesoAlvoGrafico() {
+  if (!_chartTimeline) return;
+  const alvo = parseFloat(document.getElementById('inpPesoAlvoTimeline').value) || 480;
+  const ann  = _chartTimeline.options.plugins.annotation.annotations.alvoLine;
+  ann.yMin = alvo; ann.yMax = alvo;
+  ann.label.content = `Alvo: ${alvo} kg`;
+  _chartTimeline.update();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}
