@@ -20,8 +20,6 @@ from routers.nutricao import seed_nutricao as _seed_nut
 from routers.fazendas import seed_fazendas as _seed_faz
 from routers.confinamento import seed_confinamento as _seed_conf
 
-import uvicorn
-
 app = FastAPI(title="Controle de Rebanho Bovino")
 
 app.add_middleware(
@@ -251,5 +249,6 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 if __name__ == "__main__":
     import os
+    import uvicorn
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
