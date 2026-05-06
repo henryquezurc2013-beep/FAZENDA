@@ -3,12 +3,10 @@ import io
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
-from database import get_db
-from models import Animal, Inseminacao
+from database import supabase
 from routers.relatorios import _previsao_animal
 
 router = APIRouter()
@@ -35,7 +33,7 @@ def _calc_idade_anos(data_nascimento: Optional[str]) -> str:
         return ""
 
 
-def _csv_response(rows: list[list], cabecalho: list[str], nome_arquivo: str) -> StreamingResponse:
+def _csv_response(rows: list, cabecalho: list, nome_arquivo: str) -> StreamingResponse:
     output = io.StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)
@@ -57,63 +55,55 @@ def exportar_animais(
     status: Optional[str] = Query(None),
     sexo: Optional[str] = Query(None),
     raca: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    q = db.query(Animal)
+    q = supabase.table("animais").select("*")
     if brinco:
-        q = q.filter(Animal.brinco.ilike(brinco))
+        q = q.ilike("brinco", brinco)
     if pasto:
-        q = q.filter(Animal.pasto.ilike(pasto))
+        q = q.ilike("pasto", pasto)
     if tipo:
-        q = q.filter(Animal.tipo.ilike(tipo))
+        q = q.ilike("tipo", tipo)
     if status:
-        q = q.filter(Animal.status.ilike(status))
+        q = q.ilike("status", status)
     if sexo:
-        q = q.filter(Animal.sexo.ilike(sexo))
+        q = q.ilike("sexo", sexo)
     if raca:
-        q = q.filter(Animal.raca.ilike(raca))
-
-    animais = q.order_by(Animal.brinco).all()
-
+        q = q.ilike("raca", raca)
+    animais = q.order("brinco").execute().data
     cabecalho = [
         "Brinco", "Nome", "Sexo", "Origem", "Data Compra", "Data Nascimento",
         "Raça", "Tipo", "Idade (anos)", "Status", "Pasto", "Lote", "Peso", "Última Cria",
     ]
     rows = [
         [
-            a.brinco, a.nome or "", a.sexo or "", a.origem or "",
-            _fmt(a.data_compra), _fmt(a.data_nascimento),
-            a.raca or "", a.tipo or "", _calc_idade_anos(a.data_nascimento),
-            a.status or "", a.pasto or "", a.lote or "",
-            a.peso_atual if a.peso_atual is not None else "",
-            _fmt(a.ult_cria),
+            a["brinco"], a.get("nome") or "", a.get("sexo") or "", a.get("origem") or "",
+            _fmt(a.get("data_compra")), _fmt(a.get("data_nascimento")),
+            a.get("raca") or "", a.get("tipo") or "", _calc_idade_anos(a.get("data_nascimento")),
+            a.get("status") or "", a.get("pasto") or "", a.get("lote") or "",
+            a.get("peso_atual") if a.get("peso_atual") is not None else "",
+            _fmt(a.get("ult_cria")),
         ]
         for a in animais
     ]
-
-    nome = f"animais_{date.today().isoformat()}.csv"
-    return _csv_response(rows, cabecalho, nome)
+    return _csv_response(rows, cabecalho, f"animais_{date.today().isoformat()}.csv")
 
 
 @router.get("/inseminacoes")
-def exportar_inseminacoes(db: Session = Depends(get_db)):
-    registros = db.query(Inseminacao).order_by(Inseminacao.data_insem.desc()).all()
-
+def exportar_inseminacoes():
+    registros = supabase.table("inseminacoes").select("*").order("data_insem", desc=True).execute().data
     cabecalho = [
         "Brinco", "Data Inseminação", "Prenhez", "Qtd Crias",
         "Nasc. Crias", "Status", "Observação",
     ]
     rows = [
         [
-            r.brinco, _fmt(r.data_insem), r.prenhez or "",
-            r.qtd_crias if r.qtd_crias is not None else 0,
-            _fmt(r.data_nasc_cria), r.status or "", r.obs or "",
+            r["brinco"], _fmt(r.get("data_insem")), r.get("prenhez") or "",
+            r.get("qtd_crias") if r.get("qtd_crias") is not None else 0,
+            _fmt(r.get("data_nasc_cria")), r.get("status") or "", r.get("obs") or "",
         ]
         for r in registros
     ]
-
-    nome = f"inseminacoes_{date.today().isoformat()}.csv"
-    return _csv_response(rows, cabecalho, nome)
+    return _csv_response(rows, cabecalho, f"inseminacoes_{date.today().isoformat()}.csv")
 
 
 @router.get("/previsao-saida")
@@ -125,25 +115,16 @@ def exportar_previsao_saida(
     pasto: Optional[str] = Query(None),
     lote: Optional[str] = Query(None),
     preco_arroba: Optional[float] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    q = db.query(Animal).filter(Animal.status.ilike(status))
+    q = supabase.table("animais").select("*").ilike("status", status)
     if tipo:
-        q = q.filter(Animal.tipo.ilike(tipo))
+        q = q.ilike("tipo", tipo)
     if pasto:
-        q = q.filter(Animal.pasto.ilike(pasto))
+        q = q.ilike("pasto", pasto)
     if lote:
-        q = q.filter(Animal.lote.ilike(f"%{lote}%"))
-
-    animais = q.all()
-    resultado = [_previsao_animal(a, peso_alvo, dias_gmd, preco_arroba, db) for a in animais]
-
-    cabecalho = [
-        "Brinco", "Nome", "Tipo", "Raça", "Pasto", "Lote",
-        "Peso Atual (kg)", "Peso Alvo (kg)", "Falta (kg)", "GMD Real (kg/dia)",
-        "Qtd Pesagens", "Data Prevista", "Data Otimista", "Data Pessimista",
-        "Arrobas Previstas", "Receita Estimada (R$)", "Lucro Estimado (R$)", "Situação",
-    ]
+        q = q.ilike("lote", f"%{lote}%")
+    animais = q.execute().data
+    resultado = [_previsao_animal(a, peso_alvo, dias_gmd, preco_arroba, None) for a in animais]
 
     def _dd(iso):
         if not iso:
@@ -153,10 +134,16 @@ def exportar_previsao_saida(
         except Exception:
             return iso
 
+    cabecalho = [
+        "Brinco", "Nome", "Tipo", "Raça", "Pasto", "Lote",
+        "Peso Atual (kg)", "Peso Alvo (kg)", "Falta (kg)", "GMD Real (kg/dia)",
+        "Qtd Pesagens", "Data Prevista", "Data Otimista", "Data Pessimista",
+        "Arrobas Previstas", "Receita Estimada (R$)", "Lucro Estimado (R$)", "Situação",
+    ]
     rows = [
         [
-            r["brinco"], r["nome"] or "", r["tipo"] or "", r["raca"] or "",
-            r["pasto"] or "", r["lote"] or "",
+            r["brinco"], r.get("nome") or "", r.get("tipo") or "", r.get("raca") or "",
+            r.get("pasto") or "", r.get("lote") or "",
             r["peso_atual"], r["peso_alvo"], r["diferenca_kg"],
             r["gmd_real"] if r["gmd_real"] is not None else "",
             r["qtd_pesagens"], _dd(r["data_prevista"]), _dd(r["data_otimista"]), _dd(r["data_pessimista"]),
@@ -167,6 +154,5 @@ def exportar_previsao_saida(
         ]
         for r in resultado
     ]
-
     nome = f"previsao_saida_{date.today().isoformat()}_pesoalvo_{int(peso_alvo)}kg.csv"
     return _csv_response(rows, cabecalho, nome)

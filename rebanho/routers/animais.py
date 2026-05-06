@@ -1,13 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Optional, List
 from datetime import date
 
-from database import get_db
-from models import Animal, Pesagem, Sanidade
-from schemas import AnimalCreate, AnimalUpdate, AnimalOut, PesagemOut, SanidadeOut
+from database import supabase, get_fazenda_id
 
 router = APIRouter()
+
+# Supabase animais columns:
+# id, fazenda_id, brinco, nome, tipo, raca, sexo, data_nascimento, data_compra,
+# origem, valor_compra, pasto_atual, peso_atual, status, data_morte, motivo_morte,
+# custo_kg, custo_arroba, obs, criado_em
+
+_ALLOWED_FIELDS = {
+    "brinco", "nome", "tipo", "raca", "sexo", "data_nascimento", "data_compra",
+    "origem", "valor_compra", "pasto_atual", "peso_atual", "status", "data_morte",
+    "motivo_morte", "custo_kg", "custo_arroba", "obs", "fazenda_id",
+}
 
 
 def _calc_idade(data_nascimento: str):
@@ -23,64 +31,55 @@ def _calc_idade(data_nascimento: str):
         return 0, 0
 
 
-def _to_out(animal: Animal) -> dict:
-    d = {c.name: getattr(animal, c.name) for c in animal.__table__.columns}
-    anos, meses = _calc_idade(animal.data_nascimento or "")
+def _to_out(animal: dict) -> dict:
+    d = dict(animal)
+    anos, meses = _calc_idade(animal.get("data_nascimento") or "")
     d["idade_anos"] = anos
     d["idade_meses"] = meses
+    # Backward compat: expose pasto_atual as pasto
+    d["pasto"] = animal.get("pasto_atual")
     return d
 
 
-def _calcular_custos(animal: "Animal"):
-    if animal.valor_compra and animal.valor_compra > 0 and animal.peso_atual and animal.peso_atual > 0:
-        animal.custo_kg = round(animal.valor_compra / animal.peso_atual, 2)
-        animal.custo_arroba = round(animal.valor_compra / (animal.peso_atual / 15), 2)
+def _calcular_custos(data: dict) -> dict:
+    vc = data.get("valor_compra")
+    pa = data.get("peso_atual")
+    if vc and vc > 0 and pa and pa > 0:
+        data["custo_kg"] = round(vc / pa, 2)
+        data["custo_arroba"] = round(vc / (pa / 15), 2)
     else:
-        animal.custo_kg = None
-        animal.custo_arroba = None
+        data["custo_kg"] = None
+        data["custo_arroba"] = None
+    return data
 
 
-def _validate_and_fill(data: dict, db: Session, brinco_original: str = None):
+def _clean(data: dict) -> dict:
+    """Keep only fields that exist in Supabase animais table."""
+    # Map old field names to new
+    if "pasto" in data and "pasto_atual" not in data:
+        data["pasto_atual"] = data.pop("pasto")
+    elif "pasto" in data:
+        data.pop("pasto")
+    # Remove fields not in Supabase
+    return {k: v for k, v in data.items() if k in _ALLOWED_FIELDS}
+
+
+def _validate_and_fill(data: dict):
     required = ["brinco", "sexo", "tipo", "raca", "origem", "data_nascimento", "status"]
     missing = [f for f in required if not data.get(f)]
     if missing:
         raise HTTPException(status_code=400, detail=f"Campos obrigatórios: {', '.join(missing)}")
-
     if data.get("status") == "MORTO":
         if not data.get("data_morte"):
             raise HTTPException(status_code=400, detail="data_morte é obrigatória quando status = MORTO")
         if not data.get("motivo_morte"):
             raise HTTPException(status_code=400, detail="motivo_morte é obrigatório quando status = MORTO")
-
-    if data.get("data_morte"):
-        try:
-            dt = date.fromisoformat(data["data_morte"])
-            data["mes_morte"] = dt.month
-            data["ano_morte"] = dt.year
-        except ValueError:
-            raise HTTPException(status_code=400, detail="data_morte inválida, use YYYY-MM-DD")
-
     return data
 
 
-def _atualizar_pais(data: dict, db: Session):
-    data_nasc = data.get("data_nascimento")
-    if not data_nasc:
-        return
-
-    for campo in ("nome_pai", "nome_mae"):
-        brinco_parente = data.get(campo)
-        if brinco_parente:
-            parente = db.query(Animal).filter(
-                Animal.brinco.ilike(brinco_parente)
-            ).first()
-            if parente:
-                parente.ult_cria = data_nasc
-                db.add(parente)
-
-
-@router.get("", response_model=List[AnimalOut])
+@router.get("")
 def listar_animais(
+    request: Request,
     brinco: Optional[str] = Query(None),
     pasto: Optional[str] = Query(None),
     tipo: Optional[str] = Query(None),
@@ -89,116 +88,102 @@ def listar_animais(
     raca: Optional[str] = Query(None),
     lote: Optional[str] = Query(None),
     sem_lote: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    q = db.query(Animal)
+    fid = get_fazenda_id(request)
+    q = supabase.table("animais").select("*")
+    if fid > 0:
+        q = q.eq("fazenda_id", fid)
     if brinco:
-        q = q.filter(Animal.brinco.ilike(brinco))
+        q = q.ilike("brinco", brinco)
     if pasto:
-        q = q.filter(Animal.pasto.ilike(pasto))
+        q = q.ilike("pasto_atual", pasto)
     if tipo:
-        q = q.filter(Animal.tipo.ilike(tipo))
+        q = q.ilike("tipo", tipo)
     if status:
-        q = q.filter(Animal.status.ilike(status))
+        q = q.ilike("status", status)
     if sexo:
-        q = q.filter(Animal.sexo.ilike(sexo))
+        q = q.ilike("sexo", sexo)
     if raca:
-        q = q.filter(Animal.raca.ilike(raca))
-    if lote:
-        q = q.filter(Animal.lote.ilike(f"%{lote}%"))
-    if sem_lote == "1":
-        q = q.filter((Animal.lote == None) | (Animal.lote == ""))
+        q = q.ilike("raca", raca)
+    rows = q.limit(500).execute().data
 
-    animais = q.limit(500).all()
-    return [_to_out(a) for a in animais]
+    if lote or sem_lote == "1":
+        # lote_animais lookup
+        la_q = supabase.table("lote_animais").select("brinco,lote_id")
+        if fid > 0:
+            la_q = la_q.eq("fazenda_id", fid)
+        la_rows = la_q.is_("data_saida", "null").execute().data
+        brinco_lote = {r["brinco"]: r["lote_id"] for r in la_rows}
+        if sem_lote == "1":
+            rows = [r for r in rows if r.get("brinco") not in brinco_lote]
+        if lote:
+            lote_ids = [r["id"] for r in supabase.table("lotes").select("id,nome").ilike("nome", f"%{lote}%").execute().data]
+            rows = [r for r in rows if brinco_lote.get(r.get("brinco")) in lote_ids]
+
+    return [_to_out(a) for a in rows]
 
 
-@router.get("/{brinco}", response_model=AnimalOut)
-def buscar_animal(brinco: str, db: Session = Depends(get_db)):
-    animal = db.query(Animal).filter(Animal.brinco.ilike(brinco)).first()
-    if not animal:
+@router.get("/{brinco}")
+def buscar_animal(brinco: str):
+    rows = supabase.table("animais").select("*").ilike("brinco", brinco).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Animal não encontrado")
-    return _to_out(animal)
+    return _to_out(rows[0])
 
 
-@router.post("", response_model=AnimalOut, status_code=201)
-def criar_animal(payload: AnimalCreate, db: Session = Depends(get_db)):
-    existente = db.query(Animal).filter(Animal.brinco.ilike(payload.brinco)).first()
-    if existente:
+@router.post("", status_code=201)
+def criar_animal(request: Request, body: dict):
+    existing = supabase.table("animais").select("id").ilike("brinco", body.get("brinco", "")).limit(1).execute().data
+    if existing:
         raise HTTPException(status_code=400, detail="Brinco já cadastrado")
-
-    data = payload.model_dump()
-    _validate_and_fill(data, db)
-
-    animal = Animal(**{k: v for k, v in data.items() if hasattr(Animal, k) and k not in ("custo_kg", "custo_arroba")})
-    _calcular_custos(animal)
-    db.add(animal)
-
-    _atualizar_pais(data, db)
-    db.commit()
-    db.refresh(animal)
-    return _to_out(animal)
+    data = _clean(dict(body))
+    _validate_and_fill(data)
+    fid = get_fazenda_id(request)
+    if fid > 0:
+        data["fazenda_id"] = fid
+    _calcular_custos(data)
+    result = supabase.table("animais").insert(data).execute().data[0]
+    return _to_out(result)
 
 
-@router.put("/{brinco}", response_model=AnimalOut)
-def atualizar_animal(brinco: str, payload: AnimalUpdate, db: Session = Depends(get_db)):
-    animal = db.query(Animal).filter(Animal.brinco.ilike(brinco)).first()
-    if not animal:
+@router.put("/{brinco}")
+def atualizar_animal(brinco: str, body: dict):
+    rows = supabase.table("animais").select("*").ilike("brinco", brinco).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Animal não encontrado")
-
-    update_data = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if k != "brinco"}
-
-    merged = {c.name: getattr(animal, c.name) for c in animal.__table__.columns}
+    animal = rows[0]
+    update_data = _clean({k: v for k, v in body.items() if k != "brinco"})
+    merged = dict(animal)
     merged.update(update_data)
-
-    _validate_and_fill(merged, db, brinco_original=brinco)
-
-    for k, v in update_data.items():
-        if k not in ("custo_kg", "custo_arroba"):
-            setattr(animal, k, v)
-
-    if merged.get("data_morte"):
-        animal.mes_morte = merged.get("mes_morte")
-        animal.ano_morte = merged.get("ano_morte")
-
-    _calcular_custos(animal)
-    _atualizar_pais(update_data, db)
-    db.commit()
-    db.refresh(animal)
-    return _to_out(animal)
+    _validate_and_fill(merged)
+    _calcular_custos(merged)
+    update_clean = _clean(update_data)
+    supabase.table("animais").update(update_clean).eq("id", animal["id"]).execute()
+    result = supabase.table("animais").select("*").eq("id", animal["id"]).limit(1).execute().data[0]
+    return _to_out(result)
 
 
 @router.delete("/{brinco}")
-def deletar_animal(brinco: str, db: Session = Depends(get_db)):
-    animal = db.query(Animal).filter(Animal.brinco.ilike(brinco)).first()
-    if not animal:
+def deletar_animal(brinco: str):
+    rows = supabase.table("animais").select("id").ilike("brinco", brinco).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Animal não encontrado")
-    db.delete(animal)
-    db.commit()
+    supabase.table("animais").delete().eq("id", rows[0]["id"]).execute()
     return {"mensagem": "Animal removido com sucesso"}
 
 
-@router.get("/{brinco}/pesagens", response_model=List[PesagemOut])
-def pesagens_do_animal(brinco: str, db: Session = Depends(get_db)):
-    animal = db.query(Animal).filter(Animal.brinco.ilike(brinco)).first()
-    if not animal:
+@router.get("/{brinco}/pesagens")
+def pesagens_do_animal(brinco: str):
+    rows = supabase.table("animais").select("id").ilike("brinco", brinco).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Animal não encontrado")
-    return (
-        db.query(Pesagem)
-        .filter(Pesagem.brinco.ilike(brinco))
-        .order_by(Pesagem.data_pesagem.desc())
-        .all()
-    )
+    data = supabase.table("pesagens").select("*").ilike("brinco", brinco).order("data", desc=True).execute().data
+    return [{**r, "data_pesagem": r.get("data"), "peso": r.get("peso_kg")} for r in data]
 
 
-@router.get("/{brinco}/sanidade", response_model=List[SanidadeOut])
-def sanidade_do_animal(brinco: str, db: Session = Depends(get_db)):
-    animal = db.query(Animal).filter(Animal.brinco.ilike(brinco)).first()
-    if not animal:
+@router.get("/{brinco}/sanidade")
+def sanidade_do_animal(brinco: str):
+    rows = supabase.table("animais").select("id").ilike("brinco", brinco).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Animal não encontrado")
-    return (
-        db.query(Sanidade)
-        .filter(Sanidade.brinco.ilike(brinco))
-        .order_by(Sanidade.data.desc())
-        .all()
-    )
+    return supabase.table("sanidade").select("*").ilike("brinco", brinco).order("data", desc=True).execute().data

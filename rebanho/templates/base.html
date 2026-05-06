@@ -1,157 +1,89 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Fazenda Ipanema{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Fazenda Ipanema{% endblock %} · Gestão de Rebanho</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Chart.js (usado em dashboards e relatórios) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2/dist/chartjs-chart-matrix.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+  <!-- Alpine.js (usado em várias telas) -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Leaflet (usado em pastagem) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
   <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-  <style>
-    [x-cloak] { display: none !important; }
-    /* ── Semáforo legacy (pastagem) ── */
-    .sem-VERDE     { background:#d1fae5; color:#065f46; }
-    .sem-AMARELO   { background:#fef9c3; color:#78350f; }
-    .sem-VERMELHO  { background:#fee2e2; color:#991b1b; }
-    .sem-SAIR_AGORA{ background:#fca5a5; color:#7f1d1d; }
-    .sem-OCUPADO   { background:#dbeafe; color:#1e40af; }
-    .sem-SEM_DADOS { background:#f3f4f6; color:#6b7280; }
-    /* ── Situação previsão ── */
-    .sit-PRONTO     { color:#065f46; font-weight:700; }
-    .sit-NO_PRAZO   { color:#1d4ed8; }
-    .sit-MEDIO_PRAZO{ color:#92400e; }
-    .sit-LONGO_PRAZO{ color:#6b7280; }
-    .sit-SEM_DADOS  { color:#9ca3af; }
-    /* ── Mapa Leaflet ── */
-    .piquete-pulsa { animation: piquete-pulse 1.4s ease-in-out infinite; }
-    @keyframes piquete-pulse {
-      0%,100% { opacity:1; }
-      50%      { opacity:.55; }
-    }
-    .mapa-tooltip-label {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-      font-weight: 700;
-      font-size: 11px;
-      color: #fff;
-      text-shadow: 0 1px 3px rgba(0,0,0,.7);
-    }
-  </style>
+  {% block head %}{% endblock %}
 </head>
 <body>
 <div class="app-layout">
 
-  <!-- ── SIDEBAR ── -->
+  <!-- SIDEBAR -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="sidebar-logo-mark">🐄</div>
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-mark" id="sidebarFazendaNome">Fi</div>
       <div>
-        <div class="sidebar-logo-name">Fazenda Ipanema</div>
-        <div class="sidebar-logo-sub">Gestão de Rebanho</div>
+        <div class="sidebar-brand-name">Fazenda Ipanema</div>
+        <div class="sidebar-brand-sub">Gestão de Rebanho</div>
       </div>
     </div>
 
-    <nav class="nav-wrap">
-      <div class="nav-group">
-        <div class="nav-group-label">Principal</div>
-        <a href="/dashboard" class="nav-item {% if pagina=='dashboard' %}active{% endif %}">
+    <nav>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Principal</div>
+        <a href="/dashboard"    class="nav-item {% if pagina=='dashboard' or page=='dashboard' %}active{% endif %}">
           <span class="nav-icon">🏠</span> Dashboard
         </a>
-        <a href="/animais-page" class="nav-item {% if pagina=='animais' %}active{% endif %}">
+        <a href="/animais-page" class="nav-item {% if pagina=='animais' or page=='animais' %}active{% endif %}">
           <span class="nav-icon">🐄</span> Animais
-          {% if total_animais %}<span class="nav-pill">{{ total_animais }}</span>{% endif %}
         </a>
-        <a href="/pesagem-page" class="nav-item {% if pagina=='pesagem' %}active{% endif %}">
+        <a href="/pesagem-page" class="nav-item {% if pagina=='pesagem' or page=='pesagem' %}active{% endif %}">
           <span class="nav-icon">⚖️</span> Pesagem
+        </a>
+        <a href="/balanca-page"  class="nav-item {% if pagina=='balanca' or page=='balanca' %}active{% endif %}">
+          <span class="nav-icon">📡</span> Balança S3
         </a>
       </div>
 
-      <div class="nav-group">
-        <div class="nav-group-label">Saúde</div>
-        <a href="/sanidade-page" class="nav-item {% if pagina=='sanidade' %}active{% endif %}">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Saúde</div>
+        <a href="/sanidade-page"     class="nav-item {% if pagina=='sanidade' or page=='sanidade' %}active{% endif %}">
           <span class="nav-icon">💉</span> Sanidade
         </a>
-        <a href="/nutricao-page" class="nav-item {% if pagina=='nutricao' %}active{% endif %}">
+        <a href="/nutricao-page"     class="nav-item {% if pagina=='nutricao' or page=='nutricao' %}active{% endif %}">
           <span class="nav-icon">🌾</span> Nutrição
         </a>
-        <a href="/inseminacao-page" class="nav-item {% if pagina=='inseminacao' %}active{% endif %}">
+        <a href="/confinamento-page" class="nav-item {% if pagina=='confinamento' or page=='confinamento' %}active{% endif %}">
+          <span class="nav-icon">🏗️</span> Confinamento
+        </a>
+        <a href="/inseminacao-page"  class="nav-item {% if pagina=='inseminacao' or page=='inseminacao' %}active{% endif %}">
           <span class="nav-icon">🔬</span> Inseminação
         </a>
       </div>
 
-      <div class="nav-group">
-        <div class="nav-group-label">Campo</div>
-        <a href="/pastagem-page" class="nav-item {% if pagina=='pastagem' %}active{% endif %}">
-          <span class="nav-icon">🌿</span> Pastagem
-        </a>
-        <a href="/balanca-page" class="nav-item {% if pagina=='balanca' %}active{% endif %}">
-          <span class="nav-icon">⚡</span> Balança S3
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Campo</div>
+        <a href="/pastagem-page" class="nav-item {% if pagina=='pastagem' or page=='pastagem' %}active{% endif %}">
+          <span class="nav-icon">🌿</span> Pastagem &amp; Lotes
         </a>
       </div>
 
-      <div class="nav-group">
-        <div class="nav-group-label">Gestão</div>
-        <a href="/financeiro-page" class="nav-item {% if pagina=='financeiro' %}active{% endif %}">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Gestão</div>
+        <a href="/financeiro-page" class="nav-item {% if pagina=='financeiro' or page=='financeiro' %}active{% endif %}">
           <span class="nav-icon">💰</span> Financeiro
-          {% if alertas_financeiro %}<span class="nav-pill alert">!</span>{% endif %}
+          {% if alertas_financeiro %}<span class="nav-badge">!</span>{% endif %}
         </a>
-        <a href="/relatorios-page" class="nav-item {% if pagina=='relatorios' %}active{% endif %}">
+        <a href="/relatorios-page" class="nav-item {% if pagina=='relatorios' or page=='relatorios' %}active{% endif %}">
           <span class="nav-icon">📊</span> Relatórios
         </a>
-        <a href="/pessoas-page" class="nav-item {% if pagina=='pessoas' %}active{% endif %}">
+        <a href="/pessoas-page"    class="nav-item {% if pagina=='pessoas' or page=='pessoas' %}active{% endif %}">
           <span class="nav-icon">👥</span> Pessoas
         </a>
       </div>
-
-      <!-- ── Ações Rápidas ── -->
-      <div class="sidebar-divider"></div>
-      <div class="nav-group-label">Ações rápidas</div>
-
-      <button class="nav-item nav-action {% if alertas_sanidade %}nav-urgent{% endif %}"
-              onclick="CadastroMedicamentos()">
-        <span class="nav-icon">💉</span>
-        <span>Sanidade</span>
-        {% if alertas_sanidade %}
-        <span class="nav-pill alert">{{ alertas_sanidade }}</span>
-        {% endif %}
-      </button>
-
-      <button class="nav-item nav-action {% if alertas_despesas %}nav-urgent{% endif %}"
-              onclick="CADASTRODESPESA()">
-        <span class="nav-icon">💰</span>
-        <span>Nova Despesa</span>
-        {% if alertas_despesas %}
-        <span class="nav-pill alert">!</span>
-        {% endif %}
-      </button>
-
-      <button class="nav-item nav-action highlight" onclick="irPesagem()">
-        <span class="nav-icon">⚖️</span>
-        <span>Pesagem</span>
-      </button>
-
-      <button class="nav-item nav-action" onclick="CadastroAnimal()">
-        <span class="nav-icon">🐄</span>
-        <span>Novo Animal</span>
-      </button>
-
-      <button class="nav-item nav-action highlight" onclick="irPastagem()">
-        <span class="nav-icon">🌿</span>
-        <span>Medir Pasto</span>
-      </button>
-
-      <button class="nav-item nav-action" onclick="irBalanca()">
-        <span class="nav-icon">⚡</span>
-        <span>Importar S3</span>
-      </button>
-
     </nav>
 
     <div class="sidebar-footer">
@@ -160,16 +92,30 @@
     </div>
   </aside>
 
-  <!-- ── ÁREA PRINCIPAL ── -->
+  <!-- MAIN -->
   <div class="main-area">
     <header class="topbar">
       <div class="topbar-left">
         <h1 class="topbar-title">{% block page_title %}{% endblock %}</h1>
-        <span class="topbar-sub">{% block page_sub %}{% endblock %}</span>
+        <span class="topbar-sep">{% block page_sub %}{% endblock %}</span>
       </div>
       <div class="topbar-right">
-        <span class="topbar-badge">{{ hora_atual }}</span>
+        <div class="fazenda-menu-wrap" id="fazendaMenuWrap">
+          <button class="fazenda-badge-btn topbar-badge" id="fazendaBadge" onclick="toggleFazendaMenu(event)" title="Trocar fazenda">
+            <span class="fazenda-badge-dot" id="fazendaBadgeDot"></span>
+            <span id="fazendaBadgeText">Fazenda Ipanema</span>
+            <span class="fazenda-badge-caret">▾</span>
+          </button>
+          <div class="fazenda-menu" id="fazendaMenu" style="display:none;">
+            <div class="fazenda-menu-list" id="fazendaMenuList"></div>
+          </div>
+        </div>
+        <div class="topbar-live">
+          <div class="topbar-live-dot"></div>
+          <span id="topbarHora">{{ hora_atual }}</span>
+        </div>
         <button class="topbar-btn" onclick="location.reload()" title="Atualizar">🔄</button>
+        <a href="/campo" class="topbar-btn" title="Modo Campo" style="display:grid;place-items:center;">📱</a>
       </div>
     </header>
 
@@ -180,7 +126,7 @@
 
 </div><!-- /app-layout -->
 
-<!-- ── TOAST (Alpine) ── -->
+<!-- TOAST Alpine -->
 <div id="toast-alpine"
      x-data="{ visivel: false, mensagem: '', tipo: 'sucesso', _t: null }"
      x-cloak
@@ -192,30 +138,37 @@
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
      x-on:mostrar-toast.window="mensagem=$event.detail.mensagem; tipo=$event.detail.tipo||'sucesso'; visivel=true; clearTimeout(_t); _t=setTimeout(()=>visivel=false,3000);"
-     :class="'toast ' + tipo"
+     :class="'toast toast-' + tipo"
      style="display:block;">
   <span x-text="mensagem"></span>
 </div>
 
-<!-- ── TOAST fallback (sem Alpine) ── -->
+<!-- TOAST fallback -->
 <div id="toast" class="toast" style="display:none;"></div>
 
-<!-- ── MODAL DE CONFIRMAÇÃO ── -->
-<div id="modalConfirm" style="display:none;position:fixed;inset:0;background:rgba(7,26,7,.5);
+<!-- MODAL CONFIRMAÇÃO -->
+<div id="modalConfirm" style="display:none;position:fixed;inset:0;background:oklch(0 0 0/.6);
      z-index:9998;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:380px;width:90%;
-              box-shadow:0 20px 60px rgba(0,0,0,.2);">
-    <p style="font-size:14px;color:#374151;margin-bottom:20px;">⚠️ Tem certeza? Esta ação não pode ser desfeita.</p>
+  <div style="background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;
+              padding:28px 32px;max-width:380px;width:90%;box-shadow:0 20px 60px oklch(0 0 0/.4);">
+    <p style="font-size:14px;color:var(--ink);margin-bottom:20px;">⚠️ Tem certeza? Esta ação não pode ser desfeita.</p>
     <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button onclick="fecharModal()"
-        class="btn">Cancelar</button>
-      <button id="btnConfirmarExclusao"
-        class="btn btn-danger" style="font-weight:600;">Confirmar</button>
+      <button onclick="fecharModal()" class="btn">Cancelar</button>
+      <button id="btnConfirmarExclusao" class="btn btn-danger" style="font-weight:600;">Confirmar</button>
     </div>
   </div>
 </div>
 
 <script>
+// ── Relógio ──────────────────────────────────────────────────────────────
+function _atualizarHora() {
+  const h = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  const el = document.getElementById('topbarHora');
+  if (el) el.textContent = h;
+}
+_atualizarHora();
+setInterval(_atualizarHora, 30000);
+
 // ── Toast ──────────────────────────────────────────────────────────────
 function showToast(msg, tipo) {
   window.dispatchEvent(new CustomEvent('mostrar-toast', {
@@ -223,7 +176,7 @@ function showToast(msg, tipo) {
   }));
   const t = document.getElementById('toast');
   if (t) {
-    t.className = 'toast ' + (tipo || 'sucesso');
+    t.className = 'toast toast-' + (tipo || 'sucesso');
     t.textContent = msg;
     t.style.display = 'flex';
     setTimeout(() => { t.style.display = 'none'; }, 3000);
@@ -242,9 +195,8 @@ function _alpineOpen(id, aberto) {
   if (el) el.style.display = aberto ? 'flex' : 'none';
 }
 
-// ── Modal de confirmação ───────────────────────────────────────────────
+// ── Modal confirmação ─────────────────────────────────────────────────
 let _excluirCallback = null;
-
 function confirmarExclusao(url, callback) {
   const modal = document.getElementById('modalConfirm');
   modal.style.display = 'flex';
@@ -263,7 +215,6 @@ function confirmarExclusao(url, callback) {
   };
   document.getElementById('btnConfirmarExclusao').onclick = _excluirCallback;
 }
-
 function fecharModal() {
   document.getElementById('modalConfirm').style.display = 'none';
 }
@@ -272,29 +223,178 @@ function fecharModal() {
 function fmtMoeda(v) {
   return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
-
 function fmtData(str) {
   if (!str) return '';
   const [y, m, d] = str.split('-');
-  return d && m && y ? `${d}/${m}/${y}` : str;
+  return (d && m && y) ? `${d}/${m}/${y}` : str;
 }
 
 // ── Navegação ──────────────────────────────────────────────────────────
-function CadastroAnimal()      { window.location.href = '/animais-page'; }
-function irPesagem()           { window.location.href = '/pesagem-page'; }
-function irPastagem()          { window.location.href = '/pastagem-page'; }
-function irBalanca()           { window.location.href = '/balanca-page'; }
-function irNutricao()          { window.location.href = '/nutricao-page'; }
-function CadastroMedicamentos(){ window.location.href = '/sanidade-page'; }
-function CadastroInseminacao() { window.location.href = '/inseminacao-page'; }
-function CADASTRODESPESA()     { window.location.href = '/financeiro-page'; }
-function CadastroCompra()      { window.location.href = '/financeiro-page'; }
-function CadastroVenda()       { window.location.href = '/financeiro-page'; }
-function CadastroPessoas()     { window.location.href = '/pessoas-page'; }
-function abrirConfiguracoes() {
-  if (typeof abrirConfig === 'function') { abrirConfig(); }
-  else { window.location.href = '/dashboard'; }
+function CadastroAnimal()      { location.href = '/animais-page'; }
+function irPesagem()           { location.href = '/pesagem-page'; }
+function irPastagem()          { location.href = '/pastagem-page'; }
+function irBalanca()           { location.href = '/balanca-page'; }
+function irNutricao()          { location.href = '/nutricao-page'; }
+function CadastroMedicamentos(){ location.href = '/sanidade-page'; }
+function CadastroInseminacao() { location.href = '/inseminacao-page'; }
+function CADASTRODESPESA()     { location.href = '/financeiro-page'; }
+function CadastroCompra()      { location.href = '/financeiro-page'; }
+function CadastroVenda()       { location.href = '/financeiro-page'; }
+function CadastroPessoas()     { location.href = '/pessoas-page'; }
+function abrirConfiguracoes()  { if (typeof abrirConfig === 'function') abrirConfig(); else location.href = '/dashboard'; }
+
+// ── Fetch: injeta X-Fazenda-ID ────────────────────────────────────────
+(function() {
+  const _orig = window.fetch.bind(window);
+  window.fetch = function(url, opts) {
+    const options = opts ? { ...opts } : {};
+    if (typeof url === 'string' && url.startsWith('/')) {
+      options.headers = { ...(options.headers || {}) };
+      if (!options.headers['X-Fazenda-ID']) {
+        const modo = (localStorage.getItem('fazenda_mode') || 'FAZENDA').toUpperCase();
+        const fid  = modo === 'CONSOLIDADO' ? 0 : Number(localStorage.getItem('fazenda_id') || 1);
+        options.headers['X-Fazenda-ID'] = String(Number.isFinite(fid) ? fid : 1);
+      }
+    }
+    return _orig(url, options);
+  };
+})();
+
+// ── Fazenda selector ──────────────────────────────────────────────────
+const _FAZ_KEY_ID   = 'fazenda_id';
+const _FAZ_KEY_MODE = 'fazenda_mode';
+let _fazendasCache = null;
+let _fazendaAtual  = null;
+
+function getFazendaContexto() {
+  return { modo: (localStorage.getItem(_FAZ_KEY_MODE) || 'FAZENDA').toUpperCase(), fazenda: _fazendaAtual };
 }
+
+async function apiFetch(url, options) {
+  const opts = options ? { ...options } : {};
+  opts.headers = { ...(opts.headers || {}) };
+  const modo = (localStorage.getItem(_FAZ_KEY_MODE) || 'FAZENDA').toUpperCase();
+  const fid  = (modo === 'CONSOLIDADO') ? 0 : Number(localStorage.getItem(_FAZ_KEY_ID) || 1);
+  opts.headers['X-Fazenda-ID'] = String(Number.isFinite(fid) ? fid : 1);
+  return fetch(url, opts);
+}
+
+function _atualizarUiFazenda() {
+  const modo    = (localStorage.getItem(_FAZ_KEY_MODE) || 'FAZENDA').toUpperCase();
+  const badgeTxt = document.getElementById('fazendaBadgeText');
+  const sidebarMark = document.getElementById('sidebarFazendaNome');
+  if (modo === 'CONSOLIDADO') {
+    if (badgeTxt)    badgeTxt.textContent = 'Consolidado Geral';
+    if (sidebarMark) sidebarMark.textContent = 'CG';
+  } else {
+    const nome = _fazendaAtual?.nome || 'Fazenda Ipanema';
+    if (badgeTxt)    badgeTxt.textContent = nome;
+    if (sidebarMark) sidebarMark.textContent = (nome.slice(0,2) || 'Fi').toUpperCase();
+  }
+}
+
+function _renderMenuFazendas() {
+  const box   = document.getElementById('fazendaMenuList');
+  if (!box) return;
+  const modo  = (localStorage.getItem(_FAZ_KEY_MODE) || 'FAZENDA').toUpperCase();
+  const atId  = Number(localStorage.getItem(_FAZ_KEY_ID) || 1);
+  const fazendas = Array.isArray(_fazendasCache) ? _fazendasCache : [];
+  const items = fazendas.map(f => {
+    const atual = (modo === 'FAZENDA' && Number(f.id) === atId);
+    const qtd   = f.total_ativos != null ? f.total_ativos : (f.total_animais || 0);
+    return `<button class="fazenda-menu-item" onclick="selecionarFazenda(${Number(f.id)})">
+      <span class="fazenda-menu-dot" style="background:${f.cor||'var(--accent)'};"></span>
+      <span class="fazenda-menu-name">${f.nome}</span>
+      <span class="fazenda-menu-count">${qtd} animais</span>
+      ${atual ? '<span class="fazenda-menu-atual">← ATUAL</span>' : ''}
+    </button>`;
+  }).join('');
+  const consolAtual = (modo === 'CONSOLIDADO');
+  box.innerHTML = `${items}
+    <div class="fazenda-menu-sep"></div>
+    <button class="fazenda-menu-item" onclick="selecionarConsolidado()">
+      <span class="fazenda-menu-ico">📊</span>
+      <span class="fazenda-menu-name">Consolidado Geral</span>
+      ${consolAtual ? '<span class="fazenda-menu-atual">← ATUAL</span>' : ''}
+    </button>
+    <div class="fazenda-menu-sep"></div>
+    <button class="fazenda-menu-item" onclick="location.href='/fazendas-page'">
+      <span class="fazenda-menu-ico">⚙️</span>
+      <span class="fazenda-menu-name">Gerenciar fazendas</span>
+    </button>`;
+}
+
+function _emitirMudancaFazenda() {
+  window.dispatchEvent(new CustomEvent('fazenda-contexto', { detail: getFazendaContexto() }));
+}
+
+async function carregarFazendas() {
+  if (_fazendasCache) return _fazendasCache;
+  const r = await apiFetch('/fazendas');
+  _fazendasCache = await r.json();
+  return _fazendasCache;
+}
+
+async function initFazendaSelector() {
+  try {
+    await carregarFazendas();
+    const fazendas = Array.isArray(_fazendasCache) ? _fazendasCache : [];
+    if (!fazendas.length) return;
+    let fid = Number(localStorage.getItem(_FAZ_KEY_ID) || 1);
+    if (!fazendas.some(f => Number(f.id) === fid)) fid = Number(fazendas[0].id);
+    _fazendaAtual = fazendas.find(f => Number(f.id) === fid) || fazendas[0];
+    localStorage.setItem(_FAZ_KEY_ID, String(Number(_fazendaAtual.id)));
+    const modo = (localStorage.getItem(_FAZ_KEY_MODE) || 'FAZENDA').toUpperCase();
+    if (modo !== 'CONSOLIDADO') localStorage.setItem(_FAZ_KEY_MODE, 'FAZENDA');
+    _atualizarUiFazenda();
+    _renderMenuFazendas();
+    _emitirMudancaFazenda();
+  } catch { /* fail silent */ }
+}
+
+function toggleFazendaMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('fazendaMenu');
+  if (!menu) return;
+  const aberto = menu.style.display !== 'none';
+  menu.style.display = aberto ? 'none' : 'block';
+  if (!aberto) _renderMenuFazendas();
+}
+function fecharFazendaMenu() {
+  const menu = document.getElementById('fazendaMenu');
+  if (menu) menu.style.display = 'none';
+}
+
+async function selecionarFazenda(fid) {
+  try {
+    await carregarFazendas();
+    localStorage.setItem(_FAZ_KEY_MODE, 'FAZENDA');
+    localStorage.setItem(_FAZ_KEY_ID, String(Number(fid)));
+    _fazendaAtual = (_fazendasCache || []).find(f => Number(f.id) === Number(fid)) || _fazendaAtual;
+    _atualizarUiFazenda(); _renderMenuFazendas(); fecharFazendaMenu();
+    showToast(`Fazenda: ${_fazendaAtual?.nome || 'Selecionada'}`, 'sucesso');
+    _emitirMudancaFazenda();
+  } catch { showToast('Erro ao selecionar fazenda.', 'erro'); }
+}
+
+function selecionarConsolidado() {
+  localStorage.setItem(_FAZ_KEY_MODE, 'CONSOLIDADO');
+  _atualizarUiFazenda(); _renderMenuFazendas(); fecharFazendaMenu();
+  showToast('Consolidado Geral', 'sucesso');
+  _emitirMudancaFazenda();
+}
+
+window.addEventListener('click', fecharFazendaMenu);
+document.addEventListener('DOMContentLoaded', initFazendaSelector);
+
+// ── Atalhos teclado ───────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (!e.altKey || e.ctrlKey || e.metaKey) return;
+  if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+  const atalhos = { r:'/relatorios-page', p:'/pesagem-page', s:'/sanidade-page', d:'/dashboard', c:'/campo' };
+  const dest = atalhos[e.key.toLowerCase()];
+  if (dest) { e.preventDefault(); location.href = dest; }
+});
 </script>
 
 {% block scripts %}{% endblock %}

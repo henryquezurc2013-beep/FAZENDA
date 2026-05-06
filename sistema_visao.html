@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Controle Bovino — Visão do Sistema</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #273449;
+    --border: #334155;
+    --ink: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #34d399;
+    --accent-2: #38bdf8;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --ok: #34d399;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 22px 64px; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 18px; border-bottom: 1px solid var(--border); margin-bottom: 26px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg, #16a34a 0%, #065f46 100%);
+    display: grid; place-items: center; font-weight: 800; font-size: 20px; color: #fff;
+  }
+  .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.02em; }
+  .brand .sub { font-size: 12px; color: var(--muted); }
+  .meta { font-size: 12px; color: var(--muted); text-align: right; }
+  .meta b { color: var(--ink); }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 26px; }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .kpi .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+  .kpi .l { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-top: 4px; }
+  .kpi .s { font-size: 12px; color: var(--accent); margin-top: 4px; }
+  .kpi.warn .v { color: var(--warn); }
+  .kpi.bad  .v { color: var(--bad); }
+  .kpi.ok   .v { color: var(--ok); }
+
+  h2.section {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--muted); margin: 28px 0 12px; font-weight: 600;
+  }
+
+  .grid { display: grid; gap: 12px; }
+  .grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+  .grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card h3 {
+    margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .card .icon { font-size: 18px; }
+  .card p { margin: 4px 0; font-size: 13px; color: var(--ink); }
+  .card ul { padding-left: 18px; margin: 6px 0; }
+  .card li { font-size: 12.5px; color: var(--ink); margin: 3px 0; }
+  .card small { color: var(--muted); font-size: 11.5px; }
+
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+  }
+  .pill.new   { background: rgba(56,189,248,.15);  color: #7dd3fc;  border: 1px solid rgba(56,189,248,.3); }
+  .pill.mod   { background: rgba(251,191,36,.12);  color: #fbbf24;  border: 1px solid rgba(251,191,36,.3); }
+  .pill.ok    { background: rgba(52,211,153,.12);  color: #34d399;  border: 1px solid rgba(52,211,153,.3); }
+  .pill.warn  { background: rgba(251,146,60,.12);  color: #fb923c;  border: 1px solid rgba(251,146,60,.3); }
+  .pill.bad   { background: rgba(248,113,113,.12); color: #f87171;  border: 1px solid rgba(248,113,113,.3); }
+
+  table.routes { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.routes th, table.routes td {
+    text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border);
+  }
+  table.routes th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  table.routes td.path { font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; color: #93c5fd; }
+  table.routes tr:hover td { background: rgba(255,255,255,.02); }
+
+  .alert {
+    background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3);
+    color: #fecaca; padding: 12px 14px; border-radius: 8px; font-size: 13px; margin: 8px 0;
+  }
+  .alert.warn { background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.3); color: #fde68a; }
+  .alert.info { background: rgba(56,189,248,.07); border-color: rgba(56,189,248,.3); color: #bae6fd; }
+  .alert b { color: #fff; }
+
+  .stack-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stack-tag {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 9px; font-size: 11.5px; color: var(--ink);
+  }
+  footer { margin-top: 36px; color: var(--muted); font-size: 11.5px; text-align: center; }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; color: #fcd34d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">Fi</div>
+      <div>
+        <h1>Controle Bovino · Fazenda Ipanema</h1>
+        <div class="sub">Visão geral do sistema · snapshot em 2026-05-06</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div>Branch: <b>main</b></div>
+      <div>Último commit: <b>f2d9ad1</b> "Commit inicial"</div>
+      <div>Modificações pendentes: <b style="color:var(--warn)">41 arquivos</b></div>
+    </div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi"><div class="v">17</div><div class="l">Routers</div><div class="s">FastAPI</div></div>
+    <div class="kpi"><div class="v">15</div><div class="l">Páginas HTML</div><div class="s">Jinja2</div></div>
+    <div class="kpi"><div class="v">3</div><div class="l">DDL Supabase</div><div class="s">/sql/*.sql</div></div>
+    <div class="kpi warn"><div class="v">~45k</div><div class="l">Linhas alteradas</div><div class="s" style="color:var(--warn)">não commitadas</div></div>
+    <div class="kpi ok"><div class="v">OK</div><div class="l">Último startup</div><div class="s">porta 8000</div></div>
+    <div class="kpi"><div class="v">SB</div><div class="l">Banco</div><div class="s">Supabase / PostgreSQL</div></div>
+  </div>
+
+  <div class="alert warn">
+    <b>⚠ Migração SQLite → Supabase em curso.</b>
+    <code>database.py</code> já usa <code>create_client</code> e os routers chamam <code>supabase.table(...)</code> diretamente,
+    mas <code>models.py</code> ainda importa <code>from database import Base</code> — quebra se for importado em runtime.
+    Hoje serve apenas como referência de schema.
+  </div>
+
+  <div class="alert info">
+    <b>📌 Pendência operacional:</b> os DDLs em <code>/sql/</code> precisam ser executados manualmente no SQL Editor do Supabase
+    (<code>balanca_tables.sql</code>, <code>confinamento_tables.sql</code>, <code>nutricao_tables.sql</code>).
+  </div>
+
+  <h2 class="section">Stack</h2>
+  <div class="stack-list">
+    <span class="stack-tag">FastAPI</span>
+    <span class="stack-tag">Uvicorn</span>
+    <span class="stack-tag">Supabase (postgrest)</span>
+    <span class="stack-tag">Jinja2</span>
+    <span class="stack-tag">Alpine.js</span>
+    <span class="stack-tag">Chart.js</span>
+    <span class="stack-tag">Leaflet + Leaflet.draw</span>
+    <span class="stack-tag">React 18 + Babel (local em /static)</span>
+    <span class="stack-tag">Pandas / openpyxl (importação balança)</span>
+    <span class="stack-tag">python-dotenv</span>
+  </div>
+
+  <h2 class="section">Módulos do sistema</h2>
+  <div class="grid cols-3">
+
+    <div class="card">
+      <h3><span class="icon">🏠</span> Dashboard <span class="pill mod">REVISADO</span></h3>
+      <p><small>templates/dashboard.html · +3.755 linhas</small></p>
+      <p>KPIs gerais: total de animais ativos, alertas de despesas vencidas, alertas de sanidade (animais sem evento &gt; 180 dias).</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🐄</span> Animais <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/animais.py · +251 linhas</small></p>
+      <p>Cadastro, status (ativo/morto/vendido), parentesco, custo arroba, vínculo a fazenda.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">⚖️</span> Pesagem <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/pesagem.py + balanca.py · +362 linhas</small></p>
+      <p>Pesagens manuais + importação CSV da balança S3.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">💉</span> Sanidade <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/sanidade.py · +155 linhas</small></p>
+      <p>Medicamentos, classificação, alertas automáticos no dashboard.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🌾</span> Nutrição <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/nutricao.py · +1.134 linhas | template +1.590</small></p>
+      <p>Suplementos, planos por lote, lançamentos de ração, controle de estoque, custo dia/mês.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🏗️</span> Confinamento <span class="pill new">NOVO</span></h3>
+      <p><small>routers/confinamento.py · 997 linhas | template 2.075 | DDL próprio</small></p>
+      <p>Lotes, dietas, ingredientes (volumoso/concentrado/mineral/aditivo), fases (adaptação→terminação), lançamentos diários, pesagens médias e individuais, KPIs (GMD, CA, giro).</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🔬</span> Inseminação <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/inseminacao.py · +165 linhas</small></p>
+      <p>Eventos, prenhez, crias.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🌿</span> Pastagem &amp; Lotes <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/pastagem.py · +1.344 linhas</small></p>
+      <p>Pastos, piquetes (com Leaflet), manejo, medições de altura, adubação, chuva, lotes, lote_animais.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">💰</span> Financeiro <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/financeiro.py · +240 linhas</small></p>
+      <p>Compras, vendas, despesas (com pendências disparando alerta no menu).</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">📊</span> Relatórios <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/relatorios.py · +693 linhas</small></p>
+      <p>Consolidações por período, por fazenda, exportação.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">👥</span> Pessoas <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/pessoas.py · +98 linhas</small></p>
+      <p>Fornecedores, clientes, funcionários.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🏞️</span> Fazendas <span class="pill new">NOVO</span></h3>
+      <p><small>routers/fazendas.py + template + multi-fazenda</small></p>
+      <p>Cadastro, escopo via header <code>X-Fazenda-ID</code> ou query <code>fazenda_id</code> (default 1).</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🔑</span> Auth + Login <span class="pill new">NOVO</span></h3>
+      <p><small>routers/auth.py + templates/login.html</small></p>
+      <p>Cookie <code>cb_token</code>, sessões com TTL de 12h, perfis GESTOR/FUNCIONARIO. Seeds: <code>gestor/1234</code>, <code>campo/1234</code>.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">📱</span> Modo Campo <span class="pill new">NOVO</span></h3>
+      <p><small>templates/campo.html · 507 linhas + endpoint /campo/dados</small></p>
+      <p>UI mobile para funcionário ver pastagem, planos nutricionais do dia, lotes em confinamento e animais sem pesagem nos últimos 30 dias.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">📡</span> Balança S3 <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/balanca.py · +186 linhas + DDL</small></p>
+      <p>Importação CSV, log de importações, dedup.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">📤</span> Exportação <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/exportacao.py · +90 linhas</small></p>
+      <p>Excel/CSV de tabelas-chave.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">⚙️</span> Definições / Config <span class="pill mod">REVISADO</span></h3>
+      <p><small>routers/definicoes.py + config.py</small></p>
+      <p>Tabela <code>config</code> (chave/valor) e listas auxiliares.</p>
+    </div>
+
+  </div>
+
+  <h2 class="section">Mapa de rotas (páginas)</h2>
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="routes">
+      <thead><tr><th>Rota</th><th>Template</th><th>Auth</th></tr></thead>
+      <tbody>
+        <tr><td class="path">GET /</td><td>redireciona /dashboard</td><td>—</td></tr>
+        <tr><td class="path">GET /dashboard</td><td>dashboard.html</td><td>—</td></tr>
+        <tr><td class="path">GET /animais-page</td><td>animais.html</td><td>—</td></tr>
+        <tr><td class="path">GET /pesagem-page</td><td>pesagem.html</td><td>—</td></tr>
+        <tr><td class="path">GET /sanidade-page</td><td>sanidade.html</td><td>—</td></tr>
+        <tr><td class="path">GET /inseminacao-page</td><td>inseminacao.html</td><td>—</td></tr>
+        <tr><td class="path">GET /financeiro-page</td><td>financeiro.html</td><td>—</td></tr>
+        <tr><td class="path">GET /pessoas-page</td><td>pessoas.html</td><td>—</td></tr>
+        <tr><td class="path">GET /fazendas-page</td><td>fazendas.html</td><td>—</td></tr>
+        <tr><td class="path">GET /relatorios-page</td><td>relatorios.html</td><td>—</td></tr>
+        <tr><td class="path">GET /balanca-page</td><td>balanca.html</td><td>—</td></tr>
+        <tr><td class="path">GET /pastagem-page</td><td>pastagem.html</td><td>—</td></tr>
+        <tr><td class="path">GET /nutricao-page</td><td>nutricao.html</td><td>—</td></tr>
+        <tr><td class="path">GET /confinamento-page</td><td>confinamento.html</td><td>—</td></tr>
+        <tr><td class="path">GET /login</td><td>login.html</td><td>—</td></tr>
+        <tr><td class="path">GET /campo</td><td>campo.html</td><td><span class="pill warn">requer login</span></td></tr>
+        <tr><td class="path">GET /campo/dados</td><td>JSON (pastagem, nutrição, conf., pesagem)</td><td><span class="pill warn">requer login</span></td></tr>
+        <tr><td class="path">POST /auth/login</td><td>cookie cb_token</td><td>—</td></tr>
+        <tr><td class="path">POST /auth/logout</td><td>limpa sessão</td><td>cookie</td></tr>
+        <tr><td class="path">GET /auth/me</td><td>JSON do usuário atual</td><td>cookie</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section">Pendências para retomar</h2>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3><span class="icon">📦</span> Versionamento</h3>
+      <ul>
+        <li>Repo tem só <code>f2d9ad1 "Commit inicial"</code>; tudo posterior é WIP.</li>
+        <li>Sugestão: commits temáticos (auth+login, confinamento, migração Supabase, módulo nutrição, modo campo).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🧹</span> Limpeza técnica</h3>
+      <ul>
+        <li><code>models.py</code> importa <code>Base</code> que não existe mais — decidir se mantém como doc/schema ou apaga.</li>
+        <li>Backup <code>rebanho.db.backup_20260418_183620</code> ainda no repo.</li>
+        <li>Cache <code>__pycache__/</code> com vários <code>.pyc.NÚMERO</code> (sobras de hot-reload).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🗄️</span> Banco</h3>
+      <ul>
+        <li>Rodar os 3 SQLs de <code>/sql/</code> no Supabase (se ainda não rodou).</li>
+        <li>Verificar se existe DDL para <code>usuarios</code>/<code>sessoes</code> (auth) — não há arquivo em <code>/sql/</code>.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🧪</span> Validações sugeridas</h3>
+      <ul>
+        <li>Testar fluxo Login → Modo Campo no celular.</li>
+        <li>Validar lançamento + pesagem em Confinamento ponta a ponta.</li>
+        <li>Conferir filtros multi-fazenda em Relatórios.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="section">Como rodar</h2>
+  <div class="card">
+    <p>1. Garanta o <code>.env</code> na raiz com <code>SUPABASE_URL</code> e <code>SUPABASE_KEY</code>.</p>
+    <p>2. Instale as dependências: <code>pip install -r rebanho/requirements.txt</code>.</p>
+    <p>3. Inicie o servidor: <code>cd rebanho &amp;&amp; python main.py</code> (ou execute <code>iniciar.bat</code>).</p>
+    <p>4. Abra <code>http://localhost:8000/dashboard</code> ou <code>/login</code> para o Modo Campo.</p>
+  </div>
+
+  <footer>
+    Arquivo gerado automaticamente · sistema_visao.html · snapshot estático, não consulta o banco.
+  </footer>
+</div>
+</body>
+</html>

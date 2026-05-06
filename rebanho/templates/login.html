@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — Controle Bovino</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0a2218 0%, #1b4d2e 60%, #0d3320 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px 36px 32px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.45);
+    }
+    .logo { text-align: center; margin-bottom: 28px; }
+    .logo-icon { font-size: 42px; line-height: 1; }
+    .logo-title { font-size: 20px; font-weight: 700; color: #1b4d2e; margin-top: 8px; }
+    .logo-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 5px; }
+    .field { margin-bottom: 18px; }
+    .input-wrap { position: relative; }
+    input[type=text], input[type=password] {
+      width: 100%; padding: 10px 38px 10px 12px;
+      border: 1.5px solid #d1d5db; border-radius: 8px;
+      font-size: 14px; color: #111; outline: none; transition: border-color .15s;
+    }
+    input:focus { border-color: #2d6a4f; }
+    .eye-btn {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 16px; color: #9ca3af;
+      padding: 2px;
+    }
+    .btn-login {
+      width: 100%; padding: 12px;
+      background: linear-gradient(135deg, #2d6a4f, #1b4d2e);
+      color: #fff; border: none; border-radius: 8px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: opacity .15s; margin-top: 4px;
+    }
+    .btn-login:hover { opacity: .9; }
+    .btn-login:disabled { opacity: .5; cursor: not-allowed; }
+    .erro { display: none; color: #dc2626; font-size: 12px; margin-top: 12px; text-align: center; }
+    .hint { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 20px; }
+    .hint strong { color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">🐄</div>
+      <div class="logo-title">Controle Bovino</div>
+      <div class="logo-sub">Gestão de Rebanho</div>
+    </div>
+
+    <div class="field">
+      <label for="login">Usuário</label>
+      <div class="input-wrap">
+        <input type="text" id="login" placeholder="gestor ou campo" autocomplete="username" autofocus/>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="senha">Senha</label>
+      <div class="input-wrap">
+        <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password"/>
+        <button class="eye-btn" type="button" id="eyeBtn" onclick="toggleSenha()" title="Mostrar/ocultar">👁</button>
+      </div>
+    </div>
+
+    <button class="btn-login" id="btnEntrar" onclick="fazerLogin()">Entrar</button>
+    <div class="erro" id="erroMsg">Login ou senha inválidos</div>
+
+    <div class="hint">Usuários demo: <strong>gestor/1234</strong> · <strong>campo/1234</strong></div>
+  </div>
+
+<script>
+  document.getElementById('senha').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fazerLogin();
+  });
+  document.getElementById('login').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('senha').focus();
+  });
+
+  function toggleSenha() {
+    const inp = document.getElementById('senha');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  }
+
+  async function fazerLogin() {
+    const login = document.getElementById('login').value.trim();
+    const senha = document.getElementById('senha').value;
+    const btn = document.getElementById('btnEntrar');
+    const erro = document.getElementById('erroMsg');
+    erro.style.display = 'none';
+    if (!login || !senha) { erro.textContent = 'Preencha usuário e senha'; erro.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'Entrando…';
+    try {
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({login, senha})
+      });
+      if (!res.ok) { throw new Error('credenciais'); }
+      const data = await res.json();
+      if (data.perfil === 'GESTOR') {
+        location.href = '/dashboard';
+      } else {
+        location.href = '/campo';
+      }
+    } catch {
+      erro.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Entrar';
+    }
+  }
+</script>
+</body>
+</html>

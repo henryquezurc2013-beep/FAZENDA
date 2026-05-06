@@ -1,12 +1,10 @@
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query
 
-from database import get_db
-from models import Compra, Despesa, Venda
-from schemas import CompraCreate, CompraOut, DespesaCreate, DespesaOut, VendaCreate, VendaOut
+from database import supabase
+from schemas import CompraCreate, VendaCreate, DespesaCreate
 
 router_compras = APIRouter()
 router_vendas = APIRouter()
@@ -22,166 +20,134 @@ def _parse_data(valor: str, campo: str) -> date:
 
 # ─── COMPRAS ─────────────────────────────────────────────────────────────────
 
-@router_compras.get("", response_model=List[CompraOut])
+@router_compras.get("")
 def listar_compras(
     fornecedor: Optional[str] = Query(None),
     mes: Optional[int] = Query(None),
     ano: Optional[int] = Query(None),
     data_inicio: Optional[str] = Query(None),
     data_fim: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    q = db.query(Compra)
+    q = supabase.table("compras").select("*")
     if fornecedor:
-        q = q.filter(Compra.fornecedor.ilike(f"%{fornecedor}%"))
+        q = q.ilike("fornecedor", f"%{fornecedor}%")
     if mes:
-        q = q.filter(Compra.mes == mes)
+        q = q.eq("mes", mes)
     if ano:
-        q = q.filter(Compra.ano == ano)
+        q = q.eq("ano", ano)
     if data_inicio:
-        q = q.filter(Compra.data >= data_inicio)
+        q = q.gte("data", data_inicio)
     if data_fim:
-        q = q.filter(Compra.data <= data_fim)
-    return q.order_by(Compra.data.desc()).all()
+        q = q.lte("data", data_fim)
+    return q.order("data", desc=True).execute().data
 
 
-@router_compras.post("", response_model=CompraOut, status_code=201)
-def criar_compra(payload: CompraCreate, db: Session = Depends(get_db)):
+@router_compras.post("", status_code=201)
+def criar_compra(payload: CompraCreate):
     missing = [f for f in ("fornecedor", "data", "valor_unit", "quantidade") if not getattr(payload, f)]
     if missing:
         raise HTTPException(status_code=400, detail=f"Campos obrigatórios: {', '.join(missing)}")
-
     dt = _parse_data(payload.data, "data")
-    valor_total = round((payload.valor_unit or 0) * (payload.quantidade or 1), 2)
-
-    compra = Compra(
-        **{k: v for k, v in payload.model_dump().items()},
-        valor_total=valor_total,
-        mes=dt.month,
-        ano=dt.year,
-    )
-    db.add(compra)
-    db.commit()
-    db.refresh(compra)
-    return compra
+    data = payload.model_dump()
+    data["valor_total"] = round((payload.valor_unit or 0) * (payload.quantidade or 1), 2)
+    data["mes"] = dt.month
+    data["ano"] = dt.year
+    return supabase.table("compras").insert(data).execute().data[0]
 
 
-@router_compras.put("/{id}", response_model=CompraOut)
-def atualizar_compra(id: int, payload: CompraCreate, db: Session = Depends(get_db)):
-    compra = db.query(Compra).filter(Compra.id == id).first()
-    if not compra:
+@router_compras.put("/{id}")
+def atualizar_compra(id: int, payload: CompraCreate):
+    rows = supabase.table("compras").select("*").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Compra não encontrada")
-
-    data = payload.model_dump(exclude_unset=True)
-    for k, v in data.items():
-        setattr(compra, k, v)
-
-    compra.valor_total = round((compra.valor_unit or 0) * (compra.quantidade or 1), 2)
-    if compra.data:
-        dt = _parse_data(compra.data, "data")
-        compra.mes = dt.month
-        compra.ano = dt.year
-
-    db.commit()
-    db.refresh(compra)
-    return compra
+    data = {**rows[0], **payload.model_dump(exclude_unset=True)}
+    data["valor_total"] = round((data.get("valor_unit") or 0) * (data.get("quantidade") or 1), 2)
+    if data.get("data"):
+        dt = _parse_data(data["data"], "data")
+        data["mes"] = dt.month
+        data["ano"] = dt.year
+    supabase.table("compras").update(data).eq("id", id).execute()
+    return supabase.table("compras").select("*").eq("id", id).limit(1).execute().data[0]
 
 
 @router_compras.delete("/{id}")
-def deletar_compra(id: int, db: Session = Depends(get_db)):
-    compra = db.query(Compra).filter(Compra.id == id).first()
-    if not compra:
+def deletar_compra(id: int):
+    rows = supabase.table("compras").select("id").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Compra não encontrada")
-    db.delete(compra)
-    db.commit()
+    supabase.table("compras").delete().eq("id", id).execute()
     return {"mensagem": "Compra removida com sucesso"}
 
 
 # ─── VENDAS ──────────────────────────────────────────────────────────────────
 
-@router_vendas.get("", response_model=List[VendaOut])
+@router_vendas.get("")
 def listar_vendas(
     cliente: Optional[str] = Query(None),
     mes: Optional[int] = Query(None),
     ano: Optional[int] = Query(None),
     data_inicio: Optional[str] = Query(None),
     data_fim: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    q = db.query(Venda)
+    q = supabase.table("vendas").select("*")
     if cliente:
-        q = q.filter(Venda.cliente.ilike(f"%{cliente}%"))
+        q = q.ilike("cliente", f"%{cliente}%")
     if mes:
-        q = q.filter(Venda.mes == mes)
+        q = q.eq("mes", mes)
     if ano:
-        q = q.filter(Venda.ano == ano)
+        q = q.eq("ano", ano)
     if data_inicio:
-        q = q.filter(Venda.data >= data_inicio)
+        q = q.gte("data", data_inicio)
     if data_fim:
-        q = q.filter(Venda.data <= data_fim)
-    return q.order_by(Venda.data.desc()).all()
+        q = q.lte("data", data_fim)
+    return q.order("data", desc=True).execute().data
 
 
-@router_vendas.post("", response_model=VendaOut, status_code=201)
-def criar_venda(payload: VendaCreate, db: Session = Depends(get_db)):
+@router_vendas.post("", status_code=201)
+def criar_venda(payload: VendaCreate):
     missing = [f for f in ("cliente", "data", "valor_unit", "quantidade") if not getattr(payload, f)]
     if missing:
         raise HTTPException(status_code=400, detail=f"Campos obrigatórios: {', '.join(missing)}")
-
     dt = _parse_data(payload.data, "data")
-    valor_total = round((payload.valor_unit or 0) * (payload.quantidade or 1), 2)
-
-    venda = Venda(
-        **{k: v for k, v in payload.model_dump().items()},
-        valor_total=valor_total,
-        mes=dt.month,
-        ano=dt.year,
-    )
-    db.add(venda)
-    db.commit()
-    db.refresh(venda)
-    return venda
+    data = payload.model_dump()
+    data["valor_total"] = round((payload.valor_unit or 0) * (payload.quantidade or 1), 2)
+    data["mes"] = dt.month
+    data["ano"] = dt.year
+    return supabase.table("vendas").insert(data).execute().data[0]
 
 
-@router_vendas.put("/{id}", response_model=VendaOut)
-def atualizar_venda(id: int, payload: VendaCreate, db: Session = Depends(get_db)):
-    venda = db.query(Venda).filter(Venda.id == id).first()
-    if not venda:
+@router_vendas.put("/{id}")
+def atualizar_venda(id: int, payload: VendaCreate):
+    rows = supabase.table("vendas").select("*").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
-
-    for k, v in payload.model_dump(exclude_unset=True).items():
-        setattr(venda, k, v)
-
-    venda.valor_total = round((venda.valor_unit or 0) * (venda.quantidade or 1), 2)
-    if venda.data:
-        dt = _parse_data(venda.data, "data")
-        venda.mes = dt.month
-        venda.ano = dt.year
-
-    db.commit()
-    db.refresh(venda)
-    return venda
+    data = {**rows[0], **payload.model_dump(exclude_unset=True)}
+    data["valor_total"] = round((data.get("valor_unit") or 0) * (data.get("quantidade") or 1), 2)
+    if data.get("data"):
+        dt = _parse_data(data["data"], "data")
+        data["mes"] = dt.month
+        data["ano"] = dt.year
+    supabase.table("vendas").update(data).eq("id", id).execute()
+    return supabase.table("vendas").select("*").eq("id", id).limit(1).execute().data[0]
 
 
 @router_vendas.delete("/{id}")
-def deletar_venda(id: int, db: Session = Depends(get_db)):
-    venda = db.query(Venda).filter(Venda.id == id).first()
-    if not venda:
+def deletar_venda(id: int):
+    rows = supabase.table("vendas").select("id").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
-    db.delete(venda)
-    db.commit()
+    supabase.table("vendas").delete().eq("id", id).execute()
     return {"mensagem": "Venda removida com sucesso"}
 
 
 # ─── DESPESAS ────────────────────────────────────────────────────────────────
 
-def _despesa_out(d: Despesa) -> Dict[str, Any]:
+def _despesa_out(d: dict) -> dict:
     hoje = date.today().isoformat()
-    vencida = bool(
-        d.vencimento and d.vencimento < hoje and (d.status or "").upper() == "PENDENTE"
+    row = dict(d)
+    row["vencida"] = bool(
+        d.get("vencimento") and d["vencimento"] < hoje and (d.get("status") or "").upper() == "PENDENTE"
     )
-    row = {c.name: getattr(d, c.name) for c in d.__table__.columns}
-    row["vencida"] = vencida
     return row
 
 
@@ -193,66 +159,58 @@ def listar_despesas(
     ano: Optional[int] = Query(None),
     data_inicio: Optional[str] = Query(None),
     data_fim: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    q = db.query(Despesa)
+    q = supabase.table("despesas").select("*")
     if tipo:
-        q = q.filter(Despesa.tipo.ilike(tipo))
+        q = q.ilike("tipo", tipo)
     if status:
-        q = q.filter(Despesa.status.ilike(status))
+        q = q.ilike("status", status)
     if mes:
-        q = q.filter(Despesa.mes == mes)
+        q = q.eq("mes", mes)
     if ano:
-        q = q.filter(Despesa.ano == ano)
+        q = q.eq("ano", ano)
     if data_inicio:
-        q = q.filter(Despesa.vencimento >= data_inicio)
+        q = q.gte("vencimento", data_inicio)
     if data_fim:
-        q = q.filter(Despesa.vencimento <= data_fim)
-    return [_despesa_out(d) for d in q.order_by(Despesa.vencimento.desc()).all()]
+        q = q.lte("vencimento", data_fim)
+    rows = q.order("vencimento", desc=True).execute().data
+    return [_despesa_out(d) for d in rows]
 
 
 @router_despesas.post("", status_code=201)
-def criar_despesa(payload: DespesaCreate, db: Session = Depends(get_db)):
+def criar_despesa(payload: DespesaCreate):
     missing = [f for f in ("valor", "vencimento") if not getattr(payload, f)]
     if missing:
         raise HTTPException(status_code=400, detail=f"Campos obrigatórios: {', '.join(missing)}")
-
     dt = _parse_data(payload.vencimento, "vencimento")
     data = payload.model_dump()
     if not data.get("status"):
         data["status"] = "PENDENTE"
-
-    despesa = Despesa(**data, mes=dt.month, ano=dt.year)
-    db.add(despesa)
-    db.commit()
-    db.refresh(despesa)
-    return _despesa_out(despesa)
+    data["mes"] = dt.month
+    data["ano"] = dt.year
+    row = supabase.table("despesas").insert(data).execute().data[0]
+    return _despesa_out(row)
 
 
 @router_despesas.put("/{id}")
-def atualizar_despesa(id: int, payload: DespesaCreate, db: Session = Depends(get_db)):
-    despesa = db.query(Despesa).filter(Despesa.id == id).first()
-    if not despesa:
+def atualizar_despesa(id: int, payload: DespesaCreate):
+    rows = supabase.table("despesas").select("*").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Despesa não encontrada")
-
-    for k, v in payload.model_dump(exclude_unset=True).items():
-        setattr(despesa, k, v)
-
-    if despesa.vencimento:
-        dt = _parse_data(despesa.vencimento, "vencimento")
-        despesa.mes = dt.month
-        despesa.ano = dt.year
-
-    db.commit()
-    db.refresh(despesa)
-    return _despesa_out(despesa)
+    data = {**rows[0], **payload.model_dump(exclude_unset=True)}
+    if data.get("vencimento"):
+        dt = _parse_data(data["vencimento"], "vencimento")
+        data["mes"] = dt.month
+        data["ano"] = dt.year
+    supabase.table("despesas").update(data).eq("id", id).execute()
+    row = supabase.table("despesas").select("*").eq("id", id).limit(1).execute().data[0]
+    return _despesa_out(row)
 
 
 @router_despesas.delete("/{id}")
-def deletar_despesa(id: int, db: Session = Depends(get_db)):
-    despesa = db.query(Despesa).filter(Despesa.id == id).first()
-    if not despesa:
+def deletar_despesa(id: int):
+    rows = supabase.table("despesas").select("id").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Despesa não encontrada")
-    db.delete(despesa)
-    db.commit()
+    supabase.table("despesas").delete().eq("id", id).execute()
     return {"mensagem": "Despesa removida com sucesso"}

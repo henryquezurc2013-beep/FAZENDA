@@ -1,537 +1,3354 @@
-{% extends "base.html" %}
-{% block title %}Dashboard — Fazenda Ipanema{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
-
-{% block content %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Fazenda Ipanema · Gestão de Rebanho</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  .prev-box{border-radius:8px;padding:10px;text-align:center;}
-  .prev-box-num{font-size:20px;font-weight:700;line-height:1;}
-  .prev-box-lbl{font-size:10px;font-weight:500;margin-top:3px;}
-  .sem-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-  .pes-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid #f5f5f5;}
-  .pes-row:last-child{border-bottom:none;}
-  .pes-rank{width:22px;height:22px;border-radius:50%;background:#f3f4f6;display:flex;
-            align-items:center;justify-content:center;font-size:10px;font-weight:700;
-            color:#6b7280;flex-shrink:0;}
+body { font-family: "Inter", system-ui, sans-serif; }
+body[data-density="compact"] { font-size: 12px; }
+body[data-density="compact"] .card-body { padding: 10px; }
+body[data-density="compact"] .content { padding: 14px 18px 32px; }
+body[data-density="spacious"] .card-body { padding: 18px; }
+body[data-density="spacious"] .content { padding: 28px 32px 48px; }
+/* Fazenda Ipanema — cool professional agritech */
+:root {
+  /* Cool slate/navy system */
+  --bg: oklch(0.985 0.004 240);
+  --bg-2: oklch(0.975 0.005 240);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.982 0.004 240);
+  --border: oklch(0.92 0.006 245);
+  --border-strong: oklch(0.86 0.008 245);
+  --ink: oklch(0.22 0.02 250);
+  --ink-2: oklch(0.32 0.02 250);
+  --muted: oklch(0.52 0.015 245);
+  --muted-2: oklch(0.65 0.012 245);
+  --accent: oklch(0.48 0.11 235);
+  --accent-soft: oklch(0.96 0.02 235);
+  --accent-ink: oklch(0.32 0.09 235);
+
+  --navy: oklch(0.24 0.03 250);
+  --navy-2: oklch(0.19 0.03 250);
+  --navy-ink: oklch(0.92 0.01 240);
+
+  --good: oklch(0.56 0.10 155);
+  --good-soft: oklch(0.95 0.03 155);
+  --warn: oklch(0.68 0.13 75);
+  --warn-soft: oklch(0.96 0.04 80);
+  --bad: oklch(0.56 0.17 25);
+  --bad-soft: oklch(0.96 0.03 25);
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+
+  --shadow-sm: 0 1px 2px oklch(0.22 0.02 250 / 0.04);
+  --shadow: 0 1px 3px oklch(0.22 0.02 250 / 0.05), 0 1px 2px oklch(0.22 0.02 250 / 0.03);
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv11", "ss01";
+}
+
+button { font-family: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+a { color: inherit; text-decoration: none; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: oklch(0.88 0.008 245); border-radius: 10px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.78 0.012 245); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ================ APP SHELL ================ */
+.app {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-brand-mark {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--navy);
+  color: white;
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-weight: 600; font-size: 14px;
+  letter-spacing: -0.02em;
+}
+.sidebar-brand-name {
+  font-weight: 600; font-size: 13px; letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.sidebar-brand-sub {
+  font-size: 11px; color: var(--muted);
+}
+
+.sidebar-section { padding: 12px 10px 2px; }
+.sidebar-section-title {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-weight: 600;
+  padding: 0 8px 6px;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 450;
+  position: relative;
+  margin: 1px 0;
+  width: 100%;
+  text-align: left;
+}
+.sidebar-item:hover { background: var(--bg-2); color: var(--ink); }
+.sidebar-item.active {
+  background: var(--navy);
+  color: white;
+}
+.sidebar-item.active .sidebar-icon { color: white; opacity: 0.9; }
+.sidebar-icon {
+  width: 16px; height: 16px;
+  display: inline-flex;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.sidebar-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: white;
+  min-width: 18px; text-align: center;
+}
+.sidebar-item.active .sidebar-badge { background: white; color: var(--navy); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* Topbar */
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  height: 52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  position: sticky; top: 0; z-index: 20;
+}
+.topbar-title {
+  font-size: 13px; font-weight: 500; color: var(--ink);
+}
+.topbar-sep { color: var(--border-strong); }
+.topbar-crumb { color: var(--muted); font-size: 13px; }
+.topbar-spacer { flex: 1; }
+
+.topbar-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.topbar-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px oklch(0.56 0.10 155 / 0.18); }
+
+.topbar-iconbtn {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+}
+.topbar-iconbtn:hover { background: var(--bg-2); color: var(--ink); }
+
+.topbar-user {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.avatar {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 600;
+}
+
+/* Content */
+.content {
+  padding: 20px 24px 40px;
+  max-width: 1480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ============ PRIMITIVES ============ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.card-title {
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.card-sub { font-size: 11px; color: var(--muted); font-weight: 400; }
+.card-body { padding: 14px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px; font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: background 120ms, border-color 120ms;
+}
+.btn:hover { background: var(--bg-2); border-color: var(--border-strong); color: var(--ink); }
+.btn-primary {
+  background: var(--navy); color: white; border-color: var(--navy);
+}
+.btn-primary:hover { background: var(--navy-2); border-color: var(--navy-2); color: white; }
+.btn-ghost { border-color: transparent; }
+.btn-danger { background: var(--bad); color: white; border-color: var(--bad); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px;
+  font-size: 11px; font-weight: 500;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+}
+.chip.good { background: var(--good-soft); border-color: transparent; color: var(--good); }
+.chip.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.chip.bad { background: var(--bad-soft); border-color: transparent; color: var(--bad); }
+.chip.accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
+.chip.dot::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor;
+}
+
+.num { font-family: var(--font-mono); font-feature-settings: "tnum" 1, "zero" 1; letter-spacing: -0.02em; }
+
+.hr { height: 1px; background: var(--border); border: 0; margin: 0; }
+.divider-v { width: 1px; background: var(--border); align-self: stretch; }
+
+/* Alert */
+.alert {
+  display: flex; gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.alert-urgent {
+  border-color: oklch(0.88 0.08 25);
+  background: linear-gradient(0deg, var(--bad-soft), var(--bad-soft)), var(--surface);
+}
+.alert-icon {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  color: var(--bad);
+  background: white;
+  flex-shrink: 0;
+}
+.alert-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--bad);
+}
+.alert-body { font-size: 13px; color: var(--ink); margin-top: 2px; }
+
+/* KPI */
+.kpi {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+}
+.kpi-label {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.kpi-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  margin-top: 4px;
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+}
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.kpi-accent {
+  background: var(--navy); color: white; border-color: var(--navy);
+}
+.kpi-accent .kpi-label { color: oklch(0.75 0.02 240); }
+.kpi-accent .kpi-value { color: white; }
+.kpi-accent .kpi-sub { color: oklch(0.78 0.02 240); }
+
+/* Progress */
+.progress {
+  height: 6px; border-radius: 999px; background: var(--bg-2); overflow: hidden;
+}
+.progress > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+/* Table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.table th {
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  white-space: nowrap;
+}
+.table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-2);
+  vertical-align: middle;
+}
+.table tr:last-child td { border-bottom: 0; }
+.table tr:hover td { background: var(--bg-2); }
+.table td.num, .table th.num { font-family: var(--font-mono); text-align: right; }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 2px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+}
+.tab {
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--ink); border-bottom-color: var(--navy); }
+
+/* Sparkline frame */
+.spark {
+  height: 40px; width: 100%; display: block;
+}
+
+/* Segmented */
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.seg button {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+/* Grids */
+.grid { display: grid; gap: 14px; }
+.g-cols-12 { grid-template-columns: repeat(12, 1fr); }
+.g-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.g-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.g-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.g-cols-2 { grid-template-columns: 1fr 1fr; }
+.span-3 { grid-column: span 3; }
+.span-4 { grid-column: span 4; }
+.span-5 { grid-column: span 5; }
+.span-6 { grid-column: span 6; }
+.span-7 { grid-column: span 7; }
+.span-8 { grid-column: span 8; }
+.span-9 { grid-column: span 9; }
+.span-12 { grid-column: span 12; }
+
+/* Placeholder surface for visuals */
+.placeholder-surface {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      oklch(0.94 0.008 245) 0 8px,
+      oklch(0.97 0.006 245) 8px 16px
+    );
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  display: grid; place-items: center;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: oklch(0.18 0.02 250 / 0.45);
+  backdrop-filter: blur(3px);
+  z-index: 80;
+  display: grid; place-items: center;
+  animation: fade 140ms ease;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  width: min(560px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+  box-shadow: 0 20px 60px oklch(0.15 0.02 250 / 0.2);
+  animation: rise 180ms cubic-bezier(.2,.8,.2,1);
+}
+@keyframes fade { from { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+.modal-head {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-title { font-size: 15px; font-weight: 600; }
+.modal-body { padding: 18px 20px; }
+.modal-foot {
+  padding: 12px 20px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+
+.field { display: grid; gap: 5px; margin-bottom: 12px; }
+.field label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.field input, .field select, .field textarea {
+  font-family: inherit; font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px oklch(0.48 0.11 235 / 0.15);
+}
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ============ VARIATION: BALANCED ============ */
+body[data-variant="balanced"] .kpi-accent { background: var(--navy); }
+body[data-variant="balanced"] .card { box-shadow: var(--shadow-sm); }
+
+/* ============ VARIATION: BOLD ============ */
+body[data-variant="bold"] {
+  --bg: oklch(0.17 0.025 250);
+  --bg-2: oklch(0.2 0.025 250);
+  --surface: oklch(0.22 0.025 250);
+  --surface-2: oklch(0.25 0.025 250);
+  --border: oklch(0.3 0.02 250);
+  --border-strong: oklch(0.4 0.02 250);
+  --ink: oklch(0.96 0.008 240);
+  --ink-2: oklch(0.88 0.01 240);
+  --muted: oklch(0.66 0.015 245);
+  --muted-2: oklch(0.56 0.015 245);
+  --accent: oklch(0.78 0.13 80);
+  --accent-soft: oklch(0.32 0.08 80);
+  --accent-ink: oklch(0.85 0.14 80);
+  --navy: oklch(0.92 0.015 240);
+  --navy-ink: oklch(0.2 0.025 250);
+  --good: oklch(0.82 0.14 155);
+  --good-soft: oklch(0.3 0.07 155);
+  --warn: oklch(0.85 0.14 75);
+  --warn-soft: oklch(0.32 0.1 75);
+  --bad: oklch(0.78 0.16 25);
+  --bad-soft: oklch(0.32 0.09 25);
+  --accent-ink: oklch(0.88 0.14 80);
+}
+body[data-variant="bold"] .chip.good { color: oklch(0.88 0.14 155); }
+body[data-variant="bold"] .chip.warn { color: oklch(0.88 0.14 75); }
+body[data-variant="bold"] .chip.bad { color: oklch(0.85 0.16 25); }
+body[data-variant="bold"] .sidebar-item.active { background: var(--accent); color: oklch(0.2 0.03 80); }
+body[data-variant="bold"] .sidebar-item.active .sidebar-icon { color: oklch(0.2 0.03 80); }
+body[data-variant="bold"] .btn-primary { background: var(--accent); color: oklch(0.2 0.03 80); border-color: var(--accent); }
+body[data-variant="bold"] .btn-primary:hover { background: oklch(0.85 0.14 80); color: oklch(0.2 0.03 80); border-color: oklch(0.85 0.14 80); }
+body[data-variant="bold"] .kpi-accent { background: var(--accent); color: oklch(0.2 0.03 80); border-color: var(--accent); }
+body[data-variant="bold"] .kpi-accent .kpi-label { color: oklch(0.25 0.06 80); }
+body[data-variant="bold"] .kpi-accent .kpi-value { color: oklch(0.2 0.03 80); }
+body[data-variant="bold"] .kpi-accent .kpi-sub { color: oklch(0.3 0.06 80); }
+body[data-variant="bold"] .sidebar-brand-mark { background: var(--accent); color: oklch(0.2 0.03 80); }
+body[data-variant="bold"] .avatar { background: var(--accent); color: oklch(0.2 0.03 80); }
+body[data-variant="bold"] .alert-icon { background: oklch(0.32 0.09 25); }
+body[data-variant="bold"] .tab.active { border-bottom-color: var(--accent); }
+
+/* Tweaks panel */
+.tweaks-fab {
+  position: fixed; bottom: 20px; right: 20px; z-index: 90;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--navy); color: white;
+  display: grid; place-items: center;
+  box-shadow: 0 6px 20px oklch(0.15 0.02 250 / 0.25);
+}
+.tweaks-panel {
+  position: fixed; bottom: 76px; right: 20px; z-index: 91;
+  width: 280px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px oklch(0.15 0.02 250 / 0.15);
+  overflow: hidden;
+}
+.tweaks-panel header {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: 13px;
+}
+.tweaks-panel .tw-body { padding: 14px; display: grid; gap: 14px; }
+.tw-group-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.tw-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.tw-opt {
+  padding: 8px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  font-size: 11.5px; font-weight: 500;
+  text-align: center;
+  color: var(--ink-2);
+}
+.tw-opt.on { background: var(--navy); color: white; border-color: var(--navy); }
+
+/* ================ MOBILE ================ */
+.bottom-nav { display: none; }
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .topbar { padding: 10px 14px; gap: 6px; }
+  .topbar-crumb, .topbar-sep, .topbar-pill, .topbar-user > div { display: none; }
+  .topbar-spacer { flex: 1; }
+  .topbar > button:not(.topbar-iconbtn) { display: none; }
+  .content { padding: 12px !important; padding-bottom: 72px !important; }
+  .grid.g-cols-12 .span-5, .grid.g-cols-12 .span-7, .grid.g-cols-12 .span-4, .grid.g-cols-12 .span-8, .grid.g-cols-12 .span-6 { grid-column: span 12 !important; }
+  .grid.g-cols-2 { grid-template-columns: 1fr !important; }
+  .grid.g-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid[style*="repeat(8"] { grid-template-columns: repeat(2, 1fr) !important; }
+  .tweaks-fab { bottom: 80px; }
+  .tweaks-panel { bottom: 136px; right: 12px; left: 12px; width: auto; }
+
+  .bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 50;
+    padding: 6px 4px 8px;
+    box-shadow: 0 -2px 12px oklch(0.15 0.02 250 / 0.08);
+  }
+  .bottom-nav button {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 4px;
+    font-size: 10px; color: var(--muted);
+    border-radius: 6px;
+    min-height: 48px;
+  }
+  .bottom-nav button.active { color: var(--accent-ink); background: var(--accent-soft); }
+  body[data-variant="bold"] .bottom-nav button.active { color: var(--accent); background: oklch(0.3 0.06 80); }
+}
+body[data-variant="bold"] .tw-opt.on { background: var(--accent); color: oklch(0.2 0.03 80); border-color: var(--accent); }
+
 </style>
+</head>
+<body data-variant="bold" data-density="compact">
+<div id="root"></div>
 
-<!-- ── Seção 1: Topbar ──────────────────────────────────────────────── -->
-<div class="dash-topbar">
-  <div>
-    <div class="dash-title">Dashboard</div>
-    <div class="dash-sub" id="dash-date">carregando...</div>
-  </div>
-  <div class="dash-topbar-right">
-    <div class="dash-live">
-      <div class="dash-live-dot"></div>
-      <span>Ao vivo · <span id="dash-hora">--:--</span></span>
+<script src="/static/react.js"></script>
+<script src="/static/react-dom.js"></script>
+<script src="/static/babel.min.js"></script>
+
+<script type="text/babel">
+{% raw %}
+// ── Declarações globais únicas ──
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+
+// ═══ components/icons.jsx ═══
+// Minimal stroke-icon set (Lucide-style). Single source of truth.
+const _I = (path, extra = null) => ({ size = 16, className = "sidebar-icon", strokeWidth = 1.75, ...p }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+       fill="none" stroke="currentColor" strokeWidth={strokeWidth}
+       strokeLinecap="round" strokeLinejoin="round"
+       className={className} {...p}>
+    {path}
+    {extra}
+  </svg>
+);
+
+const Icons = {
+  Dashboard: _I(<><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></>),
+  Cow: _I(<><path d="M5 8c0-2 2-3 4-3h6c2 0 4 1 4 3v6c0 3-3 5-7 5s-7-2-7-5V8z"/><circle cx="9" cy="11" r="0.8" fill="currentColor"/><circle cx="15" cy="11" r="0.8" fill="currentColor"/><path d="M10 16c.5.5 1 .7 2 .7s1.5-.2 2-.7"/><path d="M5 8 3 6M19 8l2-2"/></>),
+  Scale: _I(<><path d="M4 4h16l-2 4H6z"/><path d="M6 8l-3 8h18l-3-8"/><path d="M12 8v12"/><path d="M8 20h8"/></>),
+  Health: _I(<><path d="M20.8 10.5a6 6 0 0 0-10.8-3.5 6 6 0 0 0-10.8 3.5C-.8 17 10 22 10 22s10.8-5 10.8-11.5z" transform="translate(1.6 0)"/><path d="M9 11h2v-2h2v2h2v2h-2v2h-2v-2H9z"/></>),
+  Nutri: _I(<><path d="M12 2c3 2 5 5 5 8 0 4-3 6-5 6s-5-2-5-6c0-3 2-6 5-8z"/><path d="M12 16v6"/><path d="M8 22h8"/></>),
+  Feedlot: _I(<><rect x="3" y="9" width="18" height="11"/><path d="M3 9 12 3l9 6"/><path d="M7 14h10M7 17h10"/></>),
+  Pasture: _I(<><path d="M3 20h18"/><path d="M6 20v-4M10 20v-6M14 20v-5M18 20v-7"/><path d="M5 17c1-1 2-1 3 0M9 15c1-1 2-1 3 0M13 16c1-1 2-1 3 0M17 14c1-1 2-1 3 0"/></>),
+  Scale2: _I(<><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7h6zM19 7l-3 7h6z"/></>),
+  Money: _I(<><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v4M18 10v4"/></>),
+  Report: _I(<><path d="M4 3h10l6 6v12H4z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></>),
+  Users: _I(<><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15 15c3 0 6 2 6 5"/></>),
+  Plus: _I(<><path d="M12 5v14M5 12h14"/></>),
+  Bell: _I(<><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></>),
+  Search: _I(<><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></>),
+  Settings: _I(<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></>),
+  Alert: _I(<><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17v.1"/></>),
+  Trend: _I(<><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></>),
+  Calendar: _I(<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>),
+  Drop: _I(<><path d="M12 3s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z"/></>),
+  MapPin: _I(<><path d="M12 22s7-7 7-12a7 7 0 0 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></>),
+  Clock: _I(<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>),
+  Close: _I(<><path d="M6 6l12 12M18 6L6 18"/></>),
+  Chevron: _I(<><path d="M9 6l6 6-6 6"/></>),
+  ChevronDown: _I(<><path d="M6 9l6 6 6-6"/></>),
+  ArrowRight: _I(<><path d="M5 12h14M13 6l6 6-6 6"/></>),
+  Check: _I(<><path d="M5 12l5 5L20 6"/></>),
+  Filter: _I(<><path d="M3 5h18l-7 9v6l-4-2v-4z"/></>),
+  Flag: _I(<><path d="M5 21V3l8 2 6-2v12l-6 2-8-2z"/></>),
+  Ghost: _I(<><path d="M4 12a8 8 0 0 1 16 0v9l-3-2-2 2-3-2-2 2-3-2-3 2z"/><circle cx="9" cy="11" r="1" fill="currentColor"/><circle cx="15" cy="11" r="1" fill="currentColor"/></>),
+  DollarIn: _I(<><path d="M12 3v18M17 7H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H7"/></>),
+  Download: _I(<><path d="M12 3v13M7 11l5 5 5-5"/><path d="M4 21h16"/></>),
+};
+window.Icons = Icons;
+
+
+// ═══ components/data.jsx ═══
+// Source data for the prototype — mirrors the user's screenshot exactly.
+const FARM = {
+  name: "Fazenda Ipanema",
+  sub: "Gestão de Rebanho",
+  dateLabel: "Terça-feira, 21 de abril de 2026",
+  streamTag: "Ao vivo · 14:12",
+  seasonTag: "14/08",
+};
+
+const ALERTS = [
+  {
+    level: "critico",
+    icon: "🚨",
+    titulo: "Despesa vencida",
+    texto: "Sal mineral — 4 sacos · R$ 168,00",
+    sub: "Venceu em 17/04/2026",
+    link: "financeiro",
+  },
+  {
+    level: "atencao",
+    icon: "⚠️",
+    titulo: "Despesa a vencer amanhã",
+    texto: "Salário mensal — FUNCIONÁRIO · R$ 1.800,00",
+    sub: "Vence em 18/04/2026",
+    link: "financeiro",
+  },
+];
+
+const CATEGORY_KPIS = [
+  { key: "vaca", label: "Vaca", value: 1, accent: "oklch(0.48 0.11 235)" },
+  { key: "touro", label: "Touro", value: 0, accent: "oklch(0.58 0.16 25)" },
+  { key: "boi", label: "Boi", value: 2, accent: "oklch(0.48 0.11 235)" },
+  { key: "garrote", label: "Garrote", value: 0, accent: "oklch(0.68 0.13 75)" },
+  { key: "novilha", label: "Novilha", value: 0, accent: "oklch(0.56 0.10 155)" },
+  { key: "bezerro", label: "Bezerro", value: 2, accent: "oklch(0.48 0.11 235)" },
+  { key: "bezerra", label: "Bezerra", value: 0, accent: "oklch(0.58 0.16 25)" },
+  { key: "total", label: "Total Ativo", value: 5, dark: true },
+];
+
+const SECONDARY_KPIS = [
+  { label: "Último mês", value: "4", sub: "R$ 1.168,90 · R$ 0,00/kg" },
+  { label: "Consumo", value: "20", sub: "GMD 1,16 kg/d · CA 6,8 · 14/8/2026" },
+];
+
+const EXITS = {
+  pesoAlvo: 480,
+  gmdAlvo: 1.00,
+  buckets: {
+    agora: 0,
+    "30d": 1,
+    "60d": 1,
+    semDados: 2,
+  },
+  animals: [
+    { id: "BOI-001", peso: 470, gmd: 1.33, dias: 8 },
+    { id: "VAC-002", peso: 400, gmd: 0.82, dias: 97 },
+    { id: "10",      peso: 320, gmd: 0.78, dias: 230 },
+  ],
+  gmdAvg: 0.96,
+  meta: 1.0,
+};
+
+const PASTURES = {
+  totalArea: 9.4,
+  chuvaMes: 98,
+  lotes: [
+    { id: "P-04", status: "SEM DADOS", ocupacao: 0, area: 2.1 },
+    { id: "P-01", status: "OCUPADO", ocupacao: 78, area: 2.3, animais: 2 },
+    { id: "P-02", status: "OCUPADO", ocupacao: 64, area: 2.4, animais: 2 },
+    { id: "P-03", status: "OCUPADO", ocupacao: 52, area: 2.6, animais: 1 },
+  ],
+  counts: { prontos: 0, quasePronto: 0, naoEntrar: 0, ocupados: 3 },
+};
+
+const FINANCE = {
+  invested: 8299.87,
+  perKg: 7.44,
+  perAnimal: 111.59,
+  costliest: { id: "10", value: 2999.87 },
+  series: [120, 160, 180, 260, 340, 500, 620, 780, 900, 1100, 1380, 1600, 1900, 2200, 2600, 3000, 3400, 3900, 4400, 4900, 5500, 6000, 6600, 7200, 7800, 8299.87],
+};
+
+const WEIGHINGS = [
+  { date: "2026-04-12", id: "BOI-001", peso: 470, gmd: 1.33, obs: "OK" },
+  { date: "2026-04-08", id: "VAC-002", peso: 400, gmd: 0.82, obs: "—" },
+  { date: "2026-04-05", id: "10",      peso: 320, gmd: 0.78, obs: "atenção" },
+  { date: "2026-03-30", id: "BOI-001", peso: 458, gmd: 1.21, obs: "OK" },
+  { date: "2026-03-22", id: "VAC-002", peso: 393, gmd: 0.74, obs: "—" },
+];
+
+const EXIT_FORECAST_MONTHS = [
+  { m: "Mai", v: 0 }, { m: "Jun", v: 1 }, { m: "Jul", v: 0 }, { m: "Ago", v: 1 },
+  { m: "Set", v: 0 }, { m: "Out", v: 1 }, { m: "Nov", v: 2 }, { m: "Dez", v: 0 },
+];
+
+// Animal roster
+const ANIMALS = [
+  { id: "BOI-001", brinco: "001", categoria: "Boi", sexo: "M", nasc: "2024-02-14", peso: 470, gmd: 1.33, lote: "P-01", status: "ativo", saude: "ok", custoTotal: 1850.22, raca: "Nelore" },
+  { id: "BOI-002", brinco: "002", categoria: "Boi", sexo: "M", nasc: "2024-03-01", peso: 455, gmd: 1.18, lote: "P-02", status: "ativo", saude: "ok", custoTotal: 1720.55, raca: "Nelore" },
+  { id: "VAC-002", brinco: "V002", categoria: "Vaca", sexo: "F", nasc: "2021-06-22", peso: 400, gmd: 0.82, lote: "P-02", status: "ativo", saude: "atenção", custoTotal: 780.30, raca: "Nelore" },
+  { id: "BEZ-08",  brinco: "08",  categoria: "Bezerro", sexo: "M", nasc: "2025-10-03", peso: 120, gmd: 0.70, lote: "P-03", status: "ativo", saude: "ok", custoTotal: 320.10, raca: "Nelore" },
+  { id: "BEZ-09",  brinco: "09",  categoria: "Bezerro", sexo: "M", nasc: "2025-11-12", peso: 95,  gmd: 0.64, lote: "P-03", status: "ativo", saude: "ok", custoTotal: 240.80, raca: "Nelore" },
+  { id: "10",      brinco: "10",  categoria: "Vaca", sexo: "F", nasc: "2019-04-08", peso: 320, gmd: 0.78, lote: "P-01", status: "ativo", saude: "atenção", custoTotal: 2999.87, raca: "Nelore" },
+];
+
+const HEALTH_LOG = [
+  { date: "2026-04-10", animal: "VAC-002", tipo: "Vacinação", produto: "Aftosa (dose 1)", vet: "Dr. Mendes", proximo: "2026-10-10" },
+  { date: "2026-04-02", animal: "BOI-001", tipo: "Vermífugo", produto: "Ivermectina 1%", vet: "Dr. Mendes", proximo: "2026-07-02" },
+  { date: "2026-03-28", animal: "10",       tipo: "Tratamento", produto: "Antibiótico — mastite", vet: "Dra. Rossi", proximo: "—" },
+  { date: "2026-03-15", animal: "BEZ-08",   tipo: "Brucelose", produto: "Vacina B19", vet: "Dr. Mendes", proximo: "—" },
+];
+
+const HEALTH_UPCOMING = [
+  { date: "2026-04-25", animal: "BEZ-09", tipo: "Aftosa (reforço)", urgencia: "alta" },
+  { date: "2026-05-02", animal: "Todos", tipo: "Vermifugação geral", urgencia: "média" },
+  { date: "2026-05-10", animal: "BOI-002", tipo: "Aftosa", urgencia: "média" },
+];
+
+const NUTRITION_STOCK = [
+  { item: "Sal mineral proteinado", sku: "SAL-PROT-25", saldo: 420, unit: "kg", reord: 100, status: "ok", custoKg: 3.40 },
+  { item: "Milho moído", sku: "MIL-MOI-50", saldo: 850, unit: "kg", reord: 200, status: "ok", custoKg: 1.20 },
+  { item: "Farelo de soja", sku: "SOJ-FAR-40", saldo: 180, unit: "kg", reord: 200, status: "baixo", custoKg: 2.90 },
+  { item: "Feno de Tifton", sku: "FEN-TIF", saldo: 28, unit: "fardos", reord: 10, status: "ok", custoKg: 18.00 },
+  { item: "Núcleo proteico 20%", sku: "NUC-20", saldo: 60, unit: "kg", reord: 80, status: "baixo", custoKg: 4.80 },
+];
+
+const NUTRITION_FORMULA = [
+  { ingred: "Milho moído", pct: 55 },
+  { ingred: "Farelo de soja", pct: 22 },
+  { ingred: "Feno", pct: 15 },
+  { ingred: "Núcleo", pct: 6 },
+  { ingred: "Sal mineral", pct: 2 },
+];
+
+const FEEDLOT = {
+  capacidade: 40,
+  ocupados: 0,
+  dias: 0,
+  gmdMedio: 0,
+  caMedia: 0,
+  bays: [
+    { id: "C-1", cap: 10, atual: 0 },
+    { id: "C-2", cap: 10, atual: 0 },
+    { id: "C-3", cap: 10, atual: 0 },
+    { id: "C-4", cap: 10, atual: 0 },
+  ],
+};
+
+const FINANCE_LEDGER = [
+  { date: "2026-04-17", desc: "Sal mineral — 4 sacos", cat: "Nutrição", valor: -168.00, status: "vencida" },
+  { date: "2026-04-18", desc: "Salário mensal — FUNCIONÁRIO", cat: "Pessoal", valor: -1800.00, status: "a vencer" },
+  { date: "2026-04-10", desc: "Vacina aftosa (10 doses)", cat: "Sanidade", valor: -92.50, status: "paga" },
+  { date: "2026-04-05", desc: "Combustível — trator", cat: "Operação", valor: -210.00, status: "paga" },
+  { date: "2026-03-30", desc: "Compra BOI-001", cat: "Aquisição", valor: -1850.22, status: "paga" },
+  { date: "2026-03-22", desc: "Manutenção cerca P-02", cat: "Infra", valor: -145.00, status: "paga" },
+];
+
+const FINANCE_BY_CATEGORY = [
+  { cat: "Aquisição", valor: 6120.44, cor: "oklch(0.48 0.11 235)" },
+  { cat: "Nutrição", valor: 980.20, cor: "oklch(0.56 0.10 155)" },
+  { cat: "Sanidade", valor: 412.73, cor: "oklch(0.68 0.13 75)" },
+  { cat: "Operação", valor: 486.50, cor: "oklch(0.58 0.16 25)" },
+  { cat: "Infra", valor: 300.00, cor: "oklch(0.45 0.05 245)" },
+];
+
+const REPORTS = [
+  { title: "Desempenho do rebanho", sub: "GMD, peso médio, dias em pasto — últimos 90 dias", tag: "Performance" },
+  { title: "Fluxo de caixa mensal", sub: "Entradas vs saídas por categoria", tag: "Financeiro" },
+  { title: "Curva de custo por arroba", sub: "R$/@ ao longo do ciclo", tag: "Financeiro" },
+  { title: "Ocupação de pastagem", sub: "Taxa de lotação e rotação de piquetes", tag: "Campo" },
+  { title: "Calendário sanitário", sub: "Vacinas aplicadas e próximas", tag: "Sanidade" },
+  { title: "Previsão de abate", sub: "Animais prontos por janela temporal", tag: "Performance" },
+];
+
+window.DATA = {
+  FARM, ALERTS, CATEGORY_KPIS, SECONDARY_KPIS, EXITS, PASTURES,
+  FINANCE, WEIGHINGS, EXIT_FORECAST_MONTHS, ANIMALS, HEALTH_LOG,
+  HEALTH_UPCOMING, NUTRITION_STOCK, NUTRITION_FORMULA, FEEDLOT,
+  FINANCE_LEDGER, FINANCE_BY_CATEGORY, REPORTS,
+};
+
+
+// ═══ components/viz.jsx ═══
+// Small chart + shared visual primitives
+const Spark = ({ values, color = "var(--accent)", height = 40, fill = true }) => {
+  if (!values || !values.length) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const W = 100;
+  const H = height;
+  const step = W / (values.length - 1);
+  const pts = values.map((v, i) => [i * step, H - ((v - min) / range) * (H - 4) - 2]);
+  const d = pts.map(([x, y], i) => (i ? `L${x.toFixed(2)},${y.toFixed(2)}` : `M${x.toFixed(2)},${y.toFixed(2)}`)).join(" ");
+  const dArea = `${d} L${W},${H} L0,${H} Z`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="spark" style={{height}}>
+      {fill && <path d={dArea} fill={color} opacity="0.1" />}
+      <path d={d} stroke={color} strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
+const Bars = ({ data, labelKey = "m", valueKey = "v", color = "var(--accent)", height = 120, max }) => {
+  const vmax = max ?? Math.max(1, ...data.map(d => d[valueKey]));
+  return (
+    <div style={{display: "grid", gridTemplateColumns: `repeat(${data.length}, 1fr)`, gap: 6, alignItems: "end", height}}>
+      {data.map((d, i) => {
+        const h = (d[valueKey] / vmax) * (height - 24);
+        return (
+          <div key={i} style={{display:"flex", flexDirection:"column", alignItems:"center", gap: 4}}>
+            <div style={{
+              width: "100%", maxWidth: 22, height: Math.max(h, 2),
+              background: d[valueKey] === 0 ? "var(--bg-2)" : color,
+              borderRadius: 4,
+              border: d[valueKey] === 0 ? "1px dashed var(--border-strong)" : "none",
+            }} />
+            <div style={{fontSize: 10.5, color: "var(--muted)", fontFamily: "var(--font-mono)"}}>{d[labelKey]}</div>
+            <div style={{fontSize: 11, color: "var(--ink-2)", fontFamily: "var(--font-mono)", marginTop: -2}}>{d[valueKey]}</div>
+          </div>
+        );
+      })}
     </div>
-    <button class="topbar-btn" onclick="recarregarDashboard(this)" title="Atualizar">🔄</button>
-    <button class="topbar-btn" onclick="abrirConfig()" title="Configurações">⚙️</button>
-  </div>
-</div>
+  );
+};
 
-<!-- ── Seção 2: Alertas ─────────────────────────────────────────────── -->
-<div id="dash-alerts-box" class="dash-alerts" style="display:none;"></div>
+const Donut = ({ segments, size = 120, stroke = 14, centerTop, centerBottom }) => {
+  const total = segments.reduce((a, s) => a + s.v, 0) || 1;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  let off = 0;
+  return (
+    <div style={{position: "relative", width: size, height: size}}>
+      <svg width={size} height={size} style={{transform: "rotate(-90deg)"}}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+        {segments.map((s, i) => {
+          const len = (s.v / total) * c;
+          const el = (
+            <circle key={i} cx={size/2} cy={size/2} r={r} fill="none"
+                    stroke={s.color} strokeWidth={stroke} strokeLinecap="butt"
+                    strokeDasharray={`${len} ${c - len}`}
+                    strokeDashoffset={-off} />
+          );
+          off += len;
+          return el;
+        })}
+      </svg>
+      <div style={{position:"absolute", inset: 0, display: "grid", placeItems: "center", textAlign: "center"}}>
+        <div>
+          <div style={{fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 500, letterSpacing: "-0.03em"}}>{centerTop}</div>
+          <div style={{fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em"}}>{centerBottom}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-<!-- ── Loading ─────────────────────────────────────────────────────── -->
-<div id="dash-loading" style="display:flex;align-items:center;gap:12px;color:#555;padding:20px 0;">
-  <div class="spinner"></div><span>Carregando dashboard...</span>
-</div>
+const Ring = ({ pct, size = 48, stroke = 5, color }) => {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const dash = (pct/100) * c;
+  return (
+    <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color || "var(--accent)"} strokeWidth={stroke}
+              strokeDasharray={`${dash} ${c - dash}`} strokeLinecap="round" />
+    </svg>
+  );
+};
 
-<!-- ── Conteúdo principal ───────────────────────────────────────────── -->
-<div id="dashMain" style="display:none;">
+const Gauge = ({ value, min = 0, max = 2, color = "var(--accent)" }) => {
+  const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  return (
+    <div style={{position: "relative"}}>
+      <div style={{height: 6, background: "var(--bg-2)", borderRadius: 999, overflow: "hidden"}}>
+        <div style={{width: `${pct*100}%`, height: "100%", background: color, borderRadius: 999, transition: "width 400ms"}} />
+      </div>
+      <div style={{display: "flex", justifyContent: "space-between", fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--muted)", marginTop: 4}}>
+        <span>{min.toFixed(1)}</span>
+        <span>{max.toFixed(1)}</span>
+      </div>
+    </div>
+  );
+};
 
-  <!-- Seção 3: KPI Strip -->
-  <div id="dash-kpi-strip" class="kpi-row" style="margin-bottom:12px;"></div>
+// BRL
+const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brlShort = (n) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  <!-- Seção 4: Grid 3 colunas -->
-  <div style="display:grid;grid-template-columns:1.1fr .9fr .9fr;gap:12px;margin-bottom:12px;">
+Object.assign(window, { Spark, Bars, Donut, Ring, Gauge, brl, brlShort });
 
-    <!-- Card Previsão de Saída -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-header-left">
-          <div class="card-header-icon icon-blue">📅</div>
-          <div>
-            <div class="card-title">Previsão de Saída</div>
-            <div class="card-subtitle" id="prev-sub">—</div>
+
+// ═══ components/shell.jsx ═══
+// Sidebar + topbar shell
+
+function SidebarItem({ icon, label, active, badge, href, onClick }) {
+  const Icon = icon;
+  if (href) {
+    return (
+      <a href={href} className={`sidebar-item ${active ? "active" : ""}`}>
+        <Icon className="sidebar-icon" size={16} />
+        <span>{label}</span>
+        {badge ? <span className="sidebar-badge">{badge}</span> : null}
+      </a>
+    );
+  }
+  return (
+    <button className={`sidebar-item ${active ? "active" : ""}`} onClick={onClick}>
+      <Icon className="sidebar-icon" size={16} />
+      <span>{label}</span>
+      {badge ? <span className="sidebar-badge">{badge}</span> : null}
+    </button>
+  );
+}
+
+function Sidebar({ route, setRoute, openModal, openSale }) {
+  const sections = [
+    {
+      title: "Principal",
+      items: [
+        { key: "dashboard", label: "Dashboard", icon: Icons.Dashboard },
+        { key: "animais", label: "Animais", icon: Icons.Cow, badge: 6 },
+        { key: "pesagem", label: "Pesagem", icon: Icons.Scale },
+      ],
+    },
+    {
+      title: "Saúde",
+      items: [
+        { key: "sanidade", label: "Sanidade", icon: Icons.Health },
+        { key: "nutricao", label: "Nutrição", icon: Icons.Nutri },
+        { key: "confinamento", label: "Confinamento", icon: Icons.Feedlot },
+      ],
+    },
+    {
+      title: "Campo",
+      items: [
+        { key: "pastagem", label: "Pastagem & Lotes", icon: Icons.Pasture },
+        { key: "balanca", label: "Balança S3", icon: Icons.Scale2 },
+      ],
+    },
+    {
+      title: "Gestão",
+      items: [
+        { key: "financeiro", label: "Financeiro", icon: Icons.Money, badge: 2 },
+        { key: "relatorios", label: "Relatórios", icon: Icons.Report },
+        { key: "pessoas", label: "Pessoas", icon: Icons.Users },
+      ],
+    },
+  ];
+
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <div className="sidebar-brand-mark">Fi</div>
+        <div>
+          <div className="sidebar-brand-name">Fazenda Ipanema</div>
+          <div className="sidebar-brand-sub">Gestão de Rebanho</div>
+        </div>
+      </div>
+
+      {sections.map((s) => (
+        <div className="sidebar-section" key={s.title}>
+          <div className="sidebar-section-title">{s.title}</div>
+          {s.items.map((it) => (
+            <SidebarItem
+              key={it.key}
+              icon={it.icon}
+              label={it.label}
+              badge={it.badge}
+              active={route === it.key}
+              href={ROUTE_URLS[it.key] || (it.key === "dashboard" ? "/dashboard" : undefined)}
+              onClick={() => setRoute(it.key)}
+            />
+          ))}
+        </div>
+      ))}
+
+    </aside>
+  );
+}
+
+const ROUTE_LABELS = {
+  dashboard: "Dashboard",
+  animais: "Animais",
+  pesagem: "Pesagem",
+  sanidade: "Sanidade",
+  nutricao: "Nutrição",
+  confinamento: "Confinamento",
+  pastagem: "Pastagem & Lotes",
+  balanca: "Balança S3",
+  financeiro: "Financeiro",
+  relatorios: "Relatórios",
+  pessoas: "Pessoas",
+};
+
+// URL de cada rota no FastAPI — dashboard fica null (React gerencia)
+const ROUTE_URLS = {
+  animais:      "/animais-page",
+  pesagem:      "/pesagem-page",
+  sanidade:     "/sanidade-page",
+  nutricao:     "/nutricao-page",
+  confinamento: "/confinamento-page",
+  inseminacao:  "/inseminacao-page",
+  pastagem:     "/pastagem-page",
+  balanca:      "/balanca-page",
+  financeiro:   "/financeiro-page",
+  relatorios:   "/relatorios-page",
+  pessoas:      "/pessoas-page",
+};
+
+function Topbar({ route, setRoute, openCmdk, openSale }) {
+  return (
+    <header className="topbar">
+      <div className="topbar-title">{ROUTE_LABELS[route] || "Dashboard"}</div>
+      <div className="topbar-sep">/</div>
+      <div className="topbar-crumb">Fazenda Ipanema</div>
+
+      <div className="topbar-spacer" />
+
+      <button onClick={openCmdk} style={{display:"inline-flex", alignItems:"center", gap:8, padding:"6px 10px", borderRadius: 8, border:"1px solid var(--border)", background:"var(--bg-2)", color:"var(--muted)", fontSize: 12, minWidth: 220}}>
+        <Icons.Search size={14} />
+        <span>Buscar…</span>
+        <span style={{marginLeft:"auto", fontFamily:"var(--font-mono)", fontSize: 10, padding:"1px 6px", border:"1px solid var(--border)", borderRadius: 4}}>⌘K</span>
+      </button>
+      <button className="btn" onClick={openSale}><Icons.Trend size={14} /> Simular venda</button>
+      <button className="topbar-iconbtn" title="Notificações"><Icons.Bell size={16} /></button>
+
+      <div className="topbar-pill"><span className="dot" /> Ao vivo · 14:12</div>
+
+      <div className="topbar-user">
+        <div className="avatar">LA</div>
+        <div style={{fontSize: 12, fontWeight: 500, paddingRight: 2}}>L. Almeida</div>
+        <Icons.ChevronDown size={14} />
+      </div>
+    </header>
+  );
+}
+
+function BottomNav({ route, setRoute }) {
+  const items = [
+    { key: "dashboard", label: "Início", icon: Icons.Dashboard },
+    { key: "animais", label: "Animais", icon: Icons.Cow },
+    { key: "pesagem", label: "Pesagem", icon: Icons.Scale },
+    { key: "sanidade", label: "Saúde", icon: Icons.Health },
+    { key: "financeiro", label: "Financeiro", icon: Icons.Money },
+  ];
+  return (
+    <nav className="bottom-nav">
+      {items.map(it => {
+        const Icon = it.icon;
+        const href = ROUTE_URLS[it.key] || (it.key === "dashboard" ? "/dashboard" : undefined);
+        return href ? (
+          <a key={it.key} href={href} className={route === it.key ? "active" : ""} style={{display:"flex",flexDirection:"column",alignItems:"center",textDecoration:"none",color:"inherit"}}>
+            <Icon size={20} strokeWidth={route === it.key ? 2 : 1.75} />
+            <span>{it.label}</span>
+          </a>
+        ) : (
+          <button key={it.key} className={route === it.key ? "active" : ""} onClick={() => setRoute(it.key)}>
+            <Icon size={20} strokeWidth={route === it.key ? 2 : 1.75} />
+            <span>{it.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+Object.assign(window, { Sidebar, Topbar, BottomNav, ROUTE_LABELS });
+
+// ═══ components/dashboard.jsx ═══
+// Dashboard — rendered for "safe", "balanced", and "bold" variants
+
+function AlertRow({ level, text, onClick }) {
+  return (
+    <div className="alert alert-urgent">
+      <div className="alert-icon"><Icons.Alert size={16} strokeWidth={2} /></div>
+      <div style={{flex: 1}}>
+        <div className="alert-title">{level}</div>
+        <div className="alert-body">{text}</div>
+      </div>
+      <button className="btn" onClick={onClick}>Ver</button>
+    </div>
+  );
+}
+
+// Smart, pattern-based alerts — inferred from DATA
+const SMART_ALERTS = [
+  {
+    severity: "high",
+    icon: "Trend",
+    title: "GMD abaixo da média do lote",
+    body: "BOI-004 está 18% abaixo da média do L-03 há 14 dias. Verificar sanidade ou pasto.",
+    route: "animais",
+    tag: "Padrão · 14 dias",
+  },
+  {
+    severity: "med",
+    icon: "Pasture",
+    title: "Piquete em sobrecarga",
+    body: "P-05 com 112% de ocupação (ideal ≤ 90%). Considerar rotacionar para P-07.",
+    route: "pastagem",
+    tag: "UA/ha alto",
+  },
+  {
+    severity: "med",
+    icon: "Money",
+    title: "Despesa recorrente não lançada",
+    body: "Ração proteinada (R$ 3.2k/mês) não foi lançada em outubro. Última entrada em set/25.",
+    route: "financeiro",
+    tag: "Padrão · recorrente",
+  },
+  {
+    severity: "low",
+    icon: "Health",
+    title: "Vacina IBR/BVD próxima do vencimento",
+    body: "12 animais do lote L-02 com reforço previsto nos próximos 7 dias.",
+    route: "sanidade",
+    tag: "Calendário",
+  },
+];
+
+function SmartAlerts({ setRoute }) {
+  const [dismissed, setDismissed] = useState({});
+  const [expanded, setExpanded] = useState({});
+  const visible = SMART_ALERTS.filter((_, i) => !dismissed[i]);
+  if (visible.length === 0) return null;
+  const sevBg = { high: "var(--bad-soft)", med: "var(--warn-soft)", low: "var(--accent-soft)" };
+  const sevFg = { high: "var(--bad)", med: "var(--warn)", low: "var(--accent-ink)" };
+  return (
+    <div className="card" style={{marginBottom: 14}}>
+      <div className="card-header">
+        <div>
+          <div className="card-title"><Icons.Alert size={14} /> Alertas inteligentes</div>
+          <div className="card-sub" style={{marginTop: 2}}>detectados automaticamente por padrão de dados</div>
+        </div>
+        <span className="chip accent dot">{visible.length} ativos</span>
+      </div>
+      <div style={{padding: 10, display:"grid", gap: 6}}>
+        {SMART_ALERTS.map((a, i) => {
+          if (dismissed[i]) return null;
+          const Icon = Icons[a.icon] || Icons.Alert;
+          const isOpen = !!expanded[i];
+          return (
+            <div key={i} style={{
+              padding: "10px 12px", borderRadius: 8,
+              background: "var(--bg-2)",
+              border: "1px solid var(--border)",
+            }}>
+              <div style={{display:"flex", alignItems:"center", gap: 12}}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: sevBg[a.severity], color: sevFg[a.severity],
+                  display:"grid", placeItems:"center", flexShrink: 0,
+                }}><Icon size={16} /></div>
+                <div style={{flex: 1, minWidth: 0, display:"flex", alignItems:"center", gap: 8}}>
+                  <div style={{fontSize: 13, fontWeight: 500, letterSpacing:"-0.005em"}}>{a.title}</div>
+                  <span className="chip" style={{padding:"0 6px", fontSize: 10}}>{a.tag}</span>
+                </div>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setExpanded(e => ({...e, [i]: !e[i]}))}
+                  title={isOpen ? "Recolher" : "Expandir"}
+                  style={{transition: "transform 150ms ease", transform: isOpen ? "rotate(180deg)" : "none"}}
+                >
+                  <Icons.ChevronDown size={14} />
+                </button>
+              </div>
+              {isOpen && (
+                <div style={{
+                  marginTop: 10, paddingTop: 10, paddingLeft: 44,
+                  borderTop: "1px dashed var(--border)",
+                  display:"flex", alignItems:"center", gap: 10,
+                  animation: "rise 160ms ease",
+                }}>
+                  <div style={{flex: 1, fontSize: 12, color: "var(--muted)"}}>{a.body}</div>
+                  <button className="btn" onClick={() => setRoute(a.route)}>Investigar</button>
+                  <button className="btn btn-ghost" onClick={() => setDismissed(d => ({...d, [i]: true}))} title="Dispensar"><Icons.Close size={12} /></button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CategoryKPI({ label, value, accent, dark, delta, onClick }) {
+  return (
+    <div className={`kpi ${dark ? "kpi-accent" : ""}`} onClick={onClick} style={{cursor: onClick ? "pointer" : "default"}}>
+      {!dark && accent && (
+        <div style={{position:"absolute", top: 0, left: 0, right: 0, height: 3, background: accent}} />
+      )}
+      <div style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start"}}>
+        <div className="kpi-label">{label}</div>
+        {delta ? <span className="chip" style={{padding:"0 6px", fontSize:10}}>{delta}</span> : null}
+      </div>
+      <div className="kpi-value">{value}</div>
+      {dark && <div className="kpi-sub">cabeças</div>}
+    </div>
+  );
+}
+
+function PrevisaoSaida({ variant }) {
+  const buckets = [
+    { label: "Prontos agora", key: "agora", value: EXITS.buckets.agora, tone: "good" },
+    { label: "Até 30 dias", key: "30d", value: EXITS.buckets["30d"], tone: "accent" },
+    { label: "Até 60 dias", key: "60d", value: EXITS.buckets["60d"], tone: "warn" },
+    { label: "Sem dados", key: "sem", value: EXITS.buckets.semDados, tone: "muted" },
+  ];
+  const toneColor = (t) => ({
+    good: "var(--good-soft)", accent: "var(--accent-soft)",
+    warn: "var(--warn-soft)", muted: "var(--bg-2)"
+  }[t] || "var(--bg-2)");
+  const toneInk = (t) => ({
+    good: "var(--good)", accent: "var(--accent-ink)",
+    warn: "var(--warn)", muted: "var(--muted)"
+  }[t] || "var(--muted)");
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div>
+          <div className="card-title"><Icons.Calendar size={14} /> Previsão de Saída</div>
+          <div className="card-sub" style={{marginTop: 2}}>peso alvo {EXITS.pesoAlvo} kg · GMD alvo {EXITS.gmdAlvo.toFixed(2)}</div>
+        </div>
+        <span className="chip good dot">0 prontos</span>
+      </div>
+      <div className="card-body">
+        <div className="grid g-cols-4" style={{gap: 8}}>
+          {buckets.map((b) => (
+            <div key={b.key} style={{
+              background: toneColor(b.tone),
+              borderRadius: 8,
+              padding: "12px 12px",
+              color: toneInk(b.tone),
+            }}>
+              <div className="num" style={{fontSize: 22, fontWeight: 500, letterSpacing: "-0.03em"}}>{b.value}</div>
+              <div style={{fontSize: 11, marginTop: 2}}>{b.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* GMD vs meta */}
+        <div style={{marginTop: 16}}>
+          <div style={{display:"flex", justifyContent:"space-between", marginBottom: 6}}>
+            <span style={{fontSize: 11, color: "var(--muted)", textTransform:"uppercase", letterSpacing: "0.06em", fontWeight: 600}}>GMD médio</span>
+            <span style={{fontSize: 11, fontFamily:"var(--font-mono)", color: "var(--muted)"}}>meta {EXITS.meta.toFixed(2)} · atual {EXITS.gmdAvg.toFixed(2)}</span>
+          </div>
+          <div style={{position: "relative", height: 6, background: "var(--bg-2)", borderRadius: 999}}>
+            <div style={{position: "absolute", left: `${EXITS.meta * 50}%`, top: -3, bottom: -3, width: 2, background: "var(--ink-2)", opacity: 0.4}} />
+            <div style={{height: "100%", width: `${EXITS.gmdAvg * 50}%`, background: "var(--accent)", borderRadius: 999}} />
           </div>
         </div>
-        <span id="prev-badge" class="badge badge-green">—</span>
+
+        {/* Animals closest to exit */}
+        <table className="table" style={{marginTop: 14}}>
+          <thead>
+            <tr>
+              <th>Animal</th>
+              <th className="num">Peso</th>
+              <th className="num">GMD</th>
+              <th className="num">Dias</th>
+            </tr>
+          </thead>
+          <tbody>
+            {EXITS.animals.map(a => (
+              <tr key={a.id}>
+                <td style={{color: "var(--accent-ink)", fontWeight: 500}}>{a.id}</td>
+                <td className="num">{a.peso} kg</td>
+                <td className="num">{a.gmd.toFixed(2)}</td>
+                <td className="num">{a.dias} d</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{padding: "10px 0 0", borderTop: "1px solid var(--border)", marginTop: 10}}>
+          <button className="btn btn-ghost" style={{color: "var(--accent-ink)"}}>Ver relatório completo <Icons.ArrowRight size={12} /></button>
+        </div>
       </div>
-      <div class="card-body">
-        <div id="prev-boxes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"></div>
-        <div id="prev-gmd-bar" style="margin-bottom:10px;"></div>
-        <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-          <thead><tr>
-            <th style="text-align:left;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">ANIMAL</th>
-            <th style="text-align:right;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">PESO</th>
-            <th style="text-align:right;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">GMD</th>
-            <th style="text-align:right;padding:4px 4px 6px;color:#9ca3af;font-weight:600;font-size:10px;border-bottom:0.5px solid #f3f4f6;">DIAS</th>
-          </tr></thead>
-          <tbody id="prev-tabela"></tbody>
+    </div>
+  );
+}
+
+function PastagemCard({ onOpen }) {
+  const pcounts = [
+    { label: "Prontos", v: PASTURES.counts.prontos, bg: "var(--good-soft)", fg: "var(--good)" },
+    { label: "Quase prontos", v: PASTURES.counts.quasePronto, bg: "var(--warn-soft)", fg: "var(--warn)" },
+    { label: "Não entrar", v: PASTURES.counts.naoEntrar, bg: "var(--bad-soft)", fg: "var(--bad)" },
+    { label: "Ocupados", v: PASTURES.counts.ocupados, bg: "var(--accent-soft)", fg: "var(--accent-ink)" },
+  ];
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div>
+          <div className="card-title"><Icons.Pasture size={14} /> Pastagem & Lotes</div>
+          <div className="card-sub" style={{marginTop: 2}}>{PASTURES.totalArea} ha úteis</div>
+        </div>
+        <span className="chip accent dot">{PASTURES.chuvaMes} mm no mês</span>
+      </div>
+      <div className="card-body">
+        <div className="grid g-cols-2" style={{gap: 8}}>
+          {pcounts.map((p) => (
+            <div key={p.label} style={{background: p.bg, padding: "10px 12px", borderRadius: 8}}>
+              <div className="num" style={{fontSize: 20, fontWeight: 500, color: p.fg}}>{p.v}</div>
+              <div style={{fontSize: 11, color: p.fg}}>{p.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{marginTop: 14}}>
+          <div style={{fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, marginBottom: 8}}>
+            Piquetes por ocupação
+          </div>
+          {PASTURES.lotes.map(l => {
+            const isData = l.status !== "SEM DADOS";
+            return (
+              <div key={l.id} style={{display: "grid", gridTemplateColumns: "50px 1fr 80px", alignItems: "center", gap: 10, marginBottom: 8}}>
+                <div style={{fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 500}}>{l.id}</div>
+                <div className="progress">
+                  <span style={{
+                    width: `${l.ocupacao}%`,
+                    background: isData ? (l.ocupacao > 70 ? "var(--warn)" : "var(--accent)") : "transparent",
+                  }} />
+                </div>
+                <div style={{fontSize: 11, fontFamily: "var(--font-mono)", color: isData ? "var(--ink-2)" : "var(--muted)", textAlign: "right"}}>
+                  {isData ? `${l.ocupacao}% · ${l.animais}` : "sem dados"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{display: "flex", alignItems: "center", gap: 8, paddingTop: 10, borderTop: "1px solid var(--border)", marginTop: 10}}>
+          <Icons.Drop size={14} />
+          <span style={{fontSize: 12, color: "var(--muted)"}}>Chuva este mês {PASTURES.chuvaMes} mm</span>
+          <div style={{marginLeft: "auto"}}>
+            <button className="btn btn-ghost" style={{color:"var(--accent-ink)"}} onClick={onOpen}>Ver mapa da fazenda <Icons.ArrowRight size={12} /></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FinanceiroCard({ variant, onOpen }) {
+  return (
+    <div className="card" onClick={onOpen} style={{cursor: onOpen ? "pointer" : "default"}}>
+      <div className="card-header">
+        <div>
+          <div className="card-title"><Icons.Money size={14} /> Financeiro do Rebanho</div>
+          <div className="card-sub" style={{marginTop: 2}}>investimento e custo médio</div>
+        </div>
+        <span className="chip">Ciclo atual</span>
+      </div>
+      <div className="card-body">
+        <div className="kpi kpi-accent" style={{marginBottom: 12}}>
+          <div className="kpi-label">Total investido no rebanho</div>
+          <div className="kpi-value">R$ {brlShort(FINANCE.invested)}</div>
+          <div style={{marginTop: 10}}>
+            <Spark values={FINANCE.series} color={variant === "bold" ? "oklch(0.2 0.03 80)" : "white"} height={32} />
+          </div>
+        </div>
+        <div className="grid g-cols-2" style={{gap: 10}}>
+          <div style={{padding: "12px", border: "1px solid var(--border)", borderRadius: 8}}>
+            <div className="kpi-label">Custo / kg</div>
+            <div className="num" style={{fontSize: 22, marginTop: 4, letterSpacing: "-0.03em"}}>R$ {FINANCE.perKg.toFixed(2)}</div>
+          </div>
+          <div style={{padding: "12px", border: "1px solid var(--border)", borderRadius: 8}}>
+            <div className="kpi-label">Custo / @</div>
+            <div className="num" style={{fontSize: 22, marginTop: 4, letterSpacing: "-0.03em"}}>R$ {FINANCE.perAnimal.toFixed(2)}</div>
+          </div>
+        </div>
+        <div style={{paddingTop: 12, marginTop: 12, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+          <div>
+            <div style={{fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600}}>Animal mais caro</div>
+            <div style={{fontSize: 13, fontWeight: 500, marginTop: 2}}>{FINANCE.costliest.id}</div>
+          </div>
+          <div className="num" style={{fontSize: 18, letterSpacing: "-0.02em"}}>R$ {brlShort(FINANCE.costliest.value)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UltimasPesagens({ onOpen }) {
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div className="card-title"><Icons.Scale size={14} /> Últimas Pesagens</div>
+        <span className="chip">{WEIGHINGS.length} registros</span>
+      </div>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Animal</th>
+            <th className="num">Peso</th>
+            <th className="num">GMD</th>
+            <th>Obs.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {WEIGHINGS.map((w, i) => (
+            <tr key={i}>
+              <td style={{color:"var(--muted)"}}>{w.date}</td>
+              <td style={{color:"var(--accent-ink)", fontWeight: 500}}>{w.id}</td>
+              <td className="num">{w.peso} kg</td>
+              <td className="num">{w.gmd.toFixed(2)}</td>
+              <td>
+                {w.obs === "OK" ? <span className="chip good dot">OK</span>
+                  : w.obs === "atenção" ? <span className="chip warn dot">atenção</span>
+                  : <span style={{color: "var(--muted)"}}>—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SaidasPrevistasMes() {
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div className="card-title"><Icons.Trend size={14} /> Saídas Previstas por Mês</div>
+        <span className="chip">próximos 8 meses</span>
+      </div>
+      <div className="card-body">
+        <Bars data={EXIT_FORECAST_MONTHS} height={140} color="var(--accent)" />
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ variant = "safe", setRoute, openModal, openDrill = () => {}, openSale = () => {} }) {
+
+  const tarefas = [
+    { icone: "🌾", urgente: true,  texto: "Lançar ração — Lote Engorda",  sub: "15,2 kg planejado · não lançado hoje", acao: "Lançar →",    fn: () => setRoute("nutricao") },
+    { icone: "📏", urgente: false, texto: "Medir pasto — P-04",           sub: "Sem medição há 8 dias",              acao: "Medir →",     fn: () => setRoute("pastagem") },
+    { icone: "⚖️", urgente: false, texto: "Pesar — BOI-001",              sub: "Última pesagem há 14 dias",           acao: "Pesar →",     fn: () => setRoute("pesagem")  },
+    { icone: "💉", urgente: false, texto: "Sanidade — VAC-002",           sub: "Sem registro há 180 dias",            acao: "Registrar →", fn: () => setRoute("sanidade") },
+  ];
+
+  const gmdMedio = WEIGHINGS.length
+    ? (WEIGHINGS.reduce((s, w) => s + w.gmd, 0) / WEIGHINGS.length).toFixed(2)
+    : "—";
+
+  const placar = [
+    { valor: CATEGORY_KPIS.find(k => k.key === "total")?.value ?? 0, label: "Animais ativos",  sub: "1 vaca · 2 bois · 2 bezerros",      fn: () => setRoute("animais")    },
+    { valor: gmdMedio, label: "GMD médio",      sub: "kg/dia · últimas pesagens",  badge: "BOM",   badgeColor: "#22c55e", fn: () => setRoute("pesagem")    },
+    { valor: "2,1",    label: "UA/ha média",    sub: "3 piquetes ocupados · 9,4 ha", badge: "IDEAL", badgeColor: "#3b82f6", fn: () => setRoute("pastagem")   },
+    { valor: "R$ 1.450", label: "Saldo do mês", sub: "↑ R$ 3.500 receita · ↓ R$ 2.050",         fn: () => setRoute("financeiro") },
+  ];
+
+  return (
+    <div className="content">
+
+      {/* HEADER */}
+      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:18 }}>
+        <div>
+          <div style={{ fontSize:22, fontWeight:600, letterSpacing:"-0.015em" }}>Dashboard</div>
+          <div style={{ fontSize:12.5, color:"var(--muted)", marginTop:2 }}>{FARM.dateLabel}</div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button className="btn"><Icons.Download size={14} /> Exportar</button>
+          <button className="btn btn-primary" onClick={() => openModal("despesa")}><Icons.Plus size={14} /> Nova Despesa</button>
+        </div>
+      </div>
+
+      {/* ALERTAS FINANCEIROS */}
+      {ALERTS.length > 0 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
+          {ALERTS.map((a, i) => (
+            <div key={i} onClick={() => setRoute(a.link || "financeiro")} style={{
+              display:"flex", alignItems:"center", gap:12, padding:"10px 16px",
+              background: a.level === "critico" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.08)",
+              border: `1px solid ${a.level === "critico" ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.25)"}`,
+              borderRadius:10, cursor:"pointer",
+            }}>
+              <span style={{ fontSize:16, flexShrink:0 }}>{a.icon}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:700, marginBottom:2, color: a.level === "critico" ? "#f87171" : "#fbbf24" }}>{a.titulo}</div>
+                <div style={{ fontSize:12, color:"var(--ink-2)" }}>{a.texto}</div>
+                {a.sub && <div style={{ fontSize:11, color:"var(--muted)", marginTop:1 }}>{a.sub}</div>}
+              </div>
+              <button className="btn" style={{ fontSize:11, padding:"4px 12px", flexShrink:0 }} onClick={() => setRoute(a.link || "financeiro")}>Ver →</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* SMART ALERTS */}
+      <SmartAlerts setRoute={setRoute} />
+
+      {/* PLACAR — 4 números grandes */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:18 }}>
+        {placar.map((p) => (
+          <div key={p.label} onClick={p.fn} style={{
+            padding:"16px 18px", background:"var(--bg-card)",
+            border:"1px solid var(--border)", borderRadius:12, cursor:"pointer", transition:"border-color .15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = "var(--accent)"}
+          onMouseLeave={e => e.currentTarget.style.borderColor = "var(--border)"}
+          >
+            <div style={{ fontSize:10.5, color:"var(--muted)", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:600, marginBottom:6 }}>{p.label}</div>
+            <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+              <div className="num" style={{ fontSize:34, fontWeight:500, letterSpacing:"-0.03em", lineHeight:1 }}>{p.valor}</div>
+              {p.badge && (
+                <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:20,
+                  background:(p.badgeColor||"var(--accent)")+"22", color:p.badgeColor||"var(--accent-ink)",
+                  border:`1px solid ${(p.badgeColor||"var(--accent)")+"44"}` }}>{p.badge}</span>
+              )}
+            </div>
+            {p.sub && <div style={{ fontSize:11, color:"var(--muted)", marginTop:5 }}>{p.sub}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* TAREFAS DO DIA + 3 CARDS */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:12, marginBottom:18, alignItems:"start" }}>
+
+        {/* Tarefas */}
+        <div className="card" style={{ gridColumn:"span 1" }}>
+          <div style={{ padding:"12px 16px 10px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ fontSize:13, fontWeight:600 }}>📋 Para fazer hoje</div>
+            <span className="chip">{tarefas.length}</span>
+          </div>
+          <div style={{ padding:"4px 16px 12px" }}>
+            {tarefas.map((t, i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom: i < tarefas.length-1 ? "1px solid var(--border)" : "none" }}>
+                <span style={{ fontSize:15, flexShrink:0, width:22 }}>{t.icone}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:500, color: t.urgente ? "#f87171" : "var(--ink)" }}>{t.texto}</div>
+                  <div style={{ fontSize:10.5, color:"var(--muted)", marginTop:1 }}>{t.sub}</div>
+                </div>
+                <button className="btn" style={{ fontSize:10.5, padding:"3px 10px", flexShrink:0 }} onClick={t.fn}>{t.acao}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ gridColumn:"span 1" }}><PrevisaoSaida variant={variant} /></div>
+        <div style={{ gridColumn:"span 1" }}><PastagemCard onOpen={() => setRoute("pastagem")} /></div>
+        <div style={{ gridColumn:"span 1" }}><FinanceiroCard variant={variant} onOpen={() => openDrill({ kind:"finance" })} /></div>
+
+      </div>
+
+      {/* SAÍDAS PREVISTAS */}
+      <SaidasPrevistasMes />
+
+    </div>
+  );
+}
+
+window.Dashboard = Dashboard;
+
+
+// ═══ API Client ═══
+window.Api = (() => {
+  async function req(method, path, body) {
+    try {
+      const opts = { method, headers: {"Content-Type":"application/json"} };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(path, opts);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        console.error("API error", path, err);
+        return null;
+      }
+      return await res.json();
+    } catch (e) {
+      console.error("API fetch error", e);
+      return null;
+    }
+  }
+  return {
+    animais:       (p="") => req("GET",    `/animais${p}`),
+    criarAnimal:   (b)    => req("POST",   "/animais", b),
+    excluirAnimal: (id)   => req("DELETE", `/animais/${id}`),
+    pesagens:      (p="") => req("GET",    `/pesagens${p}`),
+    criarPesagem:  (b)    => req("POST",   "/pesagens", b),
+    sanidade:      (p="") => req("GET",    `/sanidade${p}`),
+    criarSanidade: (b)    => req("POST",   "/sanidade", b),
+    despesas:      (p="") => req("GET",    `/despesas${p}`),
+    criarDespesa:  (b)    => req("POST",   "/despesas", b),
+    vendas:        (p="") => req("GET",    `/vendas${p}`),
+    compras:       (p="") => req("GET",    `/compras${p}`),
+    medicao:       (b)    => req("POST",   "/pastagem/medicao", b),
+  };
+})();
+
+// ═══ components/screens.jsx ═══
+// Animais, Pesagem, Sanidade, Nutrição, Confinamento, Pastagem, Financeiro, Relatórios
+
+
+// ─── ANIMAIS ──────────────────────────────────────────────────────────────
+function _mapAnimal(a) {
+  if (a.categoria) return a; // já mapeado
+  return {
+    id: a.brinco, brinco: a.brinco, nome: a.nome,
+    categoria: a.tipo || "—",
+    sexo: a.sexo ? (a.sexo.toUpperCase().startsWith("M") ? "M" : "F") : "M",
+    nasc: a.data_nascimento || "",
+    peso: a.peso_atual || 0, gmd: 0,
+    lote: a.pasto_atual || "—",
+    status: (a.status || "ATIVO").toUpperCase(),
+    saude: "ok", custoTotal: a.valor_compra || 0, raca: a.raca || "—",
+  };
+}
+
+function AnimaisScreen({ setRoute, openModal }) {
+  const [animais, setAnimais]   = React.useState(DATA.ANIMALS);
+  const [loading, setLoading]   = React.useState(false);
+  const [selected, setSelected] = React.useState(DATA.ANIMALS[0]?.id);
+  const [filter, setFilter]     = React.useState("Todos");
+  const [checked, setChecked]   = React.useState({});
+  const toast = window.useToast ? window.useToast() : null;
+
+  React.useEffect(() => {
+    window.onAnimalCadastrado = carregarAnimais;
+    carregarAnimais();
+    return () => { window.onAnimalCadastrado = null; };
+  }, []);
+
+  async function carregarAnimais() {
+    setLoading(true);
+    const res = await window.Api?.animais();
+    if (res && res.length) setAnimais(res.map(_mapAnimal));
+    setLoading(false);
+  }
+
+  async function excluirAnimal(brinco) {
+    if (!confirm("Excluir este animal?")) return;
+    const res = await window.Api?.excluirAnimal(brinco);
+    if (res !== null) { await carregarAnimais(); }
+  }
+
+  const cats = ["Todos", "Boi", "Vaca", "Bezerro", "Bezerra", "Novilha", "Garrote", "Touro"];
+  const list = animais.filter(a => filter === "Todos" || (a.categoria||"").toLowerCase() === filter.toLowerCase());
+  const animal = animais.find(a => a.id === selected) || animais[0];
+  const checkedIds = Object.keys(checked).filter(id => checked[id]);
+  const allChecked = list.length > 0 && list.every(a => checked[a.id]);
+
+  const toggleAll = () => {
+    if (allChecked) { setChecked({}); }
+    else {
+      const next = {};
+      list.forEach(a => next[a.id] = true);
+      setChecked(next);
+    }
+  };
+  const bulkAction = (label) => {
+    if (toast) toast({ msg: `${label}: ${checkedIds.length} animal(is)` });
+    setChecked({});
+  };
+
+  const weightHistory = [280, 310, 340, 370, 395, 420, 442, 455, 470];
+
+  return (
+    <div className="content">
+      <div style={{display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom: 16}}>
+        <div>
+          <div style={{fontSize: 22, fontWeight: 600, letterSpacing: "-0.015em"}}>Animais</div>
+          <div style={{fontSize: 12.5, color: "var(--muted)", marginTop: 2}}>{animais.length} cadastrados · {animais.filter(a=>(a.status||"ATIVO")==="ATIVO").length} ativos</div>
+        </div>
+        <div style={{display: "flex", gap: 8}}>
+          <button className="btn"><Icons.Filter size={14} /> Filtros</button>
+          <button className="btn"><Icons.Download size={14} /> Exportar</button>
+          <button className="btn btn-primary" onClick={() => openModal("animal")}><Icons.Plus size={14} /> Novo Animal</button>
+        </div>
+      </div>
+
+      {checkedIds.length > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 14px", marginBottom: 10,
+          background: "var(--navy)", color: "white",
+          borderRadius: 8,
+          animation: "rise 150ms ease",
+        }}>
+          <span style={{fontSize: 13, fontWeight: 500}}>{checkedIds.length} selecionado(s)</span>
+          <div style={{marginLeft: "auto", display: "flex", gap: 6}}>
+            <button className="btn" style={{background:"transparent", borderColor:"oklch(0.5 0.02 250)", color:"white"}} onClick={() => bulkAction("Pesar")}><Icons.Scale size={13} /> Pesar</button>
+            <button className="btn" style={{background:"transparent", borderColor:"oklch(0.5 0.02 250)", color:"white"}} onClick={() => bulkAction("Aplicar sanidade")}><Icons.Health size={13} /> Aplicar</button>
+            <button className="btn" style={{background:"transparent", borderColor:"oklch(0.5 0.02 250)", color:"white"}} onClick={() => bulkAction("Mover de lote")}><Icons.Pasture size={13} /> Mover lote</button>
+            <button className="btn" style={{background:"transparent", borderColor:"oklch(0.5 0.02 250)", color:"white"}} onClick={() => setChecked({})}><Icons.Close size={13} /></button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid g-cols-12">
+        <div className="span-5 card">
+          <div style={{padding: 10, display: "flex", gap: 6, borderBottom: "1px solid var(--border)", overflowX: "auto"}}>
+            {cats.map(c => (
+              <button key={c} onClick={() => setFilter(c)}
+                className="chip"
+                style={{
+                  background: filter === c ? "var(--navy)" : "var(--bg-2)",
+                  color: filter === c ? "white" : "var(--ink-2)",
+                  border: "1px solid " + (filter === c ? "var(--navy)" : "var(--border)"),
+                  cursor: "pointer",
+                }}>{c}</button>
+            ))}
+          </div>
+          {loading ? (
+            <div style={{padding:40,textAlign:"center",color:"var(--muted)"}}>Carregando...</div>
+          ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th style={{width: 28}}><input type="checkbox" checked={allChecked} onChange={toggleAll} /></th>
+                <th>Brinco</th><th>Cat.</th><th className="num">Peso</th><th className="num">GMD</th><th>Lote</th><th>Saúde</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 && <tr><td colSpan="8" style={{textAlign:"center",color:"var(--muted)",padding:24}}>Nenhum animal</td></tr>}
+              {list.map(a => (
+                <tr key={a.id}
+                    style={{cursor: "pointer", background: a.id === selected ? "var(--accent-soft)" : undefined}}>
+                  <td onClick={() => setChecked(c => ({...c, [a.id]: !c[a.id]}))}>
+                    <input type="checkbox" checked={!!checked[a.id]} readOnly />
+                  </td>
+                  <td onClick={() => setSelected(a.id)} style={{fontWeight: 500, color: a.id === selected ? "var(--accent-ink)" : "var(--ink)"}}>{a.brinco||a.id}</td>
+                  <td onClick={() => setSelected(a.id)}>{a.categoria}</td>
+                  <td onClick={() => setSelected(a.id)} className="num">{a.peso||0} kg</td>
+                  <td onClick={() => setSelected(a.id)} className="num">{(a.gmd||0).toFixed(2)}</td>
+                  <td onClick={() => setSelected(a.id)} style={{fontFamily: "var(--font-mono)", fontSize: 11}}>{a.lote||"—"}</td>
+                  <td onClick={() => setSelected(a.id)}>
+                    {a.saude === "ok" || !a.saude ? <span className="chip good dot">ok</span> : <span className="chip warn dot">atenção</span>}
+                  </td>
+                  <td><button onClick={()=>excluirAnimal(a.brinco||a.id)} style={{fontSize:10,color:"var(--bad)",background:"none",border:"none",cursor:"pointer",padding:"2px 6px"}}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          )}
+        </div>
+
+        {/* Detail */}
+        <div className="span-7">
+          <div className="card">
+            <div style={{padding: "18px 18px 12px", borderBottom: "1px solid var(--border)"}}>
+              <div style={{display: "flex", alignItems: "center", justifyContent: "space-between"}}>
+                <div>
+                  <div style={{fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", letterSpacing: "0.04em"}}>BRINCO {animal.brinco}</div>
+                  <div style={{fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", marginTop: 2}}>{animal.id}</div>
+                  <div style={{fontSize: 12.5, color: "var(--muted)", marginTop: 2}}>{animal.raca} · {animal.sexo === "M" ? "Macho" : "Fêmea"} · Nasc. {animal.nasc}</div>
+                </div>
+                <div style={{display: "flex", gap: 8}}>
+                  <button className="btn"><Icons.Scale size={14} /> Pesar</button>
+                  <button className="btn"><Icons.Health size={14} /> Aplicar</button>
+                  <button className="btn btn-primary">Editar</button>
+                </div>
+              </div>
+              <div style={{display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginTop: 16}}>
+                {[
+                  { l: "Peso atual", v: `${animal.peso}`, s: "kg" },
+                  { l: "GMD", v: animal.gmd.toFixed(2), s: "kg/dia" },
+                  { l: "Lote", v: animal.lote, s: "pasto" },
+                  { l: "Custo total", v: brlShort(animal.custoTotal), s: "BRL" },
+                ].map(x => (
+                  <div key={x.l}>
+                    <div className="kpi-label">{x.l}</div>
+                    <div style={{display: "flex", alignItems: "baseline", gap: 4, marginTop: 3}}>
+                      <div className="num" style={{fontSize: 22, fontWeight: 500, letterSpacing: "-0.03em"}}>{x.v}</div>
+                      <div style={{fontSize: 11, color: "var(--muted)"}}>{x.s}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{padding: 18}}>
+              <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10}}>
+                <div style={{fontSize: 12.5, fontWeight: 600}}>Curva de peso</div>
+                <span className="chip">últimos 9 meses</span>
+              </div>
+              <div style={{height: 140, border: "1px solid var(--border)", borderRadius: 8, padding: 10, background: "var(--bg-2)"}}>
+                <Spark values={weightHistory} color="var(--accent)" height={120} />
+              </div>
+
+              <div style={{marginTop: 18}}>
+                <div style={{fontSize: 12.5, fontWeight: 600, marginBottom: 8}}>Linha do tempo</div>
+                <div style={{display: "grid", gap: 6}}>
+                  {[
+                    { d: "2026-04-12", t: "Pesagem", v: "470 kg · GMD 1,33", tag: "ok" },
+                    { d: "2026-04-02", t: "Vermífugo", v: "Ivermectina 1% — Dr. Mendes", tag: "ok" },
+                    { d: "2026-03-15", t: "Mudança lote", v: "P-02 → P-01", tag: "info" },
+                    { d: "2026-03-30", t: "Aquisição", v: `R$ ${brlShort(animal.custoTotal)}`, tag: "info" },
+                  ].map((e, i) => (
+                    <div key={i} style={{display: "grid", gridTemplateColumns: "100px 1fr auto", gap: 10, padding: "8px 10px", background: "var(--bg-2)", borderRadius: 6}}>
+                      <div style={{fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)"}}>{e.d}</div>
+                      <div><span style={{fontWeight: 500}}>{e.t}</span> <span style={{color: "var(--muted)"}}>— {e.v}</span></div>
+                      <span className={`chip ${e.tag === "ok" ? "good" : "accent"} dot`}>{e.tag}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PESAGEM ──────────────────────────────────────────────────────────────
+function PesagemScreen() {
+  const [pesagens, setPesagens] = React.useState(DATA.WEIGHINGS);
+  const [animais,  setAnimais]  = React.useState(DATA.ANIMALS);
+  const [loading,  setLoading]  = React.useState(false);
+  const [filtro,   setFiltro]   = React.useState("Todas");
+  const [showForm, setShowForm] = React.useState(false);
+  const [salvando, setSalvando] = React.useState(false);
+  const [form, setForm] = React.useState({
+    brinco:"", data: new Date().toISOString().slice(0,10),
+    peso_kg:"", responsavel:"", obs:""
+  });
+
+  React.useEffect(() => { carregarDados(); }, []);
+
+  async function carregarDados() {
+    setLoading(true);
+    const [p, a] = await Promise.all([
+      window.Api?.pesagens(), window.Api?.animais(),
+    ]);
+    if (p?.length) setPesagens(p.map(w => ({...w, date:w.data||w.date, id:w.brinco||w.id, peso:w.peso_kg||w.peso, gmd:w.gmd||0, obs:w.obs||""})));
+    if (a?.length) setAnimais(a.map(_mapAnimal));
+    setLoading(false);
+  }
+
+  async function salvarPesagem(e) {
+    e.preventDefault();
+    if (!form.brinco || !form.peso_kg) return;
+    setSalvando(true);
+    const res = await window.Api?.criarPesagem({
+      brinco: form.brinco, data: form.data,
+      peso_kg: parseFloat(form.peso_kg),
+      responsavel: form.responsavel, obs: form.obs,
+    });
+    setSalvando(false);
+    if (res) {
+      setShowForm(false);
+      setForm({ brinco:"", data:new Date().toISOString().slice(0,10), peso_kg:"", responsavel:"", obs:"" });
+      await carregarDados();
+      alert("Pesagem registrada!");
+    } else {
+      alert("Erro ao salvar pesagem. Verifique o brinco.");
+    }
+  }
+
+  const cats = ["Todas","Boi","Vaca","Bezerro"];
+  const hist = pesagens.filter(w => {
+    if (filtro==="Todas") return true;
+    const a = animais.find(x => x.brinco===w.brinco||x.id===(w.brinco||w.id));
+    return (a?.categoria||"").toLowerCase() === filtro.toLowerCase();
+  });
+  const gmdMedio = pesagens.length
+    ? (pesagens.reduce((s,w)=>s+(w.gmd||0),0)/pesagens.length).toFixed(2) : "—";
+
+  return (
+    <div className="content">
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:16}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:600,letterSpacing:"-0.015em"}}>Pesagem</div>
+          <div style={{fontSize:12.5,color:"var(--muted)",marginTop:2}}>{pesagens.length} registros</div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-primary" onClick={()=>setShowForm(!showForm)}>
+            <Icons.Plus size={14}/> {showForm?"Fechar":"Nova pesagem"}
+          </button>
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="card" style={{marginBottom:16,padding:20}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Registrar pesagem</div>
+          <form onSubmit={salvarPesagem}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:12}}>
+              <div className="field">
+                <label>Brinco / Animal *</label>
+                <select value={form.brinco} onChange={e=>setForm(f=>({...f,brinco:e.target.value}))} required>
+                  <option value="">Selecione...</option>
+                  {animais.filter(a=>(a.status||"ATIVO")==="ATIVO").map(a=>(
+                    <option key={a.brinco||a.id} value={a.brinco||a.id}>{a.brinco||a.id} — {a.categoria||a.tipo}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Data *</label>
+                <input type="date" value={form.data} onChange={e=>setForm(f=>({...f,data:e.target.value}))} required/>
+              </div>
+              <div className="field">
+                <label>Peso (kg) *</label>
+                <input type="number" step="0.1" placeholder="465.0" value={form.peso_kg}
+                  onChange={e=>setForm(f=>({...f,peso_kg:e.target.value}))} required/>
+              </div>
+              <div className="field">
+                <label>Responsável</label>
+                <input placeholder="Nome" value={form.responsavel}
+                  onChange={e=>setForm(f=>({...f,responsavel:e.target.value}))}/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button type="submit" className="btn btn-primary" disabled={salvando}>
+                {salvando?"Salvando...":"Registrar Pesagem"}
+              </button>
+              <button type="button" className="btn" onClick={()=>setShowForm(false)}>Cancelar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="grid g-cols-12" style={{marginBottom:14}}>
+        {[
+          {l:"Pesagens registradas", v:pesagens.length, s:"total"},
+          {l:"GMD médio",            v:gmdMedio,        s:"kg/dia"},
+          {l:"Animais pesados",      v:new Set(pesagens.map(w=>w.brinco||w.id)).size, s:"distintos"},
+          {l:"Última pesagem",       v:(pesagens[0]?.data||pesagens[0]?.date||"—").slice(0,10), s:"data"},
+        ].map(k=>(
+          <div key={k.l} className="span-3 kpi">
+            <div className="kpi-label">{k.l}</div>
+            <div className="kpi-value">{k.v}</div>
+            <div className="kpi-sub">{k.s}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Histórico de pesagens</div>
+          <div className="seg">
+            {cats.map(c=>(
+              <button key={c} className={filtro===c?"on":""} onClick={()=>setFiltro(c)}>{c}</button>
+            ))}
+          </div>
+        </div>
+        {loading ? (
+          <div style={{padding:40,textAlign:"center",color:"var(--muted)"}}>Carregando...</div>
+        ) : (
+        <table className="table">
+          <thead>
+            <tr><th>Data</th><th>Brinco</th><th className="num">Peso</th><th className="num">GMD</th><th>Resp.</th></tr>
+          </thead>
+          <tbody>
+            {hist.length===0 && <tr><td colSpan="5" style={{textAlign:"center",color:"var(--muted)",padding:24}}>Nenhuma pesagem registrada</td></tr>}
+            {hist.map((w,i)=>(
+              <tr key={i}>
+                <td style={{fontFamily:"var(--font-mono)",fontSize:11.5,color:"var(--muted)"}}>{(w.data||w.date||"").slice(0,10)}</td>
+                <td style={{color:"var(--accent-ink)",fontWeight:500}}>{w.brinco||w.id}</td>
+                <td className="num">{w.peso_kg||w.peso||0} kg</td>
+                <td className="num">{(w.gmd||0).toFixed(2)}</td>
+                <td style={{color:"var(--muted)"}}>{w.responsavel||"—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── SANIDADE ─────────────────────────────────────────────────────────────
+function SanidadeScreen() {
+  const [registros, setRegistros] = React.useState(DATA.HEALTH_LOG);
+  const [animais,   setAnimais]   = React.useState(DATA.ANIMALS);
+  const [showForm,  setShowForm]  = React.useState(false);
+  const [salvando,  setSalvando]  = React.useState(false);
+  const [filtro,    setFiltro]    = React.useState("Todas");
+  const [form, setForm] = React.useState({
+    brinco:"", data:new Date().toISOString().slice(0,10),
+    tipo:"VACINACAO", produto:"", dose:"", medico_vet:"",
+    proxima_data:"", custo:"",
+  });
+
+  React.useEffect(() => { carregarDados(); }, []);
+
+  async function carregarDados() {
+    const [s, a] = await Promise.all([
+      window.Api?.sanidade(), window.Api?.animais(),
+    ]);
+    if (s?.length) setRegistros(s.map(r=>({...r, date:r.data||r.date, animal:r.brinco||r.animal, produto:r.produto||r.medicamento, proximo:r.proxima_data||r.proximo})));
+    if (a?.length) setAnimais(a.map(_mapAnimal));
+  }
+
+  async function salvar(e) {
+    e.preventDefault();
+    setSalvando(true);
+    const res = await window.Api?.criarSanidade({
+      brinco: form.brinco, data: form.data, tipo: form.tipo,
+      produto: form.produto, dose: form.dose,
+      medico_vet: form.medico_vet,
+      proxima_data: form.proxima_data || null,
+      custo: parseFloat(form.custo) || null,
+    });
+    setSalvando(false);
+    if (res) {
+      setShowForm(false);
+      await carregarDados();
+      alert("Aplicação registrada!");
+    } else {
+      alert("Erro ao salvar. Verifique o brinco.");
+    }
+  }
+
+  const tipos = ["Todas","VACINACAO","VERMIFUGO","TRATAMENTO","EXAME"];
+  const hist = registros.filter(r => filtro==="Todas" || r.tipo===filtro);
+
+  return (
+    <div className="content">
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:16}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:600}}>Sanidade</div>
+          <div style={{fontSize:12.5,color:"var(--muted)",marginTop:2}}>Vacinas, vermífugos e tratamentos</div>
+        </div>
+        <button className="btn btn-primary" onClick={()=>setShowForm(!showForm)}>
+          <Icons.Plus size={14}/> {showForm?"Fechar":"Aplicar"}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="card" style={{marginBottom:16,padding:20}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Registrar aplicação</div>
+          <form onSubmit={salvar}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+              <div className="field">
+                <label>Animal *</label>
+                <select value={form.brinco} onChange={e=>setForm(f=>({...f,brinco:e.target.value}))} required>
+                  <option value="">Selecione...</option>
+                  {animais.map(a=>(
+                    <option key={a.brinco||a.id} value={a.brinco||a.id}>{a.brinco||a.id} — {a.categoria}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Data *</label>
+                <input type="date" value={form.data} onChange={e=>setForm(f=>({...f,data:e.target.value}))} required/>
+              </div>
+              <div className="field">
+                <label>Tipo *</label>
+                <select value={form.tipo} onChange={e=>setForm(f=>({...f,tipo:e.target.value}))}>
+                  <option value="VACINACAO">Vacinação</option>
+                  <option value="VERMIFUGO">Vermífugo</option>
+                  <option value="TRATAMENTO">Tratamento</option>
+                  <option value="EXAME">Exame</option>
+                  <option value="BRUCELOSE">Brucelose</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Produto *</label>
+                <input placeholder="Ex.: Aftosa dose 1" value={form.produto}
+                  onChange={e=>setForm(f=>({...f,produto:e.target.value}))} required/>
+              </div>
+              <div className="field">
+                <label>Dose / Via</label>
+                <input placeholder="Ex.: 2ml SC" value={form.dose}
+                  onChange={e=>setForm(f=>({...f,dose:e.target.value}))}/>
+              </div>
+              <div className="field">
+                <label>Veterinário</label>
+                <input placeholder="Nome" value={form.medico_vet}
+                  onChange={e=>setForm(f=>({...f,medico_vet:e.target.value}))}/>
+              </div>
+              <div className="field">
+                <label>Próxima aplicação</label>
+                <input type="date" value={form.proxima_data}
+                  onChange={e=>setForm(f=>({...f,proxima_data:e.target.value}))}/>
+              </div>
+              <div className="field">
+                <label>Custo (R$)</label>
+                <input type="number" step="0.01" placeholder="0.00" value={form.custo}
+                  onChange={e=>setForm(f=>({...f,custo:e.target.value}))}/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button type="submit" className="btn btn-primary" disabled={salvando}>
+                {salvando?"Salvando...":"Registrar Aplicação"}
+              </button>
+              <button type="button" className="btn" onClick={()=>setShowForm(false)}>Cancelar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Histórico de aplicações</div>
+          <div className="seg">
+            {tipos.map(t=>(
+              <button key={t} className={filtro===t?"on":""} onClick={()=>setFiltro(t)}>
+                {t==="Todas"?"Todas":t.charAt(0)+t.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+        <table className="table">
+          <thead>
+            <tr><th>Data</th><th>Animal</th><th>Tipo</th><th>Produto</th><th>Veterinário</th><th>Próximo</th></tr>
+          </thead>
+          <tbody>
+            {hist.length===0 && <tr><td colSpan="6" style={{textAlign:"center",color:"var(--muted)",padding:24}}>Nenhuma aplicação registrada</td></tr>}
+            {hist.map((h,i)=>(
+              <tr key={i}>
+                <td style={{fontFamily:"var(--font-mono)",fontSize:11.5,color:"var(--muted)"}}>{(h.data||h.date||"").slice(0,10)}</td>
+                <td style={{color:"var(--accent-ink)",fontWeight:500}}>{h.brinco||h.animal}</td>
+                <td><span className="chip accent">{h.tipo}</span></td>
+                <td>{h.produto||h.medicamento}</td>
+                <td style={{color:"var(--muted)"}}>{h.medico_vet||h.vet||"—"}</td>
+                <td style={{fontFamily:"var(--font-mono)",fontSize:11.5}}>{h.proxima_data||h.proximo||"—"}</td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
-      <div class="card-footer"><a href="/relatorios-page">Ver relatório completo →</a></div>
     </div>
+  );
+}
 
-    <!-- Card Pastagem & Lotes -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-header-left">
-          <div class="card-header-icon icon-green">🌿</div>
-          <div>
-            <div class="card-title">Pastagem & Lotes</div>
-            <div class="card-subtitle" id="past-sub">semáforos</div>
-          </div>
+// ─── NUTRIÇÃO ─────────────────────────────────────────────────────────────
+function NutricaoScreen() {
+  return (
+    <div className="content">
+      <div style={{fontSize:22,fontWeight:600,marginBottom:8}}>Nutrição</div>
+      <div className="card" style={{padding:40,textAlign:"center"}}>
+        <div style={{fontSize:32,marginBottom:12}}>🌾</div>
+        <div style={{fontSize:15,fontWeight:600,marginBottom:6}}>Módulo de Nutrição</div>
+        <div style={{color:"var(--muted)",fontSize:13,marginBottom:20}}>
+          Suplementação, planos nutricionais e estoque de ração.
         </div>
-        <span id="past-badge" class="badge badge-blue">—</span>
+        <button className="btn btn-primary"
+          onClick={()=>window.open("/nutricao-page","_blank")}>
+          Abrir módulo completo →
+        </button>
       </div>
-      <div class="card-body">
-        <div id="past-sem-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;"></div>
-        <div style="font-size:10px;font-weight:600;color:#9ca3af;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px;">Piquetes por urgência</div>
-        <div id="past-piquetes-lista" style="margin-bottom:10px;"></div>
-        <div id="past-footer-bar" style="font-size:11px;color:#9ca3af;padding:6px 0;border-top:0.5px solid #f5f5f5;"></div>
-      </div>
-      <div class="card-footer"><a href="/pastagem-page">Ver mapa da fazenda →</a></div>
     </div>
+  );
+}
 
-    <!-- Card Financeiro -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-header-left">
-          <div class="card-header-icon icon-amber">💰</div>
-          <div>
-            <div class="card-title">Financeiro do Rebanho</div>
-            <div class="card-subtitle">Investimento e custo médio</div>
-          </div>
+function _NutricaoScreenFull() {
+  const totalFormula = DATA.NUTRITION_FORMULA.reduce((a,x)=>a+x.pct, 0);
+  const segColors = ["oklch(0.48 0.11 235)", "oklch(0.56 0.10 155)", "oklch(0.68 0.13 75)", "oklch(0.58 0.16 25)", "oklch(0.45 0.05 245)"];
+  const donutSegs = DATA.NUTRITION_FORMULA.map((f, i) => ({ v: f.pct, color: segColors[i % segColors.length] }));
+
+  return (
+    <div className="content">
+      <div style={{display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom: 16}}>
+        <div>
+          <div style={{fontSize: 22, fontWeight: 600, letterSpacing: "-0.015em"}}>Nutrição</div>
+          <div style={{fontSize: 12.5, color: "var(--muted)", marginTop: 2}}>Estoque, fórmulas e consumo</div>
         </div>
-      </div>
-      <div class="card-body">
-        <div id="fin-boxes"></div>
-      </div>
-      <div class="card-footer"><a href="/financeiro-page">Ver financeiro completo →</a></div>
-    </div>
-
-  </div>
-
-  <!-- Seção 5: Grid 2 colunas -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-
-    <!-- Últimas Pesagens -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-header-left">
-          <div class="card-header-icon icon-amber">⚖️</div>
-          <div>
-            <div class="card-title">Últimas Pesagens</div>
-            <div class="card-subtitle" id="pes-sub">—</div>
-          </div>
-        </div>
-        <span id="pes-badge" class="badge badge-blue">—</span>
-      </div>
-      <div class="card-body">
-        <div id="pes-lista"></div>
-      </div>
-      <div class="card-footer"><a href="/pesagem-page">Registrar nova pesagem →</a></div>
-    </div>
-
-    <!-- Saídas Previstas por Mês -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-header-left">
-          <div class="card-header-icon icon-blue">📊</div>
-          <div>
-            <div class="card-title">Saídas Previstas por Mês</div>
-            <div class="card-subtitle" id="dist-sub">próximos 12 meses</div>
-          </div>
+        <div style={{display:"flex", gap: 8}}>
+          <button className="btn"><Icons.Download size={14} /> Compra</button>
+          <button className="btn btn-primary"><Icons.Plus size={14} /> Lançar consumo</button>
         </div>
       </div>
-      <div class="card-body" style="position:relative;">
-        <canvas id="grafico-dist-saidas" height="160"></canvas>
+
+      <div className="grid g-cols-12" style={{marginBottom: 14}}>
+        <div className="span-3 kpi"><div className="kpi-label">Consumo diário</div><div className="kpi-value">20</div><div className="kpi-sub">kg/animal · ratio 6,8</div></div>
+        <div className="span-3 kpi"><div className="kpi-label">Custo / kg ganho</div><div className="kpi-value">R$ 4,12</div><div className="kpi-sub">CA 6,8</div></div>
+        <div className="span-3 kpi"><div className="kpi-label">Itens em estoque</div><div className="kpi-value">{DATA.NUTRITION_STOCK.length}</div><div className="kpi-sub">2 em nível baixo</div></div>
+        <div className="span-3 kpi kpi-accent"><div className="kpi-label">GMD esperado</div><div className="kpi-value">1,16</div><div className="kpi-sub">kg/dia</div></div>
       </div>
-      <div class="card-footer"><a href="/relatorios-page">Ver relatório completo →</a></div>
+
+      <div className="grid g-cols-12">
+        <div className="span-7 card">
+          <div className="card-header"><div className="card-title">Estoque</div><button className="btn btn-ghost"><Icons.Plus size={12} /> Adicionar item</button></div>
+          <table className="table">
+            <thead>
+              <tr><th>Item</th><th>SKU</th><th className="num">Saldo</th><th className="num">Reordem</th><th>Status</th><th className="num">R$/kg</th></tr>
+            </thead>
+            <tbody>
+              {DATA.NUTRITION_STOCK.map((n, i) => (
+                <tr key={i}>
+                  <td style={{fontWeight: 500}}>{n.item}</td>
+                  <td style={{fontFamily: "var(--font-mono)", color: "var(--muted)", fontSize: 11.5}}>{n.sku}</td>
+                  <td className="num">{n.saldo} {n.unit}</td>
+                  <td className="num" style={{color: "var(--muted)"}}>{n.reord} {n.unit}</td>
+                  <td>{n.status === "ok" ? <span className="chip good dot">ok</span> : <span className="chip warn dot">baixo</span>}</td>
+                  <td className="num">R$ {n.custoKg.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="span-5">
+          <div className="card" style={{marginBottom: 14}}>
+            <div className="card-header"><div className="card-title">Fórmula atual</div><span className="chip accent">Engorda</span></div>
+            <div className="card-body" style={{display: "flex", gap: 16, alignItems: "center"}}>
+              <Donut segments={donutSegs} size={130} stroke={16} centerTop={`${totalFormula}%`} centerBottom="total" />
+              <div style={{flex: 1, display: "grid", gap: 8}}>
+                {DATA.NUTRITION_FORMULA.map((f, i) => (
+                  <div key={f.ingred} style={{display: "grid", gridTemplateColumns: "10px 1fr auto", gap: 8, alignItems: "center", fontSize: 12.5}}>
+                    <div style={{width: 8, height: 8, borderRadius: 2, background: segColors[i % segColors.length]}} />
+                    <div>{f.ingred}</div>
+                    <div className="num">{f.pct}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header"><div className="card-title">Consumo 7d</div></div>
+            <div className="card-body">
+              <Bars data={[
+                { m: "Seg", v: 18 }, { m: "Ter", v: 20 }, { m: "Qua", v: 21 },
+                { m: "Qui", v: 19 }, { m: "Sex", v: 22 }, { m: "Sáb", v: 20 }, { m: "Dom", v: 20 },
+              ]} height={120} color="var(--accent)" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  );
+}
 
-  </div>
-
-</div><!-- /dashMain -->
-
-<!-- ── Modal Config ──────────────────────────────────────────────────── -->
-<div id="modalConfig" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
-     z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:380px;width:90%;
-              box-shadow:0 8px 32px rgba(0,0,0,.18);">
-    <h3 style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:18px;">⚙️ Configurações do Dashboard</h3>
-    <div style="margin-bottom:14px;">
-      <label style="font-size:13px;font-weight:600;color:#374151;">Peso alvo padrão (kg)</label>
-      <input id="cfgPesoAlvo" type="number" step="1"
-        style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+// ─── CONFINAMENTO ─────────────────────────────────────────────────────────
+function ConfinamentoScreen() {
+  return (
+    <div className="content">
+      <div style={{fontSize:22,fontWeight:600,marginBottom:8}}>Confinamento</div>
+      <div className="card" style={{padding:40,textAlign:"center"}}>
+        <div style={{fontSize:32,marginBottom:12}}>🏗️</div>
+        <div style={{fontSize:15,fontWeight:600,marginBottom:6}}>Módulo de Confinamento</div>
+        <div style={{color:"var(--muted)",fontSize:13,marginBottom:20}}>
+          Lotes, dietas, GMD, CA e lucro por cabeça.
+        </div>
+        <button className="btn btn-primary"
+          onClick={()=>window.open("/confinamento-page","_blank")}>
+          Abrir módulo completo →
+        </button>
+      </div>
     </div>
-    <div style="margin-bottom:20px;">
-      <label style="font-size:13px;font-weight:600;color:#374151;">Preço da arroba padrão (R$)</label>
-      <input id="cfgPrecoArroba" type="number" step="0.01"
-        style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
-    </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button onclick="fecharConfig()"
-        style="padding:8px 18px;border-radius:6px;background:#e5e7eb;color:#374151;cursor:pointer;border:none;font-size:13px;">
-        Cancelar</button>
-      <button onclick="salvarConfig()"
-        style="padding:8px 18px;border-radius:6px;background:#1B5E20;color:#fff;cursor:pointer;border:none;font-size:13px;">
-        Salvar</button>
-    </div>
-  </div>
-</div>
+  );
+}
 
-{% endblock %}
-
-{% block scripts %}
-<script>
-const TIPOS = ['VACA','TOURO','BOI','GARROTE','NOVILHA','BEZERRO','BEZERRA'];
-const TIPO_CORES = {
-  VACA:'#388E3C', TOURO:'#1565C0', BOI:'#6D4C41',
-  GARROTE:'#EF6C00', NOVILHA:'#7B1FA2', BEZERRO:'#00838F', BEZERRA:'#C62828',
-};
-const MESES_ABR = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-
-let _graficoDist = null;
-let _configAtual = {};
-
-// ── Relógio ──────────────────────────────────────────────────────────
-function atualizarRelogio() {
-  const agora = new Date();
-  document.getElementById('dash-hora').textContent =
-    agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-  const data = agora.toLocaleDateString('pt-BR', {
-    weekday:'long', day:'numeric', month:'long', year:'numeric'
+// ─── PASTAGEM ─────────────────────────────────────────────────────────────
+function PastagemScreen() {
+  const [viewMode,    setViewMode]    = React.useState("ocupacao");
+  const [piqueteSel,  setPiqueteSel]  = React.useState(null);
+  const [showMedicao, setShowMedicao] = React.useState(false);
+  const [formMedicao, setFormMedicao] = React.useState({
+    data: new Date().toISOString().slice(0,10),
+    altura_cm:"", condicao:"NORMAL", responsavel:""
   });
-  document.getElementById('dash-date').textContent =
-    data.charAt(0).toUpperCase() + data.slice(1);
-}
-atualizarRelogio();
-setInterval(atualizarRelogio, 30000);
 
-// ── Carregar dashboard ────────────────────────────────────────────────
-async function carregarDashboard() {
-  try {
-    const dados = await fetch('/relatorios/kpis').then(r => r.json());
-    _configAtual = dados.config || {};
-
-    renderAlertas(dados.alertas || []);
-    renderKpiCards(dados.rebanho || {}, dados.nutricao || null);
-    renderPrevisao(dados.previsao_saida || {});
-    renderPastagem(dados.pastagem || {}, dados.lotes || {});
-    renderFinanceiro(dados.financeiro || {});
-    renderPesagens(dados.ultimas_pesagens || []);
-    renderDistribuicaoSaidas(dados.previsao_saida || {});
-
-    document.getElementById('dash-loading').style.display = 'none';
-    document.getElementById('dashMain').style.display = 'block';
-  } catch(e) {
-    document.getElementById('dash-loading').innerHTML =
-      '<span style="color:#dc2626;">❌ Erro ao carregar dados do servidor.</span>';
-  }
-}
-
-async function recarregarDashboard(btn) {
-  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-  await carregarDashboard();
-  if (btn) { btn.textContent = '🔄'; btn.disabled = false; }
-  showToast('Dashboard atualizado!', 'sucesso');
-}
-
-// ── Alertas ───────────────────────────────────────────────────────────
-function renderAlertas(alertas) {
-  const box = document.getElementById('dash-alerts-box');
-  if (!alertas.length) { box.style.display = 'none'; return; }
-  box.style.display = 'flex';
-  const nivMap = {CRITICO:'da-crit', ATENCAO:'da-warn', INFO:'da-info'};
-  const titMap = {CRITICO:'URGENTE', ATENCAO:'ATENÇÃO', INFO:'INFO'};
-  box.innerHTML = alertas.slice(0, 3).map(a => {
-    const cls = nivMap[a.nivel] || 'da-info';
-    const tit = titMap[a.nivel] || a.nivel;
-    const ctaHref = a.nivel === 'CRITICO' ? '/financeiro-page' : '/relatorios-page';
-    return `
-    <div class="dash-alert ${cls}">
-      <span class="da-icon">${a.icone || '⚠️'}</span>
-      <div class="da-txt">
-        <b>${tit}</b>
-        <span>${a.msg}</span>
+  return (
+    <div className="content">
+      <div style={{display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom: 16}}>
+        <div>
+          <div style={{fontSize: 22, fontWeight: 600, letterSpacing: "-0.015em"}}>Pastagem & Lotes</div>
+          <div style={{fontSize: 12.5, color: "var(--muted)", marginTop: 2}}>{DATA.PASTURES.totalArea} ha · {DATA.PASTURES.chuvaMes} mm de chuva no mês</div>
+        </div>
+        <div style={{display:"flex", gap: 8}}>
+          <button className="btn" onClick={()=>alert("Ordem de rotação:\nP-01 → P-02 → P-03 → P-04\nBaseado em dias de descanso.")}>Rotação</button>
+          <button className="btn btn-primary"><Icons.Plus size={14} /> Novo lote</button>
+        </div>
       </div>
-      <button class="da-cta" onclick="window.location.href='${ctaHref}'">Ver</button>
-    </div>`;
-  }).join('');
-}
 
-// ── KPI Cards ─────────────────────────────────────────────────────────
-function renderKpiCards(rebanho, nutricao) {
-  const strip = document.getElementById('dash-kpi-strip');
-  const total = rebanho.total_por_tipo || {};
-  let html = TIPOS.map(tipo => {
-    const qtd = total[tipo] || 0;
-    const cor = TIPO_CORES[tipo];
-    return `<div class="kpi-card" style="border-top:2.5px solid ${cor};">
-      <div class="kpi-number" style="color:${cor};">${qtd}</div>
-      <div class="kpi-label">${tipo}</div>
-      <div class="kpi-trend trend-flat">—</div>
-    </div>`;
-  }).join('');
-  html += `<div class="kpi-card" style="background:linear-gradient(135deg,#0d1f3c,#1a3a6b);border-color:#0d1f3c;">
-    <div class="kpi-number" style="color:#fff;">${rebanho.total_ativo || 0}</div>
-    <div class="kpi-label" style="color:rgba(255,255,255,0.45);">TOTAL ATIVO</div>
-  </div>`;
-  if (nutricao) {
-    const crit = nutricao.estoque_critico || 0;
-    const border = crit > 0 ? '#ef4444' : '#10b981';
-    html += `<a href="/nutricao-page" class="kpi-card" style="border-top:2.5px solid ${border};text-decoration:none;">
-      <div class="kpi-number" style="color:${border};">${nutricao.planos_ativos || 0}</div>
-      <div class="kpi-label">🌾 PLANOS NUT.</div>
-      <div class="kpi-trend ${crit>0?'trend-down':'trend-flat'}" style="font-size:10px;">
-        ${crit>0 ? `⚠️ ${crit} crítico` : fmtMoeda(nutricao.custo_mes||0)+'/mês'}
+      <div className="grid g-cols-12">
+        {/* Map */}
+        <div className="span-8 card" style={{overflow: "hidden"}}>
+          <div className="card-header">
+            <div className="card-title">Mapa da fazenda</div>
+            <div className="seg">
+              {["ocupacao","chuva","gmd"].map(v=>(
+                <button key={v} className={viewMode===v?"on":""}
+                  onClick={()=>setViewMode(v)}>
+                  {v==="ocupacao"?"Ocupação":v.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{position: "relative", height: 420, background: "linear-gradient(135deg, oklch(0.96 0.01 145), oklch(0.94 0.015 155))"}}>
+            <svg width="100%" height="100%" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid slice">
+              {/* Paddock outlines */}
+              <g fontFamily="var(--font-mono)" fontSize="11">
+                {/* P-04 */}
+                <g>
+                  <rect x="40" y="40" width="220" height="160" fill="oklch(0.96 0.008 245)" stroke="oklch(0.8 0.01 245)" strokeWidth="2" strokeDasharray="6 4" />
+                  <text x="50" y="60" fill="var(--muted)" fontWeight="600">P-04</text>
+                  <text x="50" y="78" fill="var(--muted)" fontSize="10">2,1 ha · sem dados</text>
+                </g>
+                {/* P-01 */}
+                <g>
+                  <rect x="280" y="40" width="260" height="180" fill="oklch(0.93 0.07 230)" stroke="oklch(0.48 0.11 235)" strokeWidth="2" />
+                  <text x="290" y="60" fill="oklch(0.32 0.09 235)" fontWeight="700">P-01</text>
+                  <text x="290" y="78" fill="oklch(0.32 0.09 235)" fontSize="10">2,3 ha · 78% · 2 animais</text>
+                  <circle cx="380" cy="130" r="4" fill="oklch(0.32 0.09 235)" />
+                  <circle cx="420" cy="150" r="4" fill="oklch(0.32 0.09 235)" />
+                </g>
+                {/* P-02 */}
+                <g>
+                  <rect x="560" y="40" width="200" height="220" fill="oklch(0.96 0.05 230)" stroke="oklch(0.48 0.11 235)" strokeWidth="2" />
+                  <text x="570" y="60" fill="oklch(0.32 0.09 235)" fontWeight="700">P-02</text>
+                  <text x="570" y="78" fill="oklch(0.32 0.09 235)" fontSize="10">2,4 ha · 64% · 2 animais</text>
+                  <circle cx="640" cy="160" r="4" fill="oklch(0.32 0.09 235)" />
+                  <circle cx="680" cy="200" r="4" fill="oklch(0.32 0.09 235)" />
+                </g>
+                {/* P-03 */}
+                <g>
+                  <rect x="40" y="220" width="500" height="160" fill="oklch(0.96 0.03 230)" stroke="oklch(0.48 0.11 235)" strokeWidth="2" />
+                  <text x="50" y="240" fill="oklch(0.32 0.09 235)" fontWeight="700">P-03</text>
+                  <text x="50" y="258" fill="oklch(0.32 0.09 235)" fontSize="10">2,6 ha · 52% · 1 animal</text>
+                  <circle cx="280" cy="320" r="4" fill="oklch(0.32 0.09 235)" />
+                </g>
+                {/* Sede */}
+                <g>
+                  <rect x="580" y="290" width="180" height="90" fill="oklch(0.98 0.005 245)" stroke="var(--border-strong)" strokeWidth="1" />
+                  <text x="590" y="308" fill="var(--muted)" fontWeight="600">SEDE</text>
+                  <text x="590" y="324" fill="var(--muted)" fontSize="10">curral · balança · depósito</text>
+                </g>
+                {/* Water source */}
+                <circle cx="150" cy="300" r="10" fill="oklch(0.75 0.11 230)" />
+                <text x="165" y="304" fontSize="10" fill="var(--muted)">Bebedouro</text>
+
+                {/* Compass */}
+                <g transform="translate(730, 350)">
+                  <circle r="20" fill="var(--surface)" stroke="var(--border)" />
+                  <path d="M0,-14 L3,0 L0,14 L-3,0 Z" fill="var(--accent)" />
+                  <text y="-22" fontSize="9" textAnchor="middle" fill="var(--muted)">N</text>
+                </g>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <div className="span-4 card">
+          <div className="card-header"><div className="card-title">Piquetes</div></div>
+          <div className="card-body" style={{padding: 0}}>
+            {DATA.PASTURES.lotes.map((l, i) => {
+              const has = l.status !== "SEM DADOS";
+              return (
+                <div key={l.id} onClick={()=>setPiqueteSel(l)} style={{cursor:"pointer", padding: "14px 16px", borderBottom: i < DATA.PASTURES.lotes.length - 1 ? "1px solid var(--border)" : "none"}}>
+                  <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6}}>
+                    <div style={{fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 13}}>{l.id}</div>
+                    {has
+                      ? <span className="chip accent dot">{l.status.toLowerCase()}</span>
+                      : <span className="chip">sem dados</span>
+                    }
+                  </div>
+                  <div style={{display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", marginBottom: 6}}>
+                    <span>{l.area} ha</span>
+                    {has && <span>{l.ocupacao}% · {l.animais} animais</span>}
+                  </div>
+                  <div className="progress"><span style={{width: `${l.ocupacao}%`, background: has ? (l.ocupacao > 70 ? "var(--warn)" : "var(--accent)") : "transparent"}} /></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
-    </a>`;
-  }
-  strip.innerHTML = html;
-}
 
-// ── Previsão de Saída ──────────────────────────────────────────────────
-function renderPrevisao(prev) {
-  const alvo = prev.peso_alvo || 480;
-  document.getElementById('prev-sub').textContent = `peso alvo: ${alvo} kg · GMD 90d`;
-  document.getElementById('prev-badge').textContent = `${prev.prontos || 0} prontos`;
+      {/* Painel de detalhe do piquete */}
+      {piqueteSel && (
+        <div className="card" style={{marginTop:14,padding:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}>
+            <div style={{fontSize:15,fontWeight:600}}>{piqueteSel.id} — Detalhes</div>
+            <button className="btn" onClick={()=>{setPiqueteSel(null);setShowMedicao(false);}}>Fechar ×</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:14}}>
+            <div className="kpi"><div className="kpi-label">Área</div><div className="kpi-value">{piqueteSel.area} ha</div></div>
+            <div className="kpi"><div className="kpi-label">Ocupação</div><div className="kpi-value">{piqueteSel.ocupacao}%</div></div>
+            <div className="kpi"><div className="kpi-label">Animais</div><div className="kpi-value">{piqueteSel.animais||0}</div></div>
+          </div>
+          <button className="btn btn-primary" onClick={()=>setShowMedicao(true)}>
+            📏 Registrar Medição de Altura
+          </button>
+        </div>
+      )}
 
-  document.getElementById('prev-boxes').innerHTML = [
-    {label:'Prontos agora', val:prev.prontos||0,       bg:'#dcfce7', fg:'#166534', bd:'#bbf7d0'},
-    {label:'Até 90 dias',   val:prev.no_prazo_90d||0,  bg:'#dbeafe', fg:'#1e40af', bd:'#bfdbfe'},
-    {label:'Até 180 dias',  val:prev.medio_prazo||0,   bg:'#fef9c3', fg:'#92400e', bd:'#fde68a'},
-    {label:'Sem dados',     val:prev.sem_dados||0,     bg:'#f3f4f6', fg:'#6b7280', bd:'#e5e7eb'},
-  ].map(b => `
-    <div class="prev-box" style="background:${b.bg};border:0.5px solid ${b.bd};">
-      <div class="prev-box-num" style="color:${b.fg};">${b.val}</div>
-      <div class="prev-box-lbl" style="color:${b.fg};">${b.label}</div>
-    </div>`).join('');
-
-  // Barra GMD
-  const animais = prev.animais_proximos || [];
-  const validos = animais.filter(a => a.gmd_real != null && a.gmd_real > 0);
-  const gmdMedio = validos.length ? (validos.reduce((s, a) => s + a.gmd_real, 0) / validos.length) : null;
-  const META = 0.8;
-  const MAX  = 1.5;
-  const gmdEl = document.getElementById('prev-gmd-bar');
-  if (gmdMedio != null) {
-    const pct     = Math.min(100, (gmdMedio / MAX) * 100);
-    const metaPct = Math.min(100, (META / MAX) * 100);
-    gmdEl.innerHTML = `
-      <div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:5px;">
-        <span style="color:#374151;font-weight:600;">GMD médio:
-          <span style="color:#1d4ed8;">${gmdMedio.toFixed(2)} kg/dia</span>
-        </span>
-        <span style="color:#7c3aed;font-size:10px;">meta ${META.toFixed(1)}</span>
-      </div>
-      <div style="position:relative;height:8px;background:#f3f4f6;border-radius:10px;overflow:visible;">
-        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#3b82f6,#06b6d4);border-radius:10px;"></div>
-        <div style="position:absolute;top:-4px;bottom:-4px;left:${metaPct}%;width:2px;background:#7c3aed;border-radius:2px;"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-top:3px;">
-        <span>0</span><span>0,5</span><span>1,0</span><span>1,5</span>
-      </div>`;
-  } else {
-    gmdEl.innerHTML = '';
-  }
-
-  const tbody = document.getElementById('prev-tabela');
-  if (!animais.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:10px;font-size:11.5px;">Nenhum dado de previsão</td></tr>';
-    return;
-  }
-  tbody.innerHTML = animais.slice(0, 4).map(a => {
-    const gmdCor = a.gmd_real == null ? '#9ca3af' : a.gmd_real >= 0.8 ? '#15803d' : a.gmd_real >= 0.4 ? '#92400e' : '#dc2626';
-    const dCor   = a.dias_restantes == null ? '#9ca3af' : a.dias_restantes <= 60 ? '#15803d' : a.dias_restantes <= 180 ? '#92400e' : '#9ca3af';
-    return `<tr style="border-bottom:0.5px solid #f5f5f5;">
-      <td style="padding:5px 4px;font-weight:600;color:#1B5E20;">${a.brinco}</td>
-      <td style="padding:5px 4px;text-align:right;">${a.peso_atual} kg</td>
-      <td style="padding:5px 4px;text-align:right;font-weight:600;color:${gmdCor};">${a.gmd_real != null ? a.gmd_real.toFixed(2) : '—'}</td>
-      <td style="padding:5px 4px;text-align:right;font-weight:600;color:${dCor};">${a.dias_restantes != null ? a.dias_restantes + 'd' : '—'}</td>
-    </tr>`;
-  }).join('');
-}
-
-// ── Pastagem ───────────────────────────────────────────────────────────
-function renderPastagem(past, lotes) {
-  const lotesLista = lotes.lista || [];
-  const comUa = lotesLista.filter(l => l.ua_ha);
-  const uaMedia = comUa.length ? (comUa.reduce((s, l) => s + l.ua_ha, 0) / comUa.length) : null;
-  document.getElementById('past-badge').textContent = uaMedia ? uaMedia.toFixed(1) + ' UA/ha' : (past.piquetes||[]).length + ' piquetes';
-
-  document.getElementById('past-sem-grid').innerHTML = [
-    {label:'Prontos',      val:(past.verde||0),                    bg:'#dcfce7', fg:'#166534'},
-    {label:'Quase prontos',val:(past.amarelo||0),                  bg:'#fef9c3', fg:'#92400e'},
-    {label:'Não entrar',   val:(past.vermelho||0)+(past.sair_agora||0), bg:'#fee2e2', fg:'#991b1b'},
-    {label:'Ocupados',     val:(past.ocupado||0),                  bg:'#dbeafe', fg:'#1e40af'},
-  ].map(b => `
-    <div style="background:${b.bg};border-radius:8px;padding:8px;text-align:center;">
-      <div style="font-size:18px;font-weight:700;color:${b.fg};line-height:1;">${b.val}</div>
-      <div style="font-size:9.5px;color:${b.fg};margin-top:2px;font-weight:500;">${b.label}</div>
-    </div>`).join('');
-
-  const urgMap = {SAIR_AGORA:0, VERMELHO:1, AMARELO:2, SEM_DADOS:3, VERDE:4, OCUPADO:5};
-  const semCors = {VERDE:'#16a34a', AMARELO:'#ca8a04', VERMELHO:'#dc2626', SAIR_AGORA:'#b91c1c', OCUPADO:'#1d4ed8', SEM_DADOS:'#9ca3af'};
-  const piquetes = (past.piquetes || [])
-    .sort((a, b) => (urgMap[a.semaforo] ?? 99) - (urgMap[b.semaforo] ?? 99))
-    .slice(0, 4);
-
-  document.getElementById('past-piquetes-lista').innerHTML = piquetes.map(p => `
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #f5f5f5;font-size:12px;">
-      <div class="sem-dot" style="background:${semCors[p.semaforo]||'#9ca3af'};"></div>
-      <div style="flex:1;font-weight:500;color:#374151;">${p.nome}</div>
-      <div style="font-size:10.5px;font-weight:600;color:${semCors[p.semaforo]||'#9ca3af'};">${p.semaforo.replace('_',' ')}</div>
-    </div>`).join('') || '<div style="color:#9ca3af;font-size:12px;padding:8px 0;">Nenhum piquete cadastrado</div>';
-
-  const alertaSeca = past.alerta_seca;
-  document.getElementById('past-footer-bar').innerHTML =
-    `${alertaSeca ? '⚠️' : '🌧️'} Chuva este mês: <b style="color:${alertaSeca?'#b45309':'#1b5e20'};">${past.chuva_mes_mm ?? 0} mm</b>${alertaSeca ? ' · <span style="color:#b45309;">abaixo de 50 mm!</span>' : ''}`;
-}
-
-// ── Financeiro ─────────────────────────────────────────────────────────
-function renderFinanceiro(fin) {
-  const box = document.getElementById('fin-boxes');
-  if (!fin.valor_total_compras_animais) {
-    box.innerHTML = '<p style="color:#9ca3af;font-size:12px;text-align:center;padding:20px;">Nenhuma compra de animal registrada</p>';
-    return;
-  }
-  box.innerHTML = `
-    <div style="background:linear-gradient(135deg,#0d1f3c,#1a3a6b);border-radius:10px;padding:14px;margin-bottom:10px;">
-      <div style="font-size:10px;color:rgba(255,255,255,0.5);font-weight:600;margin-bottom:4px;letter-spacing:0.5px;text-transform:uppercase;">Total Investido no Rebanho</div>
-      <div style="font-size:22px;font-weight:700;color:#fff;">${fmtMoeda(fin.valor_total_compras_animais)}</div>
+      {/* Formulário de medição */}
+      {showMedicao && piqueteSel && (
+        <div className="card" style={{marginTop:10,padding:20}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Medir capim — {piqueteSel.id}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+            <div className="field">
+              <label>Altura (cm) *</label>
+              <input type="number" step="0.5" placeholder="35.0"
+                value={formMedicao.altura_cm}
+                onChange={e=>setFormMedicao(f=>({...f,altura_cm:e.target.value}))}/>
+            </div>
+            <div className="field">
+              <label>Data</label>
+              <input type="date" value={formMedicao.data}
+                onChange={e=>setFormMedicao(f=>({...f,data:e.target.value}))}/>
+            </div>
+            <div className="field">
+              <label>Condição</label>
+              <select value={formMedicao.condicao}
+                onChange={e=>setFormMedicao(f=>({...f,condicao:e.target.value}))}>
+                <option value="NORMAL">Normal</option>
+                <option value="UMIDO">Úmido</option>
+                <option value="SECO">Seco</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Responsável</label>
+              <input placeholder="Nome" value={formMedicao.responsavel}
+                onChange={e=>setFormMedicao(f=>({...f,responsavel:e.target.value}))}/>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            <button className="btn btn-primary" onClick={async()=>{
+              if (!formMedicao.altura_cm) return;
+              const res = await window.Api?.medicao({
+                piquete_id: piqueteSel.dbId || 1,
+                data: formMedicao.data,
+                altura_cm: parseFloat(formMedicao.altura_cm),
+                condicao: formMedicao.condicao,
+                responsavel: formMedicao.responsavel,
+              });
+              if (res !== null) { setShowMedicao(false); alert("Medição registrada!"); }
+            }}>Salvar Medição</button>
+            <button className="btn" onClick={()=>setShowMedicao(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <div style="background:#f9fafb;border-radius:8px;padding:10px;text-align:center;">
-        <div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:2px;">CUSTO / KG</div>
-        <div style="font-size:16px;font-weight:700;color:#374151;">${fin.custo_medio_kg != null ? 'R$ ' + fin.custo_medio_kg.toFixed(2) : '—'}</div>
+  );
+}
+
+// ─── FINANCEIRO ───────────────────────────────────────────────────────────
+function FinanceiroScreen({ openModal }) {
+  const [despesas, setDespesas] = React.useState(DATA.FINANCE_LEDGER);
+  const [filtro,   setFiltro]   = React.useState("Todas");
+
+  React.useEffect(() => {
+    window.onDespesaCadastrada = () => {
+      window.Api?.despesas().then(d => { if (d?.length) setDespesas(d.map(x=>({...x,date:x.data||x.date,desc:x.descricao||x.desc,cat:x.categoria||x.cat,valor:-(Math.abs(x.valor||0))})));});
+    };
+    window.onDespesaCadastrada();
+    return () => { window.onDespesaCadastrada = null; };
+  }, []);
+
+  const total = DATA.FINANCE_BY_CATEGORY.reduce((a,x)=>a+x.valor, 0);
+  const filtrados = despesas.filter(l => {
+    if (filtro==="Todas") return true;
+    if (filtro==="Pagas")    return (l.status||"").toLowerCase()==="paga";
+    if (filtro==="Vencidas") return (l.status||"").toLowerCase()==="vencida";
+    if (filtro==="A vencer") return (l.status||"").toLowerCase().includes("vencer");
+    return true;
+  });
+  const vencidas = despesas.filter(l=>(l.status||"").toLowerCase()==="vencida").length;
+  const aVencer  = despesas.filter(l=>(l.status||"").toLowerCase().includes("vencer")).length;
+
+  return (
+    <div className="content">
+      <div style={{display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom: 16}}>
+        <div>
+          <div style={{fontSize: 22, fontWeight: 600, letterSpacing: "-0.015em"}}>Financeiro</div>
+          <div style={{fontSize: 12.5, color: "var(--muted)", marginTop: 2}}>Ciclo atual · {despesas.length} lançamentos</div>
+        </div>
+        <div style={{display:"flex", gap: 8}}>
+          <button className="btn"><Icons.Download size={14} /> Exportar</button>
+          <button className="btn btn-primary" onClick={() => openModal("despesa")}><Icons.Plus size={14} /> Nova despesa</button>
+        </div>
       </div>
-      <div style="background:#f9fafb;border-radius:8px;padding:10px;text-align:center;">
-        <div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:2px;">CUSTO / @</div>
-        <div style="font-size:16px;font-weight:700;color:#374151;">${fin.custo_medio_arroba != null ? 'R$ ' + fin.custo_medio_arroba.toFixed(2) : '—'}</div>
+
+      <div className="grid g-cols-12" style={{marginBottom: 14}}>
+        <div className="span-4 kpi kpi-accent">
+          <div className="kpi-label">Total investido</div>
+          <div className="kpi-value">R$ {brlShort(DATA.FINANCE.invested)}</div>
+          <div style={{marginTop: 10}}><Spark values={DATA.FINANCE.series} color="white" height={28} /></div>
+        </div>
+        <div className="span-2 kpi"><div className="kpi-label">Custo/kg</div><div className="kpi-value">R$ {DATA.FINANCE.perKg.toFixed(2)}</div><div className="kpi-sub">carcaça quente</div></div>
+        <div className="span-2 kpi"><div className="kpi-label">Custo/@</div><div className="kpi-value">R$ {DATA.FINANCE.perAnimal.toFixed(2)}</div><div className="kpi-sub">por arroba</div></div>
+        <div className="span-2 kpi"><div className="kpi-label">Vencidas</div><div className="kpi-value" style={{color:"var(--bad)"}}>{vencidas}</div><div className="kpi-sub">despesas</div></div>
+        <div className="span-2 kpi"><div className="kpi-label">A vencer 7d</div><div className="kpi-value" style={{color:"oklch(0.48 0.13 65)"}}>{aVencer}</div><div className="kpi-sub">despesas</div></div>
+      </div>
+
+      <div className="grid g-cols-12">
+        <div className="span-8 card">
+          <div className="card-header">
+            <div className="card-title">Lançamentos</div>
+            <div className="seg">
+              {["Todas","Pagas","A vencer","Vencidas"].map(f=>(
+                <button key={f} className={filtro===f?"on":""} onClick={()=>setFiltro(f)}>{f}</button>
+              ))}
+            </div>
+          </div>
+          <table className="table">
+            <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th className="num">Valor</th><th>Status</th></tr></thead>
+            <tbody>
+              {filtrados.length===0 && <tr><td colSpan="5" style={{textAlign:"center",color:"var(--muted)",padding:24}}>Nenhum lançamento</td></tr>}
+              {filtrados.map((l, i) => (
+                <tr key={i}>
+                  <td style={{fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--muted)"}}>{(l.data||l.date||"").slice(0,10)}</td>
+                  <td style={{fontWeight: 500}}>{l.descricao||l.desc}</td>
+                  <td><span className="chip">{l.categoria||l.cat}</span></td>
+                  <td className="num" style={{color: "var(--bad)"}}>R$ {Math.abs(l.valor||0).toFixed(2)}</td>
+                  <td>
+                    {(l.status||"").toLowerCase()==="vencida" ? <span className="chip bad dot">vencida</span>
+                      : (l.status||"").toLowerCase().includes("vencer") ? <span className="chip warn dot">a vencer</span>
+                      : <span className="chip good dot">paga</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="span-4 card">
+          <div className="card-header"><div className="card-title">Por categoria</div><span className="chip">ciclo</span></div>
+          <div className="card-body">
+            <Donut
+              segments={DATA.FINANCE_BY_CATEGORY.map(c => ({ v: c.valor, color: c.cor }))}
+              size={140} stroke={18}
+              centerTop={`R$ ${(total/1000).toFixed(1)}k`} centerBottom="total"
+            />
+            <div style={{marginTop: 16, display: "grid", gap: 8}}>
+              {DATA.FINANCE_BY_CATEGORY.map(c => (
+                <div key={c.cat} style={{display: "grid", gridTemplateColumns: "10px 1fr auto", gap: 8, alignItems: "center", fontSize: 12.5}}>
+                  <div style={{width: 8, height: 8, borderRadius: 2, background: c.cor}} />
+                  <div>{c.cat}</div>
+                  <div className="num">R$ {brlShort(c.valor)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    ${fin.animal_mais_caro ? `
-    <div style="background:#f9fafb;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:10px;color:#9ca3af;font-weight:600;">ANIMAL MAIS CARO</div>
-        <div style="font-weight:600;color:#1B5E20;font-size:12.5px;">${fin.animal_mais_caro.brinco}${fin.animal_mais_caro.nome ? ' — ' + fin.animal_mais_caro.nome : ''}</div>
-      </div>
-      <div style="font-weight:700;color:#374151;font-size:13px;">${fmtMoeda(fin.animal_mais_caro.valor_compra)}</div>
-    </div>` : ''}`;
+  );
 }
 
-// ── Pesagens ───────────────────────────────────────────────────────────
-function renderPesagens(pesagens) {
-  document.getElementById('pes-badge').textContent = pesagens.length + ' registros';
-  document.getElementById('pes-sub').textContent = pesagens.length + ' mais recentes';
-  const lista = document.getElementById('pes-lista');
-  if (!pesagens.length) {
-    lista.innerHTML = '<div style="color:#9ca3af;font-size:12px;text-align:center;padding:16px;">Nenhuma pesagem registrada</div>';
-    return;
-  }
-  lista.innerHTML = pesagens.slice(0, 5).map((p, i) => {
-    const ganho = p.ganho_kg ?? 0;
-    const gPos  = ganho >= 0;
-    const gCor  = ganho !== 0 ? (gPos ? '#16a34a' : '#dc2626') : '#9ca3af';
-    const gStr  = ganho !== 0 ? (gPos ? '↑' : '↓') + Math.abs(ganho) + ' kg' : '—';
-    return `<div class="pes-row">
-      <div class="pes-rank">${i + 1}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:12.5px;color:#1B5E20;">${p.brinco}</div>
-        <div style="font-size:10px;color:#9ca3af;">${fmtData(p.data)}</div>
+// ─── RELATÓRIOS ───────────────────────────────────────────────────────────
+function RelatoriosScreen() {
+  const relatorios = [
+    { titulo:"Desempenho do rebanho",  sub:"GMD, peso médio, dias em pasto",       tag:"Performance", icon:"📈" },
+    { titulo:"Fluxo de caixa mensal",  sub:"Entradas vs saídas por categoria",      tag:"Financeiro",  icon:"💰" },
+    { titulo:"Curva de custo por @",   sub:"R$/@ ao longo do ciclo",               tag:"Financeiro",  icon:"📊" },
+    { titulo:"Ocupação de pastagem",   sub:"Taxa de lotação e rotação de piquetes", tag:"Campo",       icon:"🌿" },
+    { titulo:"Calendário sanitário",   sub:"Vacinas aplicadas e próximas",          tag:"Sanidade",    icon:"💉" },
+    { titulo:"Previsão de abate",      sub:"Animais prontos por janela temporal",   tag:"Performance", icon:"📅" },
+  ];
+  return (
+    <div className="content">
+      <div style={{fontSize:22,fontWeight:600,letterSpacing:"-0.015em",marginBottom:16}}>Relatórios</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+        {relatorios.map((r, i) => (
+          <div key={i} className="card" style={{padding:20,cursor:"pointer"}}
+            onClick={()=>window.open("/relatorios-page","_blank")}>
+            <div style={{fontSize:28,marginBottom:10}}>{r.icon}</div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>{r.titulo}</div>
+            <div style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>{r.sub}</div>
+            <span className="chip accent">{r.tag}</span>
+          </div>
+        ))}
       </div>
-      <div style="text-align:right;">
-        <div style="font-weight:600;font-size:13px;color:#374151;">${p.peso} kg</div>
-        <div style="font-size:11px;font-weight:600;color:${gCor};">${gStr}</div>
-      </div>
-    </div>`;
-  }).join('');
+    </div>
+  );
 }
 
-// ── Distribuição de Saídas ─────────────────────────────────────────────
-function renderDistribuicaoSaidas(prev) {
-  const animais = prev.animais_proximos || [];
-  const hoje    = new Date();
-  const labels  = [], counts = [], cores = [];
+Object.assign(window, {
+  AnimaisScreen, PesagemScreen, SanidadeScreen, NutricaoScreen,
+  ConfinamentoScreen, PastagemScreen, FinanceiroScreen, RelatoriosScreen,
+});
 
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    labels.push(MESES_ABR[d.getMonth()]);
-    const qtd = animais.filter(a => a.data_prevista && a.data_prevista.startsWith(key)).length;
-    counts.push(qtd);
-    const cor = i === 0 ? 'rgba(22,101,52,0.85)'
-              : i <= 2  ? 'rgba(6,182,212,0.8)'
-              : i <= 5  ? 'rgba(59,130,246,0.7)'
-              : 'rgba(226,232,240,0.9)';
-    cores.push(qtd > 0 ? cor : 'rgba(226,232,240,0.5)');
-  }
 
-  const validos = animais.filter(a => a.gmd_real != null && a.gmd_real > 0);
-  const gmdMed  = validos.length ? (validos.reduce((s, a) => s + a.gmd_real, 0) / validos.length) : null;
-  const semDados= animais.filter(a => !a.gmd_real || a.gmd_real <= 0).length;
-  document.getElementById('dist-sub').textContent =
-    gmdMed ? `GMD médio: ${gmdMed.toFixed(2)} kg/dia · ${semDados} sem dados` : `${semDados} animais sem dados de GMD`;
+// ═══ components/modals.jsx ═══
+// Modals + Tweaks panel
 
-  if (_graficoDist) { _graficoDist.destroy(); _graficoDist = null; }
-  const ctx = document.getElementById('grafico-dist-saidas');
-  if (!ctx) return;
-  _graficoDist = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data: counts,
-        backgroundColor: cores,
-        borderRadius: 5,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: c => c.parsed.y + ' animais' } }
-      },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, font: {size:10} }, grid: { color:'#f5f5f5' } },
-        x: { ticks: { font: {size:10} }, grid: { display: false } }
-      }
+function ModalDespesa({ onClose }) {
+  const [form, setForm] = React.useState({
+    descricao:"", valor:"", data:new Date().toISOString().slice(0,10),
+    categoria:"NUTRICAO", status:"PENDENTE", vencimento:"", fornecedor:"", obs:"",
+  });
+  const [salvando, setSalvando] = React.useState(false);
+  const F = ({label,children}) => <div className="field"><label>{label}</label>{children}</div>;
+
+  async function salvar(e) {
+    e.preventDefault();
+    if (!form.descricao || !form.valor) return;
+    setSalvando(true);
+    const res = await window.Api?.criarDespesa({
+      descricao: form.descricao, valor: parseFloat(form.valor),
+      data: form.data, categoria: form.categoria, status: form.status,
+      vencimento: form.vencimento || null, fornecedor: form.fornecedor || null, obs: form.obs || null,
+    });
+    setSalvando(false);
+    if (res) {
+      if (window.onDespesaCadastrada) window.onDespesaCadastrada();
+      onClose();
+      alert("Despesa lançada!");
+    } else {
+      alert("Erro ao salvar despesa.");
     }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-title">Nova despesa</div>
+          <button className="topbar-iconbtn" onClick={onClose}><Icons.Close size={16} /></button>
+        </div>
+        <form onSubmit={salvar}>
+          <div className="modal-body">
+            <F label="Descrição *">
+              <input placeholder="Ex.: Sal mineral — 4 sacos" value={form.descricao}
+                onChange={e=>setForm(f=>({...f,descricao:e.target.value}))} required/>
+            </F>
+            <div className="field-row">
+              <F label="Valor (R$) *">
+                <input type="number" step="0.01" placeholder="168.00" value={form.valor}
+                  onChange={e=>setForm(f=>({...f,valor:e.target.value}))} required/>
+              </F>
+              <F label="Data *">
+                <input type="date" value={form.data}
+                  onChange={e=>setForm(f=>({...f,data:e.target.value}))} required/>
+              </F>
+            </div>
+            <div className="field-row">
+              <F label="Categoria">
+                <select value={form.categoria} onChange={e=>setForm(f=>({...f,categoria:e.target.value}))}>
+                  {["NUTRICAO","SANIDADE","PESSOAL","OPERACAO","INFRAESTRUTURA","AQUISICAO","OUTRO"].map(c=>(
+                    <option key={c} value={c}>{c.charAt(0)+c.slice(1).toLowerCase()}</option>
+                  ))}
+                </select>
+              </F>
+              <F label="Status">
+                <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
+                  <option value="PENDENTE">Pendente</option>
+                  <option value="PAGA">Paga</option>
+                  <option value="VENCIDA">Vencida</option>
+                </select>
+              </F>
+            </div>
+            <div className="field-row">
+              <F label="Vencimento">
+                <input type="date" value={form.vencimento}
+                  onChange={e=>setForm(f=>({...f,vencimento:e.target.value}))}/>
+              </F>
+              <F label="Fornecedor">
+                <input placeholder="Nome" value={form.fornecedor}
+                  onChange={e=>setForm(f=>({...f,fornecedor:e.target.value}))}/>
+              </F>
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button type="button" className="btn" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={salvando}>
+              {salvando?"Salvando...":"Lançar despesa"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ModalAnimal({ onClose }) {
+  const [form, setForm] = React.useState({
+    brinco:"", nome:"", tipo:"BOI", raca:"Nelore",
+    sexo:"MACHO", data_nascimento:"", origem:"COMPRA",
+    valor_compra:"", peso_atual:"", pasto_atual:"",
   });
+  const [salvando, setSalvando] = React.useState(false);
+  const [erro, setErro]         = React.useState("");
+  const F = ({label,children}) => <div className="field"><label>{label}</label>{children}</div>;
+
+  async function salvar(e) {
+    e.preventDefault();
+    if (!form.brinco) { setErro("Brinco obrigatório"); return; }
+    setSalvando(true); setErro("");
+    const res = await window.Api?.criarAnimal({
+      brinco: form.brinco, nome: form.nome || null,
+      tipo: form.tipo, raca: form.raca, sexo: form.sexo,
+      data_nascimento: form.data_nascimento || null,
+      origem: form.origem,
+      valor_compra: parseFloat(form.valor_compra) || null,
+      peso_atual:   parseFloat(form.peso_atual)   || null,
+      pasto_atual:  form.pasto_atual || null,
+      status: "ATIVO",
+    });
+    setSalvando(false);
+    if (res) {
+      if (window.onAnimalCadastrado) window.onAnimalCadastrado();
+      onClose();
+      alert("Animal cadastrado com sucesso!");
+    } else {
+      setErro("Erro ao cadastrar. Verifique se o brinco já existe.");
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-title">Novo animal</div>
+          <button className="topbar-iconbtn" onClick={onClose}><Icons.Close size={16} /></button>
+        </div>
+        <form onSubmit={salvar}>
+          <div className="modal-body">
+            {erro && <div style={{background:"var(--bad-soft)",color:"var(--bad)",padding:"8px 12px",borderRadius:8,marginBottom:12,fontSize:12}}>{erro}</div>}
+            <div className="field-row">
+              <F label="Brinco *"><input placeholder="BOI-003" value={form.brinco} onChange={e=>setForm(f=>({...f,brinco:e.target.value}))} required/></F>
+              <F label="Nome (opcional)"><input placeholder="Brutus" value={form.nome} onChange={e=>setForm(f=>({...f,nome:e.target.value}))}/></F>
+            </div>
+            <div className="field-row">
+              <F label="Tipo *">
+                <select value={form.tipo} onChange={e=>setForm(f=>({...f,tipo:e.target.value}))}>
+                  {["BOI","VACA","BEZERRO","BEZERRA","NOVILHA","GARROTE","TOURO"].map(t=>(
+                    <option key={t} value={t}>{t.charAt(0)+t.slice(1).toLowerCase()}</option>
+                  ))}
+                </select>
+              </F>
+              <F label="Sexo">
+                <select value={form.sexo} onChange={e=>setForm(f=>({...f,sexo:e.target.value}))}>
+                  <option value="MACHO">Macho</option>
+                  <option value="FEMEA">Fêmea</option>
+                </select>
+              </F>
+            </div>
+            <div className="field-row">
+              <F label="Nascimento"><input type="date" value={form.data_nascimento} onChange={e=>setForm(f=>({...f,data_nascimento:e.target.value}))}/></F>
+              <F label="Raça"><input placeholder="Nelore" value={form.raca} onChange={e=>setForm(f=>({...f,raca:e.target.value}))}/></F>
+            </div>
+            <div className="field-row">
+              <F label="Peso entrada (kg)"><input type="number" step="0.1" placeholder="380" value={form.peso_atual} onChange={e=>setForm(f=>({...f,peso_atual:e.target.value}))}/></F>
+              <F label="Origem">
+                <select value={form.origem} onChange={e=>setForm(f=>({...f,origem:e.target.value}))}>
+                  <option value="COMPRA">Compra</option>
+                  <option value="NASCIMENTO">Nascimento</option>
+                  <option value="DOACAO">Doação</option>
+                </select>
+              </F>
+            </div>
+            <div className="field-row">
+              <F label="Valor de compra (R$)"><input type="number" step="0.01" placeholder="2800.00" value={form.valor_compra} onChange={e=>setForm(f=>({...f,valor_compra:e.target.value}))}/></F>
+              <F label="Pasto / Lote"><input placeholder="P-01" value={form.pasto_atual} onChange={e=>setForm(f=>({...f,pasto_atual:e.target.value}))}/></F>
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button type="button" className="btn" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={salvando}>
+              {salvando?"Cadastrando...":"Cadastrar Animal"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
-// ── Config ─────────────────────────────────────────────────────────────
-function abrirConfig() {
-  document.getElementById('cfgPesoAlvo').value    = _configAtual.peso_alvo_padrao   || '480';
-  document.getElementById('cfgPrecoArroba').value = _configAtual.preco_arroba_padrao || '320';
-  document.getElementById('modalConfig').style.display = 'flex';
-}
-function fecharConfig() {
-  document.getElementById('modalConfig').style.display = 'none';
-}
-async function salvarConfig() {
-  const pesoAlvo = document.getElementById('cfgPesoAlvo').value;
-  const precoArr = document.getElementById('cfgPrecoArroba').value;
-  try {
-    await Promise.all([
-      fetch(`/config/peso_alvo_padrao?valor=${encodeURIComponent(pesoAlvo)}`, {method:'PUT'}),
-      fetch(`/config/preco_arroba_padrao?valor=${encodeURIComponent(precoArr)}`, {method:'PUT'}),
-    ]);
-    fecharConfig();
-    showToast('Configurações salvas!', 'sucesso');
-    carregarDashboard();
-  } catch { showToast('Erro ao salvar configurações.', 'erro'); }
+function TweaksPanel({ variant, setVariant, density, setDensity, tweaksOn }) {
+  const [open, setOpen] = useState(true);
+  if (!tweaksOn) return null;
+  return (
+    <>
+      <button className="tweaks-fab" onClick={() => setOpen(!open)} title="Tweaks">
+        <Icons.Settings size={18} />
+      </button>
+      {open && (
+        <div className="tweaks-panel">
+          <header>Tweaks</header>
+          <div className="tw-body">
+            <div>
+              <div className="tw-group-label">Variação</div>
+              <div className="tw-row">
+                {["safe", "balanced", "bold"].map(v => (
+                  <button key={v} className={`tw-opt ${variant === v ? "on" : ""}`} onClick={() => setVariant(v)}>
+                    {v === "safe" ? "Safe" : v === "balanced" ? "Balanced" : "Bold"}
+                  </button>
+                ))}
+              </div>
+              <div style={{fontSize: 11, color: "var(--muted)", marginTop: 6}}>
+                {variant === "safe" && "Limpo, bordas sutis, Linear-style"}
+                {variant === "balanced" && "Dois tons: cartões brancos + KPI navy"}
+                {variant === "bold" && "Dark navy editorial · âmbar como acento"}
+              </div>
+            </div>
+
+            <div>
+              <div className="tw-group-label">Densidade</div>
+              <div className="tw-row">
+                {["compact", "comfort", "spacious"].map(d => (
+                  <button key={d} className={`tw-opt ${density === d ? "on" : ""}`} onClick={() => setDensity(d)}>
+                    {d === "compact" ? "Compact" : d === "comfort" ? "Comfort" : "Spacious"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
-document.addEventListener('DOMContentLoaded', carregarDashboard);
-setInterval(carregarDashboard, 300000);
+Object.assign(window, { ModalDespesa, ModalAnimal, TweaksPanel });
+
+
+// ═══ components/features.jsx ═══
+// Global command palette (Cmd+K), drill-down sheet, toast system, sale simulator
+
+// ─── TOAST SYSTEM ─────────────────────────────────────────────────────────
+const ToastCtx = React.createContext(() => {});
+function ToastProvider({ children }) {
+  const [items, setItems] = useState([]);
+  const push = (t) => {
+    const id = Math.random().toString(36).slice(2);
+    setItems((xs) => [...xs, { id, ...t }]);
+    setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), t.ttl || 3200);
+  };
+  return (
+    <ToastCtx.Provider value={push}>
+      {children}
+      <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 120, display: "grid", gap: 8 }}>
+        {items.map((t) => (
+          <div key={t.id} style={{
+            background: "var(--navy)", color: "white",
+            padding: "10px 14px", borderRadius: 10,
+            boxShadow: "0 10px 30px oklch(0.15 0.02 250 / 0.3)",
+            display: "flex", alignItems: "center", gap: 10, minWidth: 240,
+            animation: "rise 180ms cubic-bezier(.2,.8,.2,1)",
+            fontSize: 13,
+          }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: 50,
+              background: t.tone === "bad" ? "var(--bad)" : "var(--good)",
+              display: "grid", placeItems: "center",
+            }}>
+              <Icons.Check size={12} strokeWidth={3} />
+            </div>
+            <span>{t.msg}</span>
+          </div>
+        ))}
+      </div>
+    </ToastCtx.Provider>
+  );
+}
+const useToast = () => React.useContext(ToastCtx);
+
+// ─── COMMAND PALETTE ──────────────────────────────────────────────────────
+function CommandPalette({ open, onClose, setRoute, openModal, openSale }) {
+  const [q, setQ] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 30);
+    if (open) setQ("");
+  }, [open]);
+
+  const actions = useMemo(() => [
+    { kind: "Ir para", label: "Dashboard", icon: Icons.Dashboard, do: () => setRoute("dashboard") },
+    { kind: "Ir para", label: "Animais", icon: Icons.Cow, do: () => setRoute("animais") },
+    { kind: "Ir para", label: "Pesagem", icon: Icons.Scale, do: () => setRoute("pesagem") },
+    { kind: "Ir para", label: "Sanidade", icon: Icons.Health, do: () => setRoute("sanidade") },
+    { kind: "Ir para", label: "Nutrição", icon: Icons.Nutri, do: () => setRoute("nutricao") },
+    { kind: "Ir para", label: "Confinamento", icon: Icons.Feedlot, do: () => setRoute("confinamento") },
+    { kind: "Ir para", label: "Pastagem & Lotes", icon: Icons.Pasture, do: () => setRoute("pastagem") },
+    { kind: "Ir para", label: "Financeiro", icon: Icons.Money, do: () => setRoute("financeiro") },
+    { kind: "Ir para", label: "Relatórios", icon: Icons.Report, do: () => setRoute("relatorios") },
+    { kind: "Ação", label: "Nova despesa", icon: Icons.DollarIn, shortcut: "N D", do: () => openModal("despesa") },
+    { kind: "Ação", label: "Novo animal", icon: Icons.Plus, shortcut: "N A", do: () => openModal("animal") },
+    { kind: "Ação", label: "Simular venda", icon: Icons.Trend, shortcut: "S V", do: () => openSale() },
+    ...DATA.ANIMALS.map((a) => ({
+      kind: "Animal", label: `${a.id} · ${a.categoria} · ${a.peso} kg`,
+      icon: Icons.Cow, do: () => setRoute("animais"),
+    })),
+    ...DATA.PASTURES.lotes.map((l) => ({
+      kind: "Piquete", label: `${l.id} · ${l.area} ha · ${l.status.toLowerCase()}`,
+      icon: Icons.Pasture, do: () => setRoute("pastagem"),
+    })),
+  ], [setRoute, openModal, openSale]);
+
+  const matches = q
+    ? actions.filter((a) => (a.label + " " + a.kind).toLowerCase().includes(q.toLowerCase())).slice(0, 8)
+    : actions.slice(0, 8);
+
+  const [idx, setIdx] = useState(0);
+  useEffect(() => { setIdx(0); }, [q]);
+
+  const onKey = (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setIdx((i) => Math.min(i + 1, matches.length - 1)); }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
+    if (e.key === "Enter")     { e.preventDefault(); matches[idx]?.do(); onClose(); }
+    if (e.key === "Escape")    { onClose(); }
+  };
+
+  if (!open) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(620px, 92vw)",
+          background: "var(--surface)",
+          borderRadius: 12,
+          border: "1px solid var(--border)",
+          boxShadow: "0 30px 60px oklch(0.15 0.02 250 / 0.35)",
+          overflow: "hidden",
+          marginTop: -80,
+        }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
+          <Icons.Search size={16} />
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="Buscar animais, ações, telas…"
+            style={{ flex: 1, border: 0, outline: 0, background: "transparent", fontFamily: "inherit", fontSize: 14, color: "var(--ink)" }}
+          />
+          <span className="chip" style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}>ESC</span>
+        </div>
+        <div style={{ maxHeight: 380, overflow: "auto", padding: 6 }}>
+          {matches.length === 0 && (
+            <div style={{ padding: 20, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Nenhum resultado</div>
+          )}
+          {matches.map((m, i) => {
+            const IconEl = m.icon;
+            const active = i === idx;
+            return (
+              <button
+                key={i}
+                onMouseEnter={() => setIdx(i)}
+                onClick={() => { m.do(); onClose(); }}
+                style={{
+                  width: "100%", textAlign: "left",
+                  display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 10, alignItems: "center",
+                  padding: "8px 10px", borderRadius: 6,
+                  background: active ? "var(--accent-soft)" : "transparent",
+                  color: active ? "var(--accent-ink)" : "var(--ink)",
+                }}
+              >
+                <IconEl size={16} className="" />
+                <span style={{ fontSize: 13 }}>{m.label}</span>
+                <span className="chip" style={{ fontSize: 10, opacity: 0.7 }}>{m.kind}</span>
+                {m.shortcut && <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)" }}>{m.shortcut}</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ padding: "8px 14px", borderTop: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", display: "flex", gap: 14 }}>
+          <span><span style={{ fontFamily: "var(--font-mono)" }}>↑↓</span> navegar</span>
+          <span><span style={{ fontFamily: "var(--font-mono)" }}>↵</span> selecionar</span>
+          <span><span style={{ fontFamily: "var(--font-mono)" }}>⌘K</span> abrir</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DRILL-DOWN SIDE SHEET ────────────────────────────────────────────────
+function DrillSheet({ drill, onClose }) {
+  if (!drill) return null;
+
+  const content = (() => {
+    switch (drill.kind) {
+      case "category": {
+        const list = DATA.ANIMALS.filter((a) => a.categoria.toLowerCase() === drill.value.toLowerCase());
+        return { title: drill.value, sub: `${list.length} animais nesta categoria`, body: (
+          <table className="table">
+            <thead><tr><th>ID</th><th className="num">Peso</th><th className="num">GMD</th><th>Lote</th></tr></thead>
+            <tbody>{list.map(a => (
+              <tr key={a.id}><td style={{fontWeight:500, color:"var(--accent-ink)"}}>{a.id}</td><td className="num">{a.peso}</td><td className="num">{a.gmd.toFixed(2)}</td><td style={{fontFamily:"var(--font-mono)"}}>{a.lote}</td></tr>
+            ))}</tbody>
+          </table>
+        )};
+      }
+      case "total": {
+        return { title: "Total ativo · rebanho", sub: "5 cabeças ativas", body: (
+          <table className="table">
+            <thead><tr><th>ID</th><th>Categoria</th><th className="num">Peso</th><th className="num">GMD</th><th>Lote</th></tr></thead>
+            <tbody>{DATA.ANIMALS.map(a => (
+              <tr key={a.id}><td style={{fontWeight:500}}>{a.id}</td><td>{a.categoria}</td><td className="num">{a.peso}</td><td className="num">{a.gmd.toFixed(2)}</td><td style={{fontFamily:"var(--font-mono)"}}>{a.lote}</td></tr>
+            ))}</tbody>
+          </table>
+        )};
+      }
+      case "finance": {
+        return { title: "Total investido", sub: `R$ ${brlShort(DATA.FINANCE.invested)} · ciclo atual`, body: (
+          <>
+            <div style={{padding: 14, background: "var(--bg-2)", borderRadius: 8, marginBottom: 14}}>
+              <Spark values={DATA.FINANCE.series} color="var(--accent)" height={60} />
+            </div>
+            <table className="table">
+              <thead><tr><th>Data</th><th>Descrição</th><th className="num">Valor</th></tr></thead>
+              <tbody>{DATA.FINANCE_LEDGER.slice(0,5).map((l, i) => (
+                <tr key={i}><td style={{fontFamily:"var(--font-mono)", fontSize:11.5, color:"var(--muted)"}}>{l.date}</td><td>{l.desc}</td><td className="num" style={{color:"var(--bad)"}}>{brl(l.valor)}</td></tr>
+              ))}</tbody>
+            </table>
+          </>
+        )};
+      }
+      default: return { title: "Detalhe", sub: "", body: null };
+    }
+  })();
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} style={{ justifyContent: "flex-end", alignItems: "stretch" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(520px, 92vw)", height: "100vh",
+          background: "var(--surface)",
+          borderLeft: "1px solid var(--border)",
+          boxShadow: "-20px 0 40px oklch(0.15 0.02 250 / 0.2)",
+          overflow: "auto",
+          animation: "slideIn 220ms cubic-bezier(.2,.8,.2,1)",
+        }}
+      >
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>Detalhe</div>
+            <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.015em", marginTop: 2 }}>{content.title}</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{content.sub}</div>
+          </div>
+          <button className="topbar-iconbtn" onClick={onClose}><Icons.Close size={16} /></button>
+        </div>
+        <div style={{ padding: 22 }}>{content.body}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SALE SIMULATOR ───────────────────────────────────────────────────────
+function SaleSimulator({ open, onClose }) {
+  const [precoArroba, setPrecoArroba] = useState(295);
+  const [rendimento, setRendimento] = useState(53);
+  const [picked, setPicked] = useState({ "BOI-001": true, "BOI-002": true });
+
+  if (!open) return null;
+  const animals = DATA.ANIMALS;
+  const selected = animals.filter(a => picked[a.id]);
+  const totalKg = selected.reduce((s, a) => s + a.peso, 0);
+  const carcass = totalKg * (rendimento / 100);
+  const arrobas = carcass / 15;
+  const receita = arrobas * precoArroba;
+  const custo = selected.reduce((s, a) => s + a.custoTotal, 0);
+  const lucro = receita - custo;
+  const roi = custo > 0 ? (lucro / custo) * 100 : 0;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(820px, 95vw)", maxHeight: "90vh", overflow: "auto",
+          background: "var(--surface)", borderRadius: 12,
+          border: "1px solid var(--border)",
+          boxShadow: "0 30px 60px oklch(0.15 0.02 250 / 0.3)",
+        }}
+      >
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>Ferramenta</div>
+            <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.015em", marginTop: 2 }}>Simulador de venda</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>Estime receita, lucro e ROI do lote escolhido</div>
+          </div>
+          <button className="topbar-iconbtn" onClick={onClose}><Icons.Close size={16} /></button>
+        </div>
+        <div style={{ padding: 22, display: "grid", gridTemplateColumns: "1fr 280px", gap: 22 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Selecione os animais</div>
+            <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+              <table className="table" style={{ fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 28 }}></th>
+                    <th>ID</th><th>Cat.</th>
+                    <th className="num">Peso</th>
+                    <th className="num">Custo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {animals.map(a => (
+                    <tr key={a.id} onClick={() => setPicked(p => ({ ...p, [a.id]: !p[a.id] }))} style={{ cursor: "pointer", background: picked[a.id] ? "var(--accent-soft)" : undefined }}>
+                      <td><input type="checkbox" checked={!!picked[a.id]} readOnly /></td>
+                      <td style={{ fontWeight: 500, color: picked[a.id] ? "var(--accent-ink)" : "var(--ink)" }}>{a.id}</td>
+                      <td>{a.categoria}</td>
+                      <td className="num">{a.peso} kg</td>
+                      <td className="num">R$ {brlShort(a.custoTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="field">
+                <label>Preço da arroba (R$)</label>
+                <input type="number" value={precoArroba} onChange={e => setPrecoArroba(+e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Rendimento carcaça (%)</label>
+                <input type="number" value={rendimento} onChange={e => setRendimento(+e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: 16, border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>Selecionados</div>
+              <div className="num" style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.03em" }}>{selected.length} <span style={{ fontSize: 12, color: "var(--muted)" }}>animais</span></div>
+            </div>
+            <div>
+              <div className="kpi-label">Peso vivo total</div>
+              <div className="num" style={{ fontSize: 20, marginTop: 2, letterSpacing: "-0.02em" }}>{totalKg.toFixed(0)} kg</div>
+            </div>
+            <div>
+              <div className="kpi-label">Arrobas (carcaça)</div>
+              <div className="num" style={{ fontSize: 20, marginTop: 2, letterSpacing: "-0.02em" }}>{arrobas.toFixed(2)} @</div>
+            </div>
+            <hr className="hr" />
+            <div>
+              <div className="kpi-label">Receita bruta</div>
+              <div className="num" style={{ fontSize: 24, marginTop: 2, letterSpacing: "-0.03em", fontWeight: 500 }}>R$ {brlShort(receita)}</div>
+            </div>
+            <div>
+              <div className="kpi-label">Custo acumulado</div>
+              <div className="num" style={{ fontSize: 16, marginTop: 2, color: "var(--muted)" }}>R$ {brlShort(custo)}</div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 8, background: lucro >= 0 ? "var(--good-soft)" : "var(--bad-soft)", color: lucro >= 0 ? "var(--good)" : "var(--bad)" }}>
+              <div style={{ fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Lucro estimado</div>
+              <div className="num" style={{ fontSize: 28, marginTop: 2, letterSpacing: "-0.03em", fontWeight: 500 }}>R$ {brlShort(lucro)}</div>
+              <div style={{ fontSize: 11.5, marginTop: 2 }}>ROI {roi.toFixed(1)}%</div>
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn" onClick={onClose}>Fechar</button>
+          <button className="btn btn-primary" onClick={onClose}>Salvar simulação</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// animation keyframes injected
+const styleInject = document.createElement("style");
+styleInject.textContent = `@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } }`;
+document.head.appendChild(styleInject);
+
+Object.assign(window, { CommandPalette, DrillSheet, SaleSimulator, ToastProvider, useToast });
+
+
+
+// ═══ App ═══
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "variant": "bold",
+  "density": "compact"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [route, _setRouteState] = useState(() => localStorage.getItem("fi.route") || "dashboard");
+  // setRoute navega via URL real para telas fora do dashboard
+  const setRoute = React.useCallback((key) => {
+    if (ROUTE_URLS[key]) {
+      window.location.href = ROUTE_URLS[key];
+    } else {
+      _setRouteState(key);
+    }
+  }, []);
+  const [modal, setModal] = useState(null);
+  const [variant, setVariant] = useState(TWEAK_DEFAULTS.variant);
+  const [density, setDensity] = useState(TWEAK_DEFAULTS.density);
+  const [tweaksOn, setTweaksOn] = useState(false);
+  const [cmdkOpen, setCmdkOpen] = useState(false);
+  const [drill, setDrill] = useState(null);
+  const [saleOpen, setSaleOpen] = useState(false);
+
+  useEffect(() => { localStorage.setItem("fi.route", "dashboard"); }, [route]);
+  useEffect(() => { document.body.dataset.variant = variant; }, [variant]);
+  useEffect(() => { document.body.dataset.density = density; }, [density]);
+
+  // Cmd+K
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdkOpen(o => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Tweaks protocol
+  useEffect(() => {
+    const onMsg = (e) => {
+      const t = e.data?.type;
+      if (t === "__activate_edit_mode") setTweaksOn(true);
+      else if (t === "__deactivate_edit_mode") setTweaksOn(false);
+    };
+    window.addEventListener("message", onMsg);
+    window.parent.postMessage({ type: "__edit_mode_available" }, "*");
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  useEffect(() => {
+    if (!tweaksOn) return;
+    window.parent.postMessage({ type: "__edit_mode_set_keys", edits: { variant, density } }, "*");
+  }, [variant, density, tweaksOn]);
+
+  const openModal = (k) => setModal(k);
+  const closeModal = () => setModal(null);
+  const openDrill = (d) => setDrill(d);
+  const openSale = () => setSaleOpen(true);
+
+  let Screen = null;
+  switch (route) {
+    case "dashboard": Screen = <Dashboard variant={variant} setRoute={setRoute} openModal={openModal} openDrill={openDrill} openSale={openSale} />; break;
+    case "animais": Screen = <AnimaisScreen setRoute={setRoute} openModal={openModal} />; break;
+    case "pesagem": Screen = <PesagemScreen />; break;
+    case "sanidade": Screen = <SanidadeScreen />; break;
+    case "nutricao": Screen = <NutricaoScreen />; break;
+    case "confinamento": Screen = <ConfinamentoScreen />; break;
+    case "pastagem": Screen = <PastagemScreen />; break;
+    case "financeiro": Screen = <FinanceiroScreen openModal={openModal} />; break;
+    case "relatorios": Screen = <RelatoriosScreen />; break;
+    default: Screen = <PlaceholderScreen label={ROUTE_LABELS[route] || route} />;
+  }
+
+  return (
+    <ToastProvider>
+      <div className="app" data-screen-label={`${route}`}>
+        <Sidebar route={route} setRoute={setRoute} openModal={openModal} openSale={openSale} />
+        <div className="main">
+          <Topbar route={route} setRoute={setRoute} openCmdk={() => setCmdkOpen(true)} openSale={openSale} />
+          {Screen}
+        </div>
+        <BottomNav route={route} setRoute={setRoute} />
+        {modal === "despesa" && <ModalDespesa onClose={closeModal} />}
+        {modal === "animal" && <ModalAnimal onClose={closeModal} />}
+        <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} setRoute={setRoute} openModal={openModal} openSale={openSale} />
+        <DrillSheet drill={drill} onClose={() => setDrill(null)} />
+        <SaleSimulator open={saleOpen} onClose={() => setSaleOpen(false)} />
+        <TweaksPanel
+          variant={variant} setVariant={setVariant}
+          density={density} setDensity={setDensity}
+          tweaksOn={tweaksOn}
+        />
+      </div>
+    </ToastProvider>
+  );
+}
+
+function PlaceholderScreen({ label }) {
+  return (
+    <div className="content">
+      <div style={{fontSize: 22, fontWeight: 600, marginBottom: 8}}>{label}</div>
+      <div className="card" style={{padding: 40, textAlign: "center", color: "var(--muted)"}}>
+        Em construção
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+{% endraw %}
 </script>
-{% endblock %}
+</body>
+</html>

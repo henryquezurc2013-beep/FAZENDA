@@ -1,5 +1,4 @@
 fastapi
-uvicorn[standard]
 supabase>=2.7.4
 python-dotenv>=1.0.0
 jinja2
@@ -8,3 +7,4 @@ pydantic
 pandas
 openpyxl
 xlrd
+httpx

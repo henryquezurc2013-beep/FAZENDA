@@ -1,0 +1,2075 @@
+{% extends "base.html" %}
+{% block title %}Confinamento — Fazenda Ipanema{% endblock %}
+{% block page_title %}Confinamento{% endblock %}
+{% block page_sub %}Gestão de lotes, dietas e lançamentos{% endblock %}
+
+{% block content %}
+<style>
+/* ── Confinamento styles ────────────────────────────────────────────── */
+.conf-header {
+  background: linear-gradient(135deg, #1a3c34 0%, #2d6a4f 100%);
+  border-radius: 14px;
+  padding: 22px 24px;
+  color: #fff;
+  margin-bottom: 18px;
+}
+.conf-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.conf-kpi {
+  background: rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: center;
+}
+.conf-kpi-val { font-size: 26px; font-weight: 800; line-height: 1; }
+.conf-kpi-lbl { font-size: 11px; opacity: .8; margin-top: 4px; }
+.conf-kpi-sub { font-size: 12px; opacity: .65; margin-top: 2px; }
+
+/* Tabs */
+.conf-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.conf-tab {
+  padding: 8px 18px; border-radius: 8px; border: none;
+  background: #f3f4f6; color: #374151; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: .15s;
+}
+.conf-tab.active { background: #2d6a4f; color: #fff; }
+.conf-tab:hover:not(.active) { background: #e5e7eb; }
+
+/* Lote cards */
+.lotes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.lote-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+}
+.lote-card-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.lote-card-title { font-size: 15px; font-weight: 700; color: #111827; }
+.lote-card-sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.lote-badge {
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+.lote-badge-ativo   { background: #d1fae5; color: #065f46; }
+.lote-badge-encerrado { background: #f3f4f6; color: #374151; }
+.lote-metrics {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px; margin-bottom: 12px;
+}
+.lote-metric {
+  background: #f9fafb; border-radius: 8px; padding: 8px 10px; text-align: center;
+}
+.lote-metric-val { font-size: 16px; font-weight: 700; color: #111827; }
+.lote-metric-lbl { font-size: 10px; color: #9ca3af; margin-top: 1px; }
+.lote-progress-wrap { margin-bottom: 12px; }
+.lote-progress-bar {
+  height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; margin-top: 4px;
+}
+.lote-progress-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+.lote-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Status colors */
+.gmd-EXCELENTE { color: #059669; font-weight: 700; }
+.gmd-BOM { color: #2563eb; font-weight: 700; }
+.gmd-REGULAR { color: #d97706; font-weight: 700; }
+.gmd-RUIM { color: #dc2626; font-weight: 700; }
+.gmd-SEM_DADOS { color: #9ca3af; }
+
+/* Formulários */
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: #374151; }
+.form-group input, .form-group select, .form-group textarea {
+  border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px;
+  font-size: 13px; color: #111827; background: #fff; width: 100%; box-sizing: border-box;
+}
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: #2d6a4f; box-shadow: 0 0 0 2px rgba(45,106,79,.15);
+}
+
+/* Tabela de ingredientes da dieta */
+.dieta-ing-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dieta-ing-table th {
+  background: #f3f4f6; padding: 8px 10px; text-align: left;
+  font-size: 11px; font-weight: 700; color: #6b7280; border-bottom: 1px solid #e5e7eb;
+}
+.dieta-ing-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+.dieta-ing-table tr:last-child td { border-bottom: none; }
+
+/* Alertas confinamento */
+.conf-alerta {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; font-size: 13px;
+}
+.conf-alerta-gmd { background: #fef3c7; color: #92400e; border-left: 3px solid #f59e0b; }
+.conf-alerta-giro { background: #fee2e2; color: #991b1b; border-left: 3px solid #ef4444; }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 9000;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #fff; border-radius: 16px; padding: 28px;
+  max-width: 680px; width: 95%; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.modal-title { font-size: 18px; font-weight: 800; color: #111827; margin-bottom: 18px; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+/* Steps */
+.steps-nav { display: flex; gap: 6px; margin-bottom: 20px; }
+.step-dot {
+  width: 28px; height: 28px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+  background: #e5e7eb; color: #9ca3af; transition: .2s;
+}
+.step-dot.done { background: #d1fae5; color: #065f46; }
+.step-dot.active { background: #2d6a4f; color: #fff; }
+.step-line { flex: 1; height: 2px; background: #e5e7eb; align-self: center; }
+.step-content { display: none; }
+.step-content.active { display: block; }
+
+/* Preview lancamento */
+.preview-box {
+  background: #f0fdf4; border-radius: 8px; padding: 12px 14px;
+  border: 1px solid #bbf7d0; margin-top: 12px;
+}
+.preview-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+.preview-row strong { color: #065f46; }
+
+/* Ingrediente tags */
+.ing-tipo { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+.ing-VOLUMOSO    { background: #d1fae5; color: #065f46; }
+.ing-CONCENTRADO { background: #dbeafe; color: #1e40af; }
+.ing-MINERAL     { background: #fef3c7; color: #92400e; }
+.ing-ADITIVO     { background: #f3e8ff; color: #6b21a8; }
+
+/* Toggle Pesagem */
+.pesagem-toggle {
+  display: flex; gap: 4px;
+  background: #f1f5f9; border-radius: 9px; padding: 4px;
+  margin-bottom: 16px; width: fit-content;
+}
+.ptog-btn {
+  padding: 7px 18px; border-radius: 7px; border: none;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  background: transparent; color: #64748b; transition: all .15s;
+  font-family: inherit;
+}
+.ptog-btn.active {
+  background: #fff; color: #0d1f3c; font-weight: 600;
+  box-shadow: 0 1px 4px rgba(13,31,60,.1);
+}
+
+/* Ranking row expand */
+.ranking-row { cursor: pointer; }
+.ranking-row:hover td { background: #f9fafb; }
+.historico-row { display: none; }
+.historico-row.open { display: table-row; }
+</style>
+
+<!-- ── Header KPIs ─────────────────────────────────────────────────────── -->
+<div class="conf-header">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div>
+      <div style="font-size:20px;font-weight:800;">🏗️ Confinamento</div>
+      <div style="font-size:12px;opacity:.7;margin-top:2px;" id="confDataAtual"></div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);"
+              onclick="abrirModalNovoLote()">➕ Novo Lote</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);"
+              onclick="carregarTudo()">🔄 Atualizar</button>
+    </div>
+  </div>
+  <div class="conf-kpis" id="confKpis">
+    <div class="conf-kpi"><div class="conf-kpi-val" id="kpiLotesAtivos">—</div><div class="conf-kpi-lbl">Lotes Ativos</div></div>
+    <div class="conf-kpi"><div class="conf-kpi-val" id="kpiAnimais">—</div><div class="conf-kpi-lbl">Animais Confinados</div></div>
+    <div class="conf-kpi"><div class="conf-kpi-val" id="kpiGmd">—</div><div class="conf-kpi-lbl">GMD Médio (kg/dia)</div></div>
+    <div class="conf-kpi"><div class="conf-kpi-val" id="kpiCa">—</div><div class="conf-kpi-lbl">CA Médio</div></div>
+    <div class="conf-kpi"><div class="conf-kpi-val" id="kpiCustoDia">—</div><div class="conf-kpi-lbl">Custo/Dia (R$)</div></div>
+    <div class="conf-kpi"><div class="conf-kpi-val" id="kpiLucroProj">—</div><div class="conf-kpi-lbl">Lucro Proj. Total</div></div>
+  </div>
+  <div id="confProximaSaida" style="font-size:12px;opacity:.75;"></div>
+</div>
+
+<!-- ── Alertas ─────────────────────────────────────────────────────────── -->
+<div id="confAlertas"></div>
+
+<!-- ── Tabs ───────────────────────────────────────────────────────────────-->
+<div class="conf-tabs">
+  <button class="conf-tab active" onclick="mudarAba('lotes', this)">📋 Lotes</button>
+  <button class="conf-tab" onclick="mudarAba('lancamentos', this)">📝 Lançamentos</button>
+  <button class="conf-tab" onclick="mudarAba('pesagens', this)">⚖️ Pesagens</button>
+  <button class="conf-tab" onclick="mudarAba('dietas', this)">🌿 Dietas</button>
+  <button class="conf-tab" onclick="mudarAba('ingredientes', this)">🧪 Ingredientes</button>
+</div>
+
+<!-- ── ABA: LOTES ──────────────────────────────────────────────────────── -->
+<div id="aba-lotes" class="aba-content">
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+    <div class="form-group" style="flex:1;min-width:160px;">
+      <select id="filtroStatusLote" onchange="carregarLotes()" style="font-size:13px;">
+        <option value="">Todos os status</option>
+        <option value="ATIVO" selected>Ativos</option>
+        <option value="ENCERRADO">Encerrados</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="abrirModalNovoLote()">➕ Novo Lote</button>
+  </div>
+
+  <div id="loadingLotes" style="display:flex;align-items:center;gap:10px;color:#555;padding:20px 0;">
+    <div class="spinner"></div><span>Carregando lotes...</span>
+  </div>
+  <div class="lotes-grid" id="gridLotes"></div>
+  <div id="semLotes" style="display:none;" class="card" style="text-align:center;padding:40px;">
+    <div style="font-size:40px;margin-bottom:12px;">🏗️</div>
+    <div style="color:#6b7280;">Nenhum lote encontrado. Crie o primeiro lote de confinamento!</div>
+  </div>
+</div>
+
+<!-- ── ABA: LANÇAMENTOS ────────────────────────────────────────────────── -->
+<div id="aba-lancamentos" class="aba-content" style="display:none;">
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header">
+      <div class="card-header-left">
+        <div class="card-header-icon icon-green">📝</div>
+        <div>
+          <div class="card-title">Lançamento Diário de Trato</div>
+          <div class="card-subtitle">Registre a quantidade fornecida por lote</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid-2" style="margin-bottom:12px;">
+        <div class="form-group">
+          <label>Lote de Confinamento *</label>
+          <select id="lancLote" onchange="onChangeLancLote()">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fase Ativa</label>
+          <select id="lancFase">
+            <option value="">— selecione o lote —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" id="lancData">
+        </div>
+        <div class="form-group">
+          <label>Quantidade Fornecida (kg) *</label>
+          <input type="number" id="lancQtd" step="0.1" placeholder="ex: 230" oninput="calcularPreviewLanc()">
+        </div>
+        <div class="form-group">
+          <label>Responsável</label>
+          <input type="text" id="lancResp" placeholder="Nome do responsável">
+        </div>
+        <div class="form-group">
+          <label>Obs</label>
+          <input type="text" id="lancObs" placeholder="Observação">
+        </div>
+      </div>
+      <div class="preview-box" id="previewLanc" style="display:none;">
+        <div style="font-size:12px;font-weight:700;color:#065f46;margin-bottom:8px;">Prévia do Lançamento</div>
+        <div class="preview-row"><span>Qtd Planejada:</span><strong id="prev-qtd-plan">—</strong></div>
+        <div class="preview-row"><span>MS Fornecida:</span><strong id="prev-ms">—</strong></div>
+        <div class="preview-row"><span>Custo Estimado:</span><strong id="prev-custo">—</strong></div>
+        <div class="preview-row"><span>Variação vs Plano:</span><strong id="prev-var">—</strong></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-primary" onclick="salvarLancamento()">💾 Registrar Trato</button>
+        <button class="btn" onclick="limparFormLanc()">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-left">
+        <div class="card-header-icon">📊</div>
+        <div>
+          <div class="card-title">Histórico de Lançamentos</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="filtroLancLote" onchange="carregarLancamentos()" style="font-size:12px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">
+          <option value="">Todos os lotes</option>
+        </select>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <div id="tabelaLancamentos" style="overflow-x:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ABA: PESAGENS ───────────────────────────────────────────────────── -->
+<div id="aba-pesagens" class="aba-content" style="display:none;">
+
+  <!-- Toggle Lote / Individual -->
+  <div class="pesagem-toggle">
+    <button class="ptog-btn active" id="btn-lote" onclick="mostrarModo('lote')">📦 Pesagem do Lote</button>
+    <button class="ptog-btn" id="btn-individual" onclick="mostrarModo('individual')">🐄 Pesagem Individual</button>
+  </div>
+
+  <!-- ── MODO LOTE (existente) ─────────────────────────────────────────── -->
+  <div id="modo-lote">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon icon-blue">⚖️</div>
+          <div><div class="card-title">Registrar Pesagem de Lote</div></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-grid-3" style="margin-bottom:12px;">
+          <div class="form-group">
+            <label>Lote *</label>
+            <select id="pesLote" onchange="carregarPesagensLote()">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Data *</label>
+            <input type="date" id="pesData">
+          </div>
+          <div class="form-group">
+            <label>Peso Médio (kg) *</label>
+            <input type="number" id="pesPeso" step="0.1" placeholder="ex: 420.5">
+          </div>
+          <div class="form-group">
+            <label>Qtd Animais</label>
+            <input type="number" id="pesQtd" placeholder="Deixe em branco p/ usar do lote">
+          </div>
+          <div class="form-group">
+            <label>Responsável</label>
+            <input type="text" id="pesResp">
+          </div>
+          <div class="form-group">
+            <label>Obs</label>
+            <input type="text" id="pesObs">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="salvarPesagem()">💾 Registrar Pesagem</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon">📈</div>
+          <div>
+            <div class="card-title">Evolução de Peso</div>
+            <div class="card-subtitle" id="pesagemSubtitulo">Selecione um lote acima</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <canvas id="chartPesagem" height="80"></canvas>
+        <div id="tabelaPesagens" style="margin-top:18px;overflow-x:auto;"></div>
+      </div>
+    </div>
+  </div><!-- /modo-lote -->
+
+  <!-- ── MODO INDIVIDUAL (novo) ────────────────────────────────────────── -->
+  <div id="modo-individual" style="display:none;">
+
+    <!-- Cabeçalho de seleção -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon icon-blue">🐄</div>
+          <div><div class="card-title">Pesagem Individual por Animal</div></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-grid-3" style="margin-bottom:12px;">
+          <div class="form-group">
+            <label>Lote *</label>
+            <select id="pesLoteInd" onchange="onChangeLoteInd()">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Data da Pesagem *</label>
+            <input type="date" id="data-pesagem-ind">
+          </div>
+          <div class="form-group">
+            <label>Responsável</label>
+            <input type="text" id="resp-pesagem-ind" placeholder="Nome do responsável">
+          </div>
+        </div>
+
+        <!-- Aviso sem lote -->
+        <div id="ind-sem-lote" style="text-align:center;padding:24px;color:#9ca3af;">
+          Selecione um lote para exibir os animais
+        </div>
+
+        <!-- Tabela de entrada de pesos -->
+        <div id="ind-tabela-wrap" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;font-weight:600;color:#374151;">
+              Animais do lote — informe o peso de cada um
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm" onclick="selecionarTodos(true)">Selecionar todos</button>
+              <button class="btn btn-sm" onclick="selecionarTodos(false)">Desmarcar todos</button>
+            </div>
+          </div>
+
+          <div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:680px;">
+              <thead>
+                <tr style="background:#f9fafb;">
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;width:36px;">
+                    <input type="checkbox" id="cb-todos" checked onchange="selecionarTodos(this.checked)">
+                  </th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:11px;color:#6b7280;">BRINCO</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:11px;color:#6b7280;">NOME</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px;color:#6b7280;">TIPO</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:11px;color:#6b7280;">PESO ANTERIOR</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px;color:#6b7280;">PESO ATUAL (kg)*</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:11px;color:#6b7280;">GMD</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px;color:#6b7280;">STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-individual"></tbody>
+              <tfoot>
+                <tr style="background:#f0fdf4;font-size:12px;font-weight:600;">
+                  <td colspan="2" style="padding:8px 10px;color:#065f46;">
+                    <span id="rodape-count">0</span> animais selecionados
+                  </td>
+                  <td colspan="2" style="padding:8px 10px;text-align:center;color:#374151;">
+                    Peso médio: <span id="rodape-peso">—</span>
+                  </td>
+                  <td style="padding:8px 10px;text-align:right;color:#374151;">
+                    GMD médio: <span id="rodape-gmd">—</span>
+                  </td>
+                  <td colspan="3" style="padding:8px 10px;text-align:right;color:#374151;">
+                    Acima da meta: <span id="rodape-acima" style="color:#059669;">0</span> |
+                    Abaixo: <span id="rodape-abaixo" style="color:#dc2626;">0</span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;"
+                  onclick="registrarPesagensIndividuais()">
+            💾 Registrar Pesagens Selecionadas
+          </button>
+        </div>
+
+        <!-- Card de resultado (pós-salvar) -->
+        <div id="ind-resultado" style="display:none;margin-top:14px;" class="preview-box">
+          <div style="font-size:13px;font-weight:700;color:#065f46;margin-bottom:10px;" id="ind-res-titulo">✅ Pesagens registradas</div>
+          <div class="preview-row"><span>Peso médio do lote:</span><strong id="ind-res-peso">—</strong></div>
+          <div class="preview-row"><span>GMD médio:</span><strong id="ind-res-gmd">—</strong></div>
+          <div class="preview-row"><span>Melhor GMD:</span><strong id="ind-res-max">—</strong></div>
+          <div class="preview-row"><span>Menor GMD:</span><strong id="ind-res-min">—</strong></div>
+          <div class="preview-row"><span>Abaixo da meta (&lt;1,0):</span><strong id="ind-res-abaixo">—</strong></div>
+          <div id="ind-res-erros" style="margin-top:8px;font-size:11px;color:#b91c1c;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ranking individual -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon">🏆</div>
+          <div>
+            <div class="card-title">Ranking de Desempenho Individual</div>
+            <div class="card-subtitle" id="ranking-subtitulo">Selecione um lote acima</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="ind-ranking-wrap" style="display:none;">
+          <div style="overflow-x:auto;margin-bottom:18px;">
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:700px;">
+              <thead>
+                <tr style="background:#f9fafb;">
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;width:40px;">#</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:left;">BRINCO</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:center;">TIPO</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:right;">ENTRADA</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:right;">ATUAL</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:right;">GANHO</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:center;">GMD</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:right;">FALTA</th>
+                  <th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:center;">SAÍDA PREV.</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-ranking"></tbody>
+            </table>
+          </div>
+          <!-- Gráfico dispersão -->
+          <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">
+            Dispersão: Dias × Peso atual (vs trajetória ideal)
+          </div>
+          <canvas id="chartDispersao" height="100"></canvas>
+        </div>
+        <div id="ind-ranking-vazio" style="text-align:center;padding:24px;color:#9ca3af;">
+          Selecione um lote para ver o ranking
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /modo-individual -->
+
+</div><!-- /aba-pesagens -->
+
+<!-- ── ABA: DIETAS ──────────────────────────────────────────────────────── -->
+<div id="aba-dietas" class="aba-content" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="font-size:14px;font-weight:700;color:#111827;">Dietas de Confinamento</div>
+    <button class="btn btn-primary btn-sm" onclick="abrirModalDieta()">➕ Nova Dieta</button>
+  </div>
+  <div id="loadingDietas" style="display:flex;align-items:center;gap:10px;color:#555;padding:20px 0;">
+    <div class="spinner"></div><span>Carregando dietas...</span>
+  </div>
+  <div id="gridDietas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;"></div>
+</div>
+
+<!-- ── ABA: INGREDIENTES ────────────────────────────────────────────────── -->
+<div id="aba-ingredientes" class="aba-content" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="font-size:14px;font-weight:700;color:#111827;">Ingredientes / Alimentos</div>
+    <button class="btn btn-primary btn-sm" onclick="abrirModalIngrediente()">➕ Novo Ingrediente</button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div id="loadingIngredientes" style="display:flex;align-items:center;gap:10px;color:#555;padding:20px;">
+      <div class="spinner"></div><span>Carregando...</span>
+    </div>
+    <div id="tabelaIngredientes" style="overflow-x:auto;"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- MODAIS -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- Modal: Novo Lote (3 etapas) -->
+<div class="modal-overlay" id="modalNovoLote">
+  <div class="modal-box" style="max-width:700px;">
+    <div class="modal-title">🏗️ Novo Lote de Confinamento</div>
+
+    <div class="steps-nav">
+      <div class="step-dot active" id="step-dot-1">1</div>
+      <div class="step-line"></div>
+      <div class="step-dot" id="step-dot-2">2</div>
+      <div class="step-line"></div>
+      <div class="step-dot" id="step-dot-3">3</div>
+    </div>
+
+    <!-- Etapa 1: Dados básicos -->
+    <div class="step-content active" id="step1">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#374151;">Dados do Lote</div>
+      <div class="form-grid-2">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Nome do Lote *</label>
+          <input type="text" id="novoNome" placeholder="ex: Engorda Inverno 2026">
+        </div>
+        <div class="form-group">
+          <label>Data de Entrada *</label>
+          <input type="date" id="novoDataEntrada">
+        </div>
+        <div class="form-group">
+          <label>Qtd. Animais *</label>
+          <input type="number" id="novoQtd" placeholder="ex: 50">
+        </div>
+        <div class="form-group">
+          <label>Peso Médio Entrada (kg) *</label>
+          <input type="number" id="novoPesoEntrada" step="0.1" placeholder="ex: 380">
+        </div>
+        <div class="form-group">
+          <label>Peso Alvo Saída (kg) *</label>
+          <input type="number" id="novoPesoSaida" step="0.1" placeholder="ex: 480">
+        </div>
+        <div class="form-group">
+          <label>Obs</label>
+          <input type="text" id="novoObs">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="fecharModalNovoLote()">Cancelar</button>
+        <button class="btn btn-primary" onclick="irStep(2)">Próximo →</button>
+      </div>
+    </div>
+
+    <!-- Etapa 2: Custos -->
+    <div class="step-content" id="step2">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#374151;">Custos de Aquisição</div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label>Valor de Compra / Cabeça (R$) *</label>
+          <input type="number" id="novoValorCab" step="0.01" placeholder="ex: 2800.00">
+        </div>
+        <div class="form-group">
+          <label>Frete de Entrada (R$ total)</label>
+          <input type="number" id="novoFreteEnt" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Mão de Obra / Cabeça / Dia (R$)</label>
+          <input type="number" id="novoMaoObra" step="0.01" placeholder="ex: 1.50">
+        </div>
+        <div class="form-group">
+          <label>Outros Custos (R$)</label>
+          <input type="number" id="novoOutros" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Preço Arroba Venda (R$)</label>
+          <input type="number" id="novoPrecArr" step="0.01" placeholder="ex: 320.00">
+        </div>
+        <div class="form-group">
+          <label>RC Estimado (%)</label>
+          <input type="number" id="novoRc" step="0.1" placeholder="54" value="54">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="irStep(1)">← Anterior</button>
+        <button class="btn btn-primary" onclick="irStep(3)">Próximo →</button>
+      </div>
+    </div>
+
+    <!-- Etapa 3: Fases / Dietas -->
+    <div class="step-content" id="step3">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#374151;">Fases e Dietas</div>
+      <div id="fasesNovoLote"></div>
+      <button class="btn btn-sm" onclick="adicionarFaseForm()" style="margin-top:8px;">➕ Adicionar Fase</button>
+      <div class="modal-footer">
+        <button class="btn" onclick="irStep(2)">← Anterior</button>
+        <button class="btn btn-primary" onclick="salvarNovoLote()">💾 Criar Lote</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Encerrar Lote -->
+<div class="modal-overlay" id="modalEncerrar">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-title">🏁 Encerrar Lote</div>
+    <input type="hidden" id="encLoteId">
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label>Data de Saída *</label>
+        <input type="date" id="encData">
+      </div>
+      <div class="form-group">
+        <label>Peso Médio Saída (kg) *</label>
+        <input type="number" id="encPeso" step="0.1" oninput="calcPreviewEnc()">
+      </div>
+      <div class="form-group">
+        <label>RC Real (%)</label>
+        <input type="number" id="encRc" step="0.1" value="54" oninput="calcPreviewEnc()">
+      </div>
+      <div class="form-group">
+        <label>Preço Arroba Venda (R$)</label>
+        <input type="number" id="encPrecArr" step="0.01" oninput="calcPreviewEnc()">
+      </div>
+      <div class="form-group">
+        <label>Frete Saída (R$ total)</label>
+        <input type="number" id="encFrete" step="0.01">
+      </div>
+    </div>
+    <div class="preview-box" id="previewEnc" style="display:none;margin-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:#065f46;margin-bottom:8px;">Resultado Estimado</div>
+      <div class="preview-row"><span>Arrobas:</span><strong id="enc-arrobas">—</strong></div>
+      <div class="preview-row"><span>Receita:</span><strong id="enc-receita">—</strong></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal2('modalEncerrar')">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarEncerrar()">✅ Encerrar Lote</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Avancar Fase -->
+<div class="modal-overlay" id="modalAvancarFase">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-title">🔄 Avançar Fase</div>
+    <input type="hidden" id="afLoteId">
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label>Nova Fase</label>
+        <select id="afFase">
+          <option value="CRESCIMENTO">CRESCIMENTO</option>
+          <option value="TERMINACAO">TERMINACAO</option>
+          <option value="MANUTENCAO">MANUTENCAO</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nova Dieta</label>
+        <select id="afDieta"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Duração Prevista (dias)</label>
+        <input type="number" id="afDuracao" placeholder="ex: 30">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal2('modalAvancarFase')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarAvancarFase()">✅ Avançar Fase</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Novo Ingrediente -->
+<div class="modal-overlay" id="modalIngrediente">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-title" id="titleIngrediente">🧪 Novo Ingrediente</div>
+    <input type="hidden" id="ingId">
+    <div class="form-grid-2">
+      <div class="form-group" style="grid-column:1/-1;">
+        <label>Nome *</label>
+        <input type="text" id="ingNome">
+      </div>
+      <div class="form-group">
+        <label>Tipo *</label>
+        <select id="ingTipo">
+          <option value="VOLUMOSO">VOLUMOSO</option>
+          <option value="CONCENTRADO">CONCENTRADO</option>
+          <option value="MINERAL">MINERAL</option>
+          <option value="ADITIVO">ADITIVO</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>% Matéria Seca *</label>
+        <input type="number" id="ingPctMs" step="0.1" placeholder="ex: 88">
+      </div>
+      <div class="form-group">
+        <label>Preço (R$/kg) *</label>
+        <input type="number" id="ingPreco" step="0.001" placeholder="ex: 1.45">
+      </div>
+      <div class="form-group">
+        <label>Energia (Mcal/kg MS)</label>
+        <input type="number" id="ingEnergia" step="0.01" placeholder="opcional">
+      </div>
+      <div class="form-group">
+        <label>Proteína (% MS)</label>
+        <input type="number" id="ingProteina" step="0.1" placeholder="opcional">
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label>Obs</label>
+        <input type="text" id="ingObs">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal2('modalIngrediente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarIngrediente()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nova/Editar Dieta -->
+<div class="modal-overlay" id="modalDieta">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-title" id="titleDieta">🌿 Nova Dieta</div>
+    <input type="hidden" id="dietaId">
+    <div class="form-grid-3" style="margin-bottom:14px;">
+      <div class="form-group">
+        <label>Nome *</label>
+        <input type="text" id="dietaNome">
+      </div>
+      <div class="form-group">
+        <label>Fase</label>
+        <select id="dietaFase">
+          <option value="ADAPTACAO">ADAPTAÇÃO</option>
+          <option value="CRESCIMENTO">CRESCIMENTO</option>
+          <option value="TERMINACAO">TERMINAÇÃO</option>
+          <option value="MANUTENCAO">MANUTENÇÃO</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Duração Padrão (dias)</label>
+        <input type="number" id="dietaDuracao" placeholder="opcional">
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">Ingredientes da Dieta</div>
+    <div id="dietaIngredientes"></div>
+    <button class="btn btn-sm" onclick="adicionarIngDieta()" style="margin-top:8px;margin-bottom:14px;">➕ Adicionar Ingrediente</button>
+    <div class="preview-box" id="previewDieta">
+      <div class="preview-row"><span>Total MS/cab/dia:</span><strong id="prev-dieta-ms">—</strong></div>
+      <div class="preview-row"><span>Custo/cab/dia:</span><strong id="prev-dieta-custo">—</strong></div>
+      <div class="preview-row"><span>Total kg/cab/dia:</span><strong id="prev-dieta-kg">—</strong></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal2('modalDieta')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarDieta()">💾 Salvar Dieta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Estado global ─────────────────────────────────────────────────────────
+let _lotes = [];
+let _dietas = [];
+let _ingredientes = [];
+let _lancamentos = [];
+let _chartPesagem = null;
+let _faseAtual = {};
+
+// ── Utilitários ───────────────────────────────────────────────────────────
+const fmt = (v, dec=1) => v != null ? Number(v).toFixed(dec) : '—';
+const fmtR = v => v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const fmtKg = v => v != null ? fmt(v,1) + ' kg' : '—';
+const hoje = () => new Date().toISOString().split('T')[0];
+
+function mudarAba(aba, btn) {
+  document.querySelectorAll('.aba-content').forEach(a => a.style.display = 'none');
+  document.querySelectorAll('.conf-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('aba-' + aba).style.display = 'block';
+  btn.classList.add('active');
+  if (aba === 'lotes') carregarLotes();
+  if (aba === 'lancamentos') { carregarLancamentos(); popularSelectsLanc(); }
+  if (aba === 'pesagens') { popularSelectsPes(); popularSelectInd(); }
+  if (aba === 'dietas') carregarDietas();
+  if (aba === 'ingredientes') carregarIngredientes();
+}
+
+// ── Dashboard / KPIs ─────────────────────────────────────────────────────
+async function carregarDashboard() {
+  try {
+    const r = await fetch('/confinamento/dashboard');
+    const d = await r.json();
+    document.getElementById('kpiLotesAtivos').textContent = d.lotes_ativos || 0;
+    document.getElementById('kpiAnimais').textContent = d.animais_confinados || 0;
+    document.getElementById('kpiGmd').textContent = d.gmd_medio != null ? fmt(d.gmd_medio,2) : '—';
+    document.getElementById('kpiCa').textContent = d.ca_medio != null ? fmt(d.ca_medio,1) : '—';
+    document.getElementById('kpiCustoDia').textContent = d.custo_dia_total != null ? fmtR(d.custo_dia_total) : '—';
+    document.getElementById('kpiLucroProj').textContent = d.lucro_proj_total != null ? fmtR(d.lucro_proj_total) : '—';
+
+    if (d.proxima_saida) {
+      document.getElementById('confProximaSaida').textContent =
+        `📅 Próxima saída: ${d.proxima_saida.lote} em ${fmtData(d.proxima_saida.data)} (${d.proxima_saida.dias || 0} dias)`;
+    }
+
+    const alertasEl = document.getElementById('confAlertas');
+    alertasEl.innerHTML = '';
+    (d.alertas || []).forEach(al => {
+      const cls = al.tipo === 'GMD_BAIXO' ? 'conf-alerta-gmd' : 'conf-alerta-giro';
+      const msg = al.tipo === 'GMD_BAIXO'
+        ? `⚠️ GMD baixo (${fmt(al.valor,3)} kg/dia) no lote: ${al.lote}`
+        : `🔴 Giro longo (${al.dias} dias) no lote: ${al.lote}`;
+      alertasEl.innerHTML += `<div class="conf-alerta ${cls}">${msg}</div>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
+// ── LOTES ─────────────────────────────────────────────────────────────────
+async function carregarLotes() {
+  const status = document.getElementById('filtroStatusLote')?.value || 'ATIVO';
+  document.getElementById('loadingLotes').style.display = 'flex';
+  document.getElementById('gridLotes').innerHTML = '';
+  document.getElementById('semLotes').style.display = 'none';
+  try {
+    const url = status ? `/confinamento/lotes?status=${status}` : '/confinamento/lotes';
+    const r = await fetch(url);
+    _lotes = await r.json();
+    renderLotes(_lotes);
+  } catch(e) {
+    showToast('Erro ao carregar lotes', 'erro');
+  }
+  document.getElementById('loadingLotes').style.display = 'none';
+}
+
+function renderLotes(lotes) {
+  const grid = document.getElementById('gridLotes');
+  grid.innerHTML = '';
+  if (!lotes.length) {
+    document.getElementById('semLotes').style.display = 'block';
+    return;
+  }
+  lotes.forEach(l => {
+    const perc = l.peso_alvo_saida > l.peso_medio_entrada
+      ? Math.min(100, Math.round((l.peso_atual - l.peso_medio_entrada) / (l.peso_alvo_saida - l.peso_medio_entrada) * 100))
+      : 0;
+    const badgeCls = l.status === 'ATIVO' ? 'lote-badge-ativo' : 'lote-badge-encerrado';
+    const gmdCls = 'gmd-' + (l.status_gmd || 'SEM_DADOS');
+    const fase = l.fase_atual ? `<span style="font-size:11px;color:#2563eb;">${l.fase_atual.fase}${l.fase_atual.dieta_nome ? ' · '+l.fase_atual.dieta_nome : ''}</span>` : '<span style="font-size:11px;color:#9ca3af;">Sem fase ativa</span>';
+    const saida = l.data_saida_prevista ? `<div style="font-size:11px;color:#6b7280;margin-top:6px;">📅 Saída prevista: ${fmtData(l.data_saida_prevista)} (${l.dias_restantes || 0} dias)</div>` : '';
+    const acoes = l.status === 'ATIVO' ? `
+      <button class="btn btn-sm btn-primary" onclick="abrirLancParaLote(${l.id})">📝 Trato</button>
+      <button class="btn btn-sm" onclick="abrirModalAvancarFase(${l.id})">🔄 Fase</button>
+      <button class="btn btn-sm btn-danger" onclick="abrirModalEncerrar(${l.id})">🏁 Encerrar</button>
+    ` : `<span style="font-size:12px;color:#9ca3af;">Encerrado em ${fmtData(l.data_saida_real || '')}</span>`;
+
+    grid.innerHTML += `
+    <div class="lote-card">
+      <div class="lote-card-header">
+        <div>
+          <div class="lote-card-title">${l.nome}</div>
+          <div class="lote-card-sub">${l.qtd_animais} animais · ${l.dias_confinamento} dias · ${fase}</div>
+        </div>
+        <span class="lote-badge ${badgeCls}">${l.status}</span>
+      </div>
+      <div class="lote-metrics">
+        <div class="lote-metric">
+          <div class="lote-metric-val ${gmdCls}">${fmt(l.gmd,3)}</div>
+          <div class="lote-metric-lbl">GMD (kg/dia)</div>
+        </div>
+        <div class="lote-metric">
+          <div class="lote-metric-val">${l.ca != null ? fmt(l.ca,1) : '—'}</div>
+          <div class="lote-metric-lbl">CA</div>
+        </div>
+        <div class="lote-metric">
+          <div class="lote-metric-val">${fmtKg(l.peso_atual)}</div>
+          <div class="lote-metric-lbl">Peso Atual</div>
+        </div>
+        <div class="lote-metric">
+          <div class="lote-metric-val">${fmtR(l.custo_total)}</div>
+          <div class="lote-metric-lbl">Custo Total</div>
+        </div>
+        <div class="lote-metric">
+          <div class="lote-metric-val" style="color:${l.lucro_proj>=0?'#059669':'#dc2626'}">${fmtR(l.lucro_proj)}</div>
+          <div class="lote-metric-lbl">Lucro Proj.</div>
+        </div>
+        <div class="lote-metric">
+          <div class="lote-metric-val">${l.custo_arroba_proj != null ? fmtR(l.custo_arroba_proj)+'/@ ' : '—'}</div>
+          <div class="lote-metric-lbl">Custo/@</div>
+        </div>
+      </div>
+      <div class="lote-progress-wrap">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;">
+          <span>Progresso ao peso alvo</span><span>${perc}%</span>
+        </div>
+        <div class="lote-progress-bar">
+          <div class="lote-progress-fill" style="width:${perc}%;background:${perc>=100?'#059669':perc>=60?'#2563eb':'#f59e0b'};"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;margin-top:2px;">
+          <span>Entrada: ${fmtKg(l.peso_medio_entrada)}</span>
+          <span>Alvo: ${fmtKg(l.peso_alvo_saida)}</span>
+        </div>
+      </div>
+      ${saida}
+      <div class="lote-actions" style="margin-top:12px;">${acoes}</div>
+    </div>`;
+  });
+}
+
+// ── LANÇAMENTOS ───────────────────────────────────────────────────────────
+async function popularSelectsLanc() {
+  const sel = document.getElementById('lancLote');
+  const selFiltro = document.getElementById('filtroLancLote');
+  const lotesAtivos = _lotes.filter(l => l.status === 'ATIVO');
+  if (!lotesAtivos.length) {
+    const r = await fetch('/confinamento/lotes?status=ATIVO');
+    _lotes = await r.json();
+  }
+  const opts = _lotes.map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+  sel.innerHTML = '<option value="">Selecione...</option>' + opts;
+  selFiltro.innerHTML = '<option value="">Todos os lotes</option>' + opts;
+  document.getElementById('lancData').value = hoje();
+}
+
+async function onChangeLancLote() {
+  const loteId = document.getElementById('lancLote').value;
+  const selFase = document.getElementById('lancFase');
+  selFase.innerHTML = '<option value="">Carregando...</option>';
+  if (!loteId) { selFase.innerHTML = '<option value="">— selecione o lote —</option>'; return; }
+  try {
+    const r = await fetch(`/confinamento/lotes/${loteId}/fases`);
+    const fases = await r.json();
+    const ativas = fases.filter(f => f.status === 'ATIVA');
+    selFase.innerHTML = ativas.map(f =>
+      `<option value="${f.id}" data-plan="${f.dieta_totais?.total_kg_cab_dia||0}" data-ms="${f.dieta_totais?.ms_total_cab_dia||0}" data-custo="${f.dieta_totais?.custo_cab_dia||0}">${f.fase} — ${f.dieta_nome || 'sem dieta'}</option>`
+    ).join('') || '<option value="">Nenhuma fase ativa</option>';
+    _faseAtual = ativas[0] || {};
+    calcularPreviewLanc();
+  } catch { selFase.innerHTML = '<option value="">Erro ao carregar</option>'; }
+}
+
+function calcularPreviewLanc() {
+  const qtd = parseFloat(document.getElementById('lancQtd').value) || 0;
+  const selFase = document.getElementById('lancFase');
+  const opt = selFase.options[selFase.selectedIndex];
+  if (!qtd || !opt?.value) { document.getElementById('previewLanc').style.display = 'none'; return; }
+  const loteId = document.getElementById('lancLote').value;
+  const lote = _lotes.find(l => l.id == loteId);
+  const qtdAnimais = lote?.qtd_animais || 1;
+  const plan = parseFloat(opt.dataset.plan || 0) * qtdAnimais;
+  const msPct = parseFloat(opt.dataset.ms || 0) / (parseFloat(opt.dataset.plan || 1) || 1);
+  const custoPct = parseFloat(opt.dataset.custo || 0) / (parseFloat(opt.dataset.plan || 1) || 1);
+  const ms = qtd * msPct;
+  const custo = qtd * custoPct;
+  const variacao = plan > 0 ? ((qtd - plan) / plan * 100).toFixed(1) : '—';
+  document.getElementById('prev-qtd-plan').textContent = fmtKg(plan);
+  document.getElementById('prev-ms').textContent = fmtKg(ms);
+  document.getElementById('prev-custo').textContent = fmtR(custo);
+  document.getElementById('prev-var').textContent = variacao !== '—' ? variacao + '%' : '—';
+  document.getElementById('previewLanc').style.display = 'block';
+}
+
+async function salvarLancamento() {
+  const lote_conf_id = document.getElementById('lancLote').value;
+  const fase_id = document.getElementById('lancFase').value;
+  const qtd = document.getElementById('lancQtd').value;
+  if (!lote_conf_id || !fase_id || !qtd) {
+    showToast('Preencha lote, fase e quantidade', 'erro'); return;
+  }
+  try {
+    const r = await fetch('/confinamento/lancamentos', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        lote_conf_id: parseInt(lote_conf_id), fase_id: parseInt(fase_id),
+        qtd_fornecida_kg: parseFloat(qtd),
+        data: document.getElementById('lancData').value,
+        responsavel: document.getElementById('lancResp').value,
+        obs: document.getElementById('lancObs').value,
+      })
+    });
+    if (r.ok) { showToast('Lançamento registrado!', 'sucesso'); limparFormLanc(); carregarLancamentos(); }
+    else { const d = await r.json(); showToast(d.detail || 'Erro', 'erro'); }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+function limparFormLanc() {
+  ['lancLote','lancFase','lancQtd','lancResp','lancObs'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('lancData').value = hoje();
+  document.getElementById('previewLanc').style.display = 'none';
+}
+
+async function carregarLancamentos() {
+  const filtroLote = document.getElementById('filtroLancLote')?.value;
+  let url = '/confinamento/lancamentos';
+  if (filtroLote) url += `?lote_conf_id=${filtroLote}`;
+  try {
+    const r = await fetch(url);
+    _lancamentos = await r.json();
+    renderTabelaLancamentos(_lancamentos);
+  } catch { console.error('Erro ao carregar lançamentos'); }
+}
+
+function renderTabelaLancamentos(lancs) {
+  const el = document.getElementById('tabelaLancamentos');
+  if (!lancs.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;">Nenhum lançamento encontrado.</div>'; return; }
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#f9fafb;">
+      <th style="padding:10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">DATA</th>
+      <th style="padding:10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">LOTE</th>
+      <th style="padding:10px;text-align:right;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">FORNECIDO</th>
+      <th style="padding:10px;text-align:right;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">PLANEJADO</th>
+      <th style="padding:10px;text-align:right;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">MS</th>
+      <th style="padding:10px;text-align:right;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">CUSTO</th>
+      <th style="padding:10px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">AÇÃO</th>
+    </tr></thead><tbody>`;
+  lancs.slice(0, 50).forEach(l => {
+    const lote = _lotes.find(x => x.id === l.lote_conf_id);
+    const loteName = lote?.nome || `Lote #${l.lote_conf_id}`;
+    const var_pct = l.qtd_planejada_kg ? ((l.qtd_fornecida_kg - l.qtd_planejada_kg) / l.qtd_planejada_kg * 100).toFixed(1) : null;
+    const varStyle = var_pct == null ? '' : parseFloat(var_pct) > 5 ? 'color:#dc2626' : parseFloat(var_pct) < -5 ? 'color:#f59e0b' : 'color:#059669';
+    html += `<tr>
+      <td style="padding:8px 10px;">${fmtData(l.data)}</td>
+      <td style="padding:8px 10px;">${loteName}</td>
+      <td style="padding:8px 10px;text-align:right;">${fmtKg(l.qtd_fornecida_kg)}</td>
+      <td style="padding:8px 10px;text-align:right;">${l.qtd_planejada_kg ? fmtKg(l.qtd_planejada_kg) : '—'}</td>
+      <td style="padding:8px 10px;text-align:right;">${l.ms_fornecida_kg ? fmtKg(l.ms_fornecida_kg) : '—'}</td>
+      <td style="padding:8px 10px;text-align:right;">${l.custo_real ? fmtR(l.custo_real) : '—'}</td>
+      <td style="padding:8px 10px;text-align:center;">
+        <button class="btn btn-sm btn-danger" onclick="excluirLancamento(${l.id})" style="padding:3px 8px;font-size:11px;">🗑</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+async function excluirLancamento(id) {
+  confirmarExclusao(`/confinamento/lancamentos/${id}`, () => carregarLancamentos());
+}
+
+// ── PESAGENS ─────────────────────────────────────────────────────────────
+async function popularSelectsPes() {
+  const sel = document.getElementById('pesLote');
+  if (!_lotes.length) {
+    const r = await fetch('/confinamento/lotes?status=ATIVO');
+    _lotes = await r.json();
+  }
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    _lotes.filter(l => l.status === 'ATIVO').map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+  document.getElementById('pesData').value = hoje();
+}
+
+async function salvarPesagem() {
+  const loteId = document.getElementById('pesLote').value;
+  const peso = document.getElementById('pesPeso').value;
+  if (!loteId || !peso) { showToast('Preencha lote e peso', 'erro'); return; }
+  try {
+    const r = await fetch(`/confinamento/lotes/${loteId}/pesagens`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        data: document.getElementById('pesData').value,
+        peso_medio_kg: parseFloat(peso),
+        qtd_animais: document.getElementById('pesQtd').value ? parseInt(document.getElementById('pesQtd').value) : undefined,
+        responsavel: document.getElementById('pesResp').value,
+        obs: document.getElementById('pesObs').value,
+      })
+    });
+    if (r.ok) {
+      showToast('Pesagem registrada!', 'sucesso');
+      carregarPesagensLote();
+      document.getElementById('pesPeso').value = '';
+    } else {
+      const d = await r.json(); showToast(d.detail || 'Erro', 'erro');
+    }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+async function carregarPesagensLote() {
+  const loteId = document.getElementById('pesLote').value;
+  if (!loteId) return;
+  const lote = _lotes.find(l => l.id == loteId);
+  document.getElementById('pesagemSubtitulo').textContent = lote ? lote.nome : '';
+  try {
+    const r = await fetch(`/confinamento/lotes/${loteId}/pesagens`);
+    const pesagens = await r.json();
+    renderChartPesagem(pesagens, lote);
+    renderTabelaPesagens(pesagens);
+  } catch { console.error('Erro ao carregar pesagens'); }
+}
+
+function renderChartPesagem(pesagens, lote) {
+  const ctx = document.getElementById('chartPesagem').getContext('2d');
+  if (_chartPesagem) _chartPesagem.destroy();
+  if (!pesagens.length) return;
+
+  // Build projection from last actual weight using GMD
+  const gmd = lote?.gmd || 0;
+  const pesoAlvo = lote?.peso_alvo_saida || 0;
+  const ultimaPes = pesagens[pesagens.length - 1];
+  const projLabels = [];
+  const projPesos = [];
+
+  if (gmd > 0 && pesoAlvo > ultimaPes.peso_medio_kg) {
+    let peso = ultimaPes.peso_medio_kg;
+    let dt = new Date(ultimaPes.data + 'T00:00:00');
+    while (peso < pesoAlvo) {
+      peso = Math.min(peso + gmd, pesoAlvo);
+      dt = new Date(dt.getTime() + 86400000 * 7); // ponto a cada 7 dias
+      projLabels.push(dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }));
+      projPesos.push(parseFloat(peso.toFixed(1)));
+    }
+  }
+
+  const allLabels = [...pesagens.map(p => fmtData(p.data)), ...projLabels];
+  const pesosReal = pesagens.map(p => p.peso_medio_kg);
+  // Projection dataset: null for historical points, values for projected
+  const pesosProj = [
+    ...pesagens.map((_, i) => i === pesagens.length - 1 ? pesagens[i].peso_medio_kg : null),
+    ...projPesos
+  ];
+  const alvoLine = Array(allLabels.length).fill(pesoAlvo);
+
+  _chartPesagem = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [
+        {
+          label: 'Peso Real (kg)',
+          data: pesosReal,
+          borderColor: '#2d6a4f',
+          backgroundColor: 'rgba(45,106,79,.08)',
+          tension: 0.3, pointRadius: 5, fill: true,
+        },
+        {
+          label: 'Projeção (GMD atual)',
+          data: pesosProj,
+          borderColor: '#16a34a',
+          borderDash: [5, 4],
+          pointRadius: projPesos.map((_, i) => i === projPesos.length - 1 ? 6 : 3),
+          pointBackgroundColor: projPesos.map((_, i) => i === projPesos.length - 1 ? '#dc2626' : '#16a34a'),
+          tension: 0.2, fill: false, spanGaps: false,
+        },
+        {
+          label: 'Peso Alvo',
+          data: alvoLine,
+          borderColor: '#dc2626',
+          borderDash: [6, 4],
+          pointRadius: 0, borderWidth: 1.5, fill: false,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: {
+        y: { beginAtZero: false, title: { display: true, text: 'kg' } }
+      }
+    }
+  });
+}
+
+function renderTabelaPesagens(pesagens) {
+  const el = document.getElementById('tabelaPesagens');
+  if (!pesagens.length) { el.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">Nenhuma pesagem registrada.</div>'; return; }
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#f9fafb;">
+      <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;">DATA</th>
+      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;">PESO MÉDIO</th>
+      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;">GMD</th>
+      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;">CA</th>
+      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;">CMS/Cab/Dia</th>
+    </tr></thead><tbody>`;
+  [...pesagens].reverse().forEach(p => {
+    html += `<tr>
+      <td style="padding:7px 10px;">${fmtData(p.data)}</td>
+      <td style="padding:7px 10px;text-align:right;">${fmtKg(p.peso_medio_kg)}</td>
+      <td style="padding:7px 10px;text-align:right;">${p.gmd_periodo != null ? fmt(p.gmd_periodo,3) : '—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${p.ca_periodo != null ? fmt(p.ca_periodo,1) : '—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${p.cms_cab_dia != null ? fmtKg(p.cms_cab_dia) : '—'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── DIETAS ────────────────────────────────────────────────────────────────
+async function carregarDietas() {
+  document.getElementById('loadingDietas').style.display = 'flex';
+  try {
+    const r = await fetch('/confinamento/dietas');
+    _dietas = await r.json();
+    renderDietas(_dietas);
+  } catch { showToast('Erro ao carregar dietas', 'erro'); }
+  document.getElementById('loadingDietas').style.display = 'none';
+}
+
+function renderDietas(dietas) {
+  const grid = document.getElementById('gridDietas');
+  if (!dietas.length) { grid.innerHTML = '<div style="color:#9ca3af;">Nenhuma dieta cadastrada.</div>'; return; }
+  const faseCor = { ADAPTACAO: '#fef3c7', CRESCIMENTO: '#d1fae5', TERMINACAO: '#dbeafe', MANUTENCAO: '#f3e8ff' };
+  const faseCorTxt = { ADAPTACAO: '#92400e', CRESCIMENTO: '#065f46', TERMINACAO: '#1e40af', MANUTENCAO: '#6b21a8' };
+  grid.innerHTML = dietas.map(d => {
+    const cor = faseCor[d.fase] || '#f3f4f6';
+    const cortxt = faseCorTxt[d.fase] || '#374151';
+    const ings = (d.ingredientes || []).map(i =>
+      `<tr><td style="padding:5px 8px;">${i.nome}</td>
+       <td style="padding:5px 8px;text-align:center;"><span class="ing-tipo ing-${i.tipo}">${i.tipo}</span></td>
+       <td style="padding:5px 8px;text-align:right;">${fmt(i.kg_cab_dia,2)} kg</td>
+       <td style="padding:5px 8px;text-align:right;">${fmt(i.ms_cab_dia,3)} kg MS</td>
+       <td style="padding:5px 8px;text-align:right;">${fmtR(i.custo_cab_dia)}</td></tr>`
+    ).join('');
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;">${d.nome}</div>
+          <div style="margin-top:3px;">
+            <span style="padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${cor};color:${cortxt};">${d.fase}</span>
+            ${d.duracao_dias ? `<span style="font-size:11px;color:#9ca3af;margin-left:6px;">${d.duracao_dias} dias</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" onclick="editarDieta(${d.id})">✏️</button>
+          <button class="btn btn-sm btn-danger" onclick="confirmarExclusao('/confinamento/dietas/${d.id}', carregarDietas)">🗑</button>
+        </div>
+      </div>
+      <table class="dieta-ing-table">
+        <thead><tr><th>Ingrediente</th><th>Tipo</th><th>kg/cab/dia</th><th>MS/cab/dia</th><th>Custo/cab/dia</th></tr></thead>
+        <tbody>${ings}</tbody>
+        <tfoot>
+          <tr style="font-weight:700;background:#f9fafb;">
+            <td colspan="2" style="padding:7px 8px;">TOTAL</td>
+            <td style="padding:7px 8px;text-align:right;">${fmt(d.total_kg_cab_dia,2)} kg</td>
+            <td style="padding:7px 8px;text-align:right;">${fmt(d.ms_total_cab_dia,3)} kg MS</td>
+            <td style="padding:7px 8px;text-align:right;">${fmtR(d.custo_cab_dia)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+function abrirModalDieta() {
+  document.getElementById('titleDieta').textContent = '🌿 Nova Dieta';
+  document.getElementById('dietaId').value = '';
+  document.getElementById('dietaNome').value = '';
+  document.getElementById('dietaFase').value = 'CRESCIMENTO';
+  document.getElementById('dietaDuracao').value = '';
+  document.getElementById('dietaIngredientes').innerHTML = '';
+  abrirModal2('modalDieta');
+}
+
+async function editarDieta(id) {
+  const dieta = _dietas.find(d => d.id === id);
+  if (!dieta) return;
+  document.getElementById('titleDieta').textContent = '✏️ Editar Dieta';
+  document.getElementById('dietaId').value = id;
+  document.getElementById('dietaNome').value = dieta.nome;
+  document.getElementById('dietaFase').value = dieta.fase;
+  document.getElementById('dietaDuracao').value = dieta.duracao_dias || '';
+  // Render ingredientes
+  document.getElementById('dietaIngredientes').innerHTML = '';
+  for (const i of (dieta.ingredientes || [])) {
+    await adicionarIngDieta(i);
+  }
+  abrirModal2('modalDieta');
+}
+
+async function adicionarIngDieta(ing) {
+  if (!_ingredientes.length) {
+    const r = await fetch('/confinamento/ingredientes');
+    _ingredientes = await r.json();
+  }
+  const opts = _ingredientes.map(i =>
+    `<option value="${i.id}" ${ing && i.id === ing.ingrediente_id ? 'selected' : ''}>${i.nome} (${i.tipo})</option>`
+  ).join('');
+  const uid = Date.now() + Math.random();
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;';
+  row.innerHTML = `
+    <select class="di-ing" style="flex:2;border:1px solid #d1d5db;border-radius:6px;padding:7px;font-size:12px;" onchange="calcPreviewDieta()">${opts}</select>
+    <input type="number" class="di-kg" step="0.01" placeholder="kg/cab/dia" value="${ing ? ing.kg_cab_dia : ''}"
+      style="width:110px;border:1px solid #d1d5db;border-radius:6px;padding:7px;font-size:12px;" oninput="calcPreviewDieta()">
+    <button class="btn btn-sm btn-danger" onclick="this.parentElement.remove();calcPreviewDieta();" style="padding:5px 8px;">✕</button>
+  `;
+  document.getElementById('dietaIngredientes').appendChild(row);
+}
+
+function calcPreviewDieta() {
+  const rows = document.querySelectorAll('#dietaIngredientes > div');
+  let totalMs = 0, totalCusto = 0, totalKg = 0;
+  rows.forEach(row => {
+    const ingId = parseInt(row.querySelector('.di-ing').value);
+    const kg = parseFloat(row.querySelector('.di-kg').value) || 0;
+    const ing = _ingredientes.find(i => i.id === ingId);
+    if (ing && kg) {
+      totalMs += kg * ing.pct_ms / 100;
+      totalCusto += kg * ing.preco_kg;
+      totalKg += kg;
+    }
+  });
+  document.getElementById('prev-dieta-ms').textContent = fmt(totalMs, 3) + ' kg MS';
+  document.getElementById('prev-dieta-custo').textContent = fmtR(totalCusto);
+  document.getElementById('prev-dieta-kg').textContent = fmt(totalKg, 2) + ' kg';
+}
+
+async function salvarDieta() {
+  const id = document.getElementById('dietaId').value;
+  const nome = document.getElementById('dietaNome').value.trim();
+  if (!nome) { showToast('Nome é obrigatório', 'erro'); return; }
+  const rows = document.querySelectorAll('#dietaIngredientes > div');
+  const ingredientes = [];
+  for (const row of rows) {
+    const ingId = parseInt(row.querySelector('.di-ing').value);
+    const kg = parseFloat(row.querySelector('.di-kg').value) || 0;
+    if (ingId && kg) ingredientes.push({ ingrediente_id: ingId, kg_cab_dia: kg });
+  }
+  const body = {
+    nome, fase: document.getElementById('dietaFase').value,
+    duracao_dias: parseInt(document.getElementById('dietaDuracao').value) || null,
+    ingredientes,
+  };
+  try {
+    const url = id ? `/confinamento/dietas/${id}` : '/confinamento/dietas';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) {
+      showToast('Dieta salva!', 'sucesso');
+      fecharModal2('modalDieta');
+      carregarDietas();
+    } else {
+      const d = await r.json(); showToast(d.detail || 'Erro', 'erro');
+    }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+// ── INGREDIENTES ─────────────────────────────────────────────────────────
+async function carregarIngredientes() {
+  document.getElementById('loadingIngredientes').style.display = 'flex';
+  try {
+    const r = await fetch('/confinamento/ingredientes');
+    _ingredientes = await r.json();
+    renderIngredientes(_ingredientes);
+  } catch { showToast('Erro ao carregar ingredientes', 'erro'); }
+  document.getElementById('loadingIngredientes').style.display = 'none';
+}
+
+function renderIngredientes(ings) {
+  const el = document.getElementById('tabelaIngredientes');
+  if (!ings.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;">Nenhum ingrediente cadastrado.</div>'; return; }
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#f9fafb;">
+      <th style="padding:10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">NOME</th>
+      <th style="padding:10px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">TIPO</th>
+      <th style="padding:10px;text-align:right;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">% MS</th>
+      <th style="padding:10px;text-align:right;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">PREÇO/kg</th>
+      <th style="padding:10px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">ATIVO</th>
+      <th style="padding:10px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">AÇÕES</th>
+    </tr></thead><tbody>`;
+  ings.forEach(i => {
+    html += `<tr>
+      <td style="padding:8px 10px;font-weight:600;">${i.nome}</td>
+      <td style="padding:8px 10px;text-align:center;"><span class="ing-tipo ing-${i.tipo}">${i.tipo}</span></td>
+      <td style="padding:8px 10px;text-align:right;">${fmt(i.pct_ms,1)}%</td>
+      <td style="padding:8px 10px;text-align:right;">${fmtR(i.preco_kg)}</td>
+      <td style="padding:8px 10px;text-align:center;">${i.ativo ? '✅' : '❌'}</td>
+      <td style="padding:8px 10px;text-align:center;">
+        <button class="btn btn-sm" onclick="editarIngrediente(${i.id})" style="margin-right:4px;">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="confirmarExclusao('/confinamento/ingredientes/${i.id}', carregarIngredientes)">🗑</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function abrirModalIngrediente() {
+  document.getElementById('titleIngrediente').textContent = '🧪 Novo Ingrediente';
+  document.getElementById('ingId').value = '';
+  ['ingNome','ingPctMs','ingPreco','ingEnergia','ingProteina','ingObs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ingTipo').value = 'CONCENTRADO';
+  abrirModal2('modalIngrediente');
+}
+
+function editarIngrediente(id) {
+  const ing = _ingredientes.find(i => i.id === id);
+  if (!ing) return;
+  document.getElementById('titleIngrediente').textContent = '✏️ Editar Ingrediente';
+  document.getElementById('ingId').value = id;
+  document.getElementById('ingNome').value = ing.nome;
+  document.getElementById('ingTipo').value = ing.tipo;
+  document.getElementById('ingPctMs').value = ing.pct_ms;
+  document.getElementById('ingPreco').value = ing.preco_kg;
+  document.getElementById('ingEnergia').value = ing.energia_mcal || '';
+  document.getElementById('ingProteina').value = ing.proteina_pct || '';
+  document.getElementById('ingObs').value = ing.obs || '';
+  abrirModal2('modalIngrediente');
+}
+
+async function salvarIngrediente() {
+  const id = document.getElementById('ingId').value;
+  const nome = document.getElementById('ingNome').value.trim();
+  const pct_ms = parseFloat(document.getElementById('ingPctMs').value);
+  const preco_kg = parseFloat(document.getElementById('ingPreco').value);
+  if (!nome || !pct_ms || !preco_kg) { showToast('Preencha nome, % MS e preço', 'erro'); return; }
+  const body = {
+    nome, tipo: document.getElementById('ingTipo').value,
+    pct_ms, preco_kg,
+    energia_mcal: parseFloat(document.getElementById('ingEnergia').value) || null,
+    proteina_pct: parseFloat(document.getElementById('ingProteina').value) || null,
+    obs: document.getElementById('ingObs').value,
+    ativo: true,
+  };
+  try {
+    const url = id ? `/confinamento/ingredientes/${id}` : '/confinamento/ingredientes';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) {
+      showToast('Ingrediente salvo!', 'sucesso');
+      fecharModal2('modalIngrediente');
+      carregarIngredientes();
+    } else {
+      const d = await r.json(); showToast(d.detail || 'Erro', 'erro');
+    }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+// ── MODAL NOVO LOTE ───────────────────────────────────────────────────────
+let _stepAtual = 1;
+
+async function abrirModalNovoLote() {
+  // Carregar dietas se não carregadas
+  if (!_dietas.length) {
+    const r = await fetch('/confinamento/dietas');
+    _dietas = await r.json();
+  }
+  _stepAtual = 1;
+  ['novoNome','novoObs','novoQtd','novoPesoEntrada','novoPesoSaida','novoValorCab',
+   'novoFreteEnt','novoMaoObra','novoOutros','novoPrecArr'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('novoDataEntrada').value = hoje();
+  document.getElementById('novoRc').value = '54';
+  document.getElementById('fasesNovoLote').innerHTML = '';
+  irStep(1);
+  abrirModal2('modalNovoLote');
+}
+
+function fecharModalNovoLote() { fecharModal2('modalNovoLote'); }
+
+function irStep(n) {
+  _stepAtual = n;
+  [1,2,3].forEach(i => {
+    document.getElementById('step' + i).classList.toggle('active', i === n);
+    const dot = document.getElementById('step-dot-' + i);
+    if (i < n) { dot.classList.add('done'); dot.classList.remove('active'); }
+    else if (i === n) { dot.classList.add('active'); dot.classList.remove('done'); }
+    else { dot.classList.remove('done', 'active'); }
+  });
+  if (n === 3 && !document.querySelectorAll('#fasesNovoLote .fase-row').length) {
+    adicionarFaseForm();
+  }
+}
+
+async function adicionarFaseForm(fase) {
+  if (!_dietas.length) {
+    const r = await fetch('/confinamento/dietas');
+    _dietas = await r.json();
+  }
+  const opts = _dietas.map(d => `<option value="${d.id}">${d.nome} (${d.fase})</option>`).join('');
+  const faseOpts = ['ADAPTACAO','CRESCIMENTO','TERMINACAO','MANUTENCAO'].map(f =>
+    `<option value="${f}" ${fase?.fase === f ? 'selected' : ''}>${f}</option>`
+  ).join('');
+  const row = document.createElement('div');
+  row.className = 'fase-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 80px auto;gap:8px;align-items:center;margin-bottom:8px;';
+  row.innerHTML = `
+    <select style="border:1px solid #d1d5db;border-radius:6px;padding:7px;font-size:12px;">${faseOpts}</select>
+    <select style="border:1px solid #d1d5db;border-radius:6px;padding:7px;font-size:12px;">${opts}</select>
+    <input type="number" placeholder="Dias" value="${fase?.duracao_prevista || ''}"
+      style="border:1px solid #d1d5db;border-radius:6px;padding:7px;font-size:12px;">
+    <button class="btn btn-sm btn-danger" onclick="this.parentElement.remove();" style="padding:5px 8px;">✕</button>
+  `;
+  document.getElementById('fasesNovoLote').appendChild(row);
+}
+
+async function salvarNovoLote() {
+  const nome = document.getElementById('novoNome').value.trim();
+  const qtd = parseInt(document.getElementById('novoQtd').value);
+  const pesoEnt = parseFloat(document.getElementById('novoPesoEntrada').value);
+  const pesoSaida = parseFloat(document.getElementById('novoPesoSaida').value);
+  const valorCab = parseFloat(document.getElementById('novoValorCab').value);
+  if (!nome || !qtd || !pesoEnt || !pesoSaida || !valorCab) {
+    showToast('Preencha todos os campos obrigatórios', 'erro'); return;
+  }
+
+  // Coletar fases
+  const faseRows = document.querySelectorAll('#fasesNovoLote .fase-row');
+  const fases = Array.from(faseRows).map(row => {
+    const sels = row.querySelectorAll('select');
+    const inp = row.querySelector('input');
+    return { fase: sels[0].value, dieta_id: parseInt(sels[1].value), duracao_prevista: parseInt(inp.value) || 14 };
+  }).filter(f => f.dieta_id);
+
+  const body = {
+    nome,
+    data_entrada: document.getElementById('novoDataEntrada').value,
+    qtd_animais: qtd,
+    peso_medio_entrada: pesoEnt,
+    peso_alvo_saida: pesoSaida,
+    valor_compra_cab: valorCab,
+    frete_entrada: parseFloat(document.getElementById('novoFreteEnt').value) || 0,
+    mao_obra_cab_dia: parseFloat(document.getElementById('novoMaoObra').value) || 0,
+    outros_custos: parseFloat(document.getElementById('novoOutros').value) || 0,
+    preco_arroba_venda: parseFloat(document.getElementById('novoPrecArr').value) || null,
+    rc_estimado_pct: parseFloat(document.getElementById('novoRc').value) || 54,
+    obs: document.getElementById('novoObs').value,
+    fases,
+  };
+
+  try {
+    const r = await fetch('/confinamento/lotes', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      showToast('Lote criado!', 'sucesso');
+      fecharModalNovoLote();
+      carregarLotes();
+      carregarDashboard();
+    } else {
+      const d = await r.json(); showToast(d.detail || 'Erro', 'erro');
+    }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+// ── MODAL ENCERRAR ────────────────────────────────────────────────────────
+function abrirModalEncerrar(loteId) {
+  document.getElementById('encLoteId').value = loteId;
+  document.getElementById('encData').value = hoje();
+  document.getElementById('encPeso').value = '';
+  document.getElementById('encRc').value = '54';
+  document.getElementById('previewEnc').style.display = 'none';
+  const lote = _lotes.find(l => l.id === loteId);
+  if (lote) {
+    document.getElementById('encRc').value = lote.rc_estimado_pct || 54;
+    if (lote.preco_arroba_venda) document.getElementById('encPrecArr').value = lote.preco_arroba_venda;
+  }
+  abrirModal2('modalEncerrar');
+}
+
+function calcPreviewEnc() {
+  const peso = parseFloat(document.getElementById('encPeso').value) || 0;
+  const rc = parseFloat(document.getElementById('encRc').value) || 54;
+  const prec = parseFloat(document.getElementById('encPrecArr').value) || 0;
+  const loteId = document.getElementById('encLoteId').value;
+  const lote = _lotes.find(l => l.id == loteId);
+  if (!peso || !prec) { document.getElementById('previewEnc').style.display = 'none'; return; }
+  const qtd = lote?.qtd_animais || 1;
+  const arrobas = (peso * rc / 100 * qtd) / 15;
+  const receita = arrobas * prec;
+  document.getElementById('enc-arrobas').textContent = fmt(arrobas, 1) + ' @';
+  document.getElementById('enc-receita').textContent = fmtR(receita);
+  document.getElementById('previewEnc').style.display = 'block';
+}
+
+async function confirmarEncerrar() {
+  const id = document.getElementById('encLoteId').value;
+  const body = {
+    data_saida_real: document.getElementById('encData').value,
+    peso_medio_saida: parseFloat(document.getElementById('encPeso').value),
+    rc_real_pct: parseFloat(document.getElementById('encRc').value),
+    preco_arroba_venda: parseFloat(document.getElementById('encPrecArr').value) || null,
+    frete_saida: parseFloat(document.getElementById('encFrete').value) || 0,
+  };
+  if (!body.peso_medio_saida) { showToast('Informe o peso de saída', 'erro'); return; }
+  try {
+    const r = await fetch(`/confinamento/lotes/${id}/encerrar`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      const d = await r.json();
+      fecharModal2('modalEncerrar');
+      showToast(`Lote encerrado! Receita: ${fmtR(d.receita_real)}`, 'sucesso');
+      carregarLotes();
+      carregarDashboard();
+    } else {
+      const d = await r.json(); showToast(d.detail || 'Erro', 'erro');
+    }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+// ── MODAL AVANÇAR FASE ────────────────────────────────────────────────────
+async function abrirModalAvancarFase(loteId) {
+  document.getElementById('afLoteId').value = loteId;
+  if (!_dietas.length) {
+    const r = await fetch('/confinamento/dietas');
+    _dietas = await r.json();
+  }
+  const opts = _dietas.map(d => `<option value="${d.id}">${d.nome} (${d.fase})</option>`).join('');
+  document.getElementById('afDieta').innerHTML = '<option value="">Selecione...</option>' + opts;
+  document.getElementById('afDuracao').value = '';
+  abrirModal2('modalAvancarFase');
+}
+
+async function confirmarAvancarFase() {
+  const id = document.getElementById('afLoteId').value;
+  const dieta_id = document.getElementById('afDieta').value;
+  const fase = document.getElementById('afFase').value;
+  const duracao = document.getElementById('afDuracao').value;
+  if (!dieta_id) { showToast('Selecione a nova dieta', 'erro'); return; }
+  try {
+    const r = await fetch(`/confinamento/lotes/${id}/fases/avancar`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ dieta_id: parseInt(dieta_id), fase, duracao_prevista: duracao ? parseInt(duracao) : null })
+    });
+    if (r.ok) {
+      showToast('Fase avançada!', 'sucesso');
+      fecharModal2('modalAvancarFase');
+      carregarLotes();
+    } else {
+      const d = await r.json(); showToast(d.detail || 'Erro', 'erro');
+    }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+// ── Shortcuts ─────────────────────────────────────────────────────────────
+function abrirLancParaLote(loteId) {
+  mudarAba('lancamentos', document.querySelectorAll('.conf-tab')[1]);
+  setTimeout(async () => {
+    await popularSelectsLanc();
+    document.getElementById('lancLote').value = loteId;
+    onChangeLancLote();
+  }, 100);
+}
+
+// ── Helpers de modal ─────────────────────────────────────────────────────
+function abrirModal2(id) { document.getElementById(id).classList.add('open'); }
+function fecharModal2(id) { document.getElementById(id).classList.remove('open'); }
+
+// Fechar modais ao clicar fora
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ── PESAGEM INDIVIDUAL ────────────────────────────────────────────────────
+let loteConfSelecionado = null;
+let _animaisLote = [];
+let _chartDispersao = null;
+
+function mostrarModo(modo) {
+  document.getElementById('modo-lote').style.display       = modo === 'lote'       ? 'block' : 'none';
+  document.getElementById('modo-individual').style.display = modo === 'individual' ? 'block' : 'none';
+  document.getElementById('btn-lote').classList.toggle('active',       modo === 'lote');
+  document.getElementById('btn-individual').classList.toggle('active', modo === 'individual');
+  if (modo === 'individual') popularSelectInd();
+}
+
+async function popularSelectInd() {
+  const sel = document.getElementById('pesLoteInd');
+  if (!_lotes.length) {
+    const r = await fetch('/confinamento/lotes?status=ATIVO');
+    _lotes = await r.json();
+  }
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    _lotes.filter(l => l.status === 'ATIVO').map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+  document.getElementById('data-pesagem-ind').value = hoje();
+  if (loteConfSelecionado) {
+    sel.value = loteConfSelecionado;
+    await carregarAnimaisLote(loteConfSelecionado);
+  }
+}
+
+async function onChangeLoteInd() {
+  const loteId = document.getElementById('pesLoteInd').value;
+  if (!loteId) {
+    document.getElementById('ind-sem-lote').style.display = 'block';
+    document.getElementById('ind-tabela-wrap').style.display = 'none';
+    document.getElementById('ind-ranking-wrap').style.display = 'none';
+    document.getElementById('ind-ranking-vazio').style.display = 'block';
+    loteConfSelecionado = null;
+    return;
+  }
+  loteConfSelecionado = parseInt(loteId);
+  await carregarAnimaisLote(loteConfSelecionado);
+  await carregarRankingLote(loteConfSelecionado);
+}
+
+async function carregarAnimaisLote(loteId) {
+  document.getElementById('ind-sem-lote').style.display = 'none';
+  document.getElementById('ind-tabela-wrap').style.display = 'none';
+  try {
+    const r = await fetch(`/confinamento/lotes/${loteId}/animais`);
+    _animaisLote = await r.json();
+    if (_animaisLote.length) {
+      renderTabelaIndividual(_animaisLote);
+      document.getElementById('ind-tabela-wrap').style.display = 'block';
+    } else {
+      document.getElementById('ind-sem-lote').textContent = 'Nenhum animal encontrado para este lote. Associe animais ao lote pelo campo "Lote" em Animais.';
+      document.getElementById('ind-sem-lote').style.display = 'block';
+    }
+  } catch(e) {
+    document.getElementById('ind-sem-lote').textContent = 'Erro ao carregar animais.';
+    document.getElementById('ind-sem-lote').style.display = 'block';
+  }
+}
+
+function renderTabelaIndividual(animais) {
+  const tbody = document.getElementById('tbody-individual');
+  tbody.innerHTML = '';
+  animais.forEach(a => {
+    const antInfo = a.ultima_pesagem
+      ? `${fmt(a.peso_atual, 1)} kg <small style="color:#94a3b8;display:block;">${fmtData(a.ultima_pesagem)} (${a.dias_desde_ultima}d)</small>`
+      : `${fmt(a.peso_atual, 1)} kg <small style="color:#94a3b8;display:block;">sem pesagem</small>`;
+    const tr = document.createElement('tr');
+    tr.dataset.brinco = a.brinco;
+    tr.innerHTML = `
+      <td style="padding:8px 10px;text-align:center;">
+        <input type="checkbox" checked class="cb-animal" data-brinco="${a.brinco}" onchange="atualizarRodapeTabela()">
+      </td>
+      <td style="padding:8px 10px;font-weight:600;color:#1B5E20;">${a.brinco}</td>
+      <td style="padding:8px 10px;color:#374151;">${a.nome || '—'}</td>
+      <td style="padding:8px 10px;text-align:center;"><span class="ing-tipo" style="background:#f3f4f6;color:#374151;">${a.tipo || '—'}</span></td>
+      <td style="padding:8px 10px;text-align:right;font-size:12px;">${antInfo}</td>
+      <td style="padding:8px 10px;text-align:center;">
+        <input type="number" class="peso-input" step="0.1" placeholder="kg"
+               data-brinco="${a.brinco}"
+               data-peso-ant="${a.peso_atual || a.peso_entrada}"
+               data-dias="${a.dias_desde_ultima || a.dias_confinamento || 1}"
+               style="width:90px;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:13px;text-align:center;"
+               oninput="calcularGMDLinha(this)">
+      </td>
+      <td class="gmd-cell-ind" style="padding:8px 10px;text-align:right;">—</td>
+      <td class="status-cell-ind" style="padding:8px 10px;text-align:center;">—</td>`;
+    tbody.appendChild(tr);
+  });
+  atualizarRodapeTabela();
+}
+
+function calcularGMDLinha(input) {
+  const pesoNovo = parseFloat(input.value);
+  const pesoAnt  = parseFloat(input.dataset.pesoAnt) || 0;
+  const dias     = parseInt(input.dataset.dias) || 1;
+  const tr       = input.closest('tr');
+  const tdGmd    = tr.querySelector('.gmd-cell-ind');
+  const tdStatus = tr.querySelector('.status-cell-ind');
+  if (!pesoNovo || !pesoAnt) {
+    tdGmd.textContent = '—'; tdStatus.textContent = '—';
+    tr.style.background = ''; return;
+  }
+  const gmd = (pesoNovo - pesoAnt) / dias;
+  const cor  = gmd > 1.4 ? '#16a34a' : gmd > 1.0 ? '#2563eb' : gmd > 0.7 ? '#b45309' : '#dc2626';
+  const txt  = gmd > 1.4 ? 'ÓTIMO'  : gmd > 1.0 ? 'BOM'     : gmd > 0.7 ? 'REGULAR' : 'RUIM';
+  tdGmd.innerHTML    = `<span style="font-weight:600;color:${cor};">${gmd.toFixed(2)}</span>`;
+  tdStatus.innerHTML = `<span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:${cor}20;color:${cor};border:0.5px solid ${cor}40;">${txt}</span>`;
+  tr.style.background = gmd > 1.0 ? '#f0fdf4' : gmd < 0.7 ? '#fef2f2' : '';
+  atualizarRodapeTabela();
+}
+
+function atualizarRodapeTabela() {
+  const pesos = [], gmds = [];
+  document.querySelectorAll('.peso-input').forEach(inp => {
+    const cb = document.querySelector(`.cb-animal[data-brinco="${inp.dataset.brinco}"]`);
+    if (!inp.value || !cb || !cb.checked) return;
+    const p = parseFloat(inp.value);
+    const pa = parseFloat(inp.dataset.pesoAnt) || 0;
+    const d = parseInt(inp.dataset.dias) || 1;
+    pesos.push(p);
+    if (pa) gmds.push((p - pa) / d);
+  });
+  document.getElementById('rodape-count').textContent  = pesos.length;
+  document.getElementById('rodape-peso').textContent   = pesos.length ? (pesos.reduce((a,b)=>a+b,0)/pesos.length).toFixed(1)+' kg' : '—';
+  document.getElementById('rodape-gmd').textContent    = gmds.length  ? (gmds.reduce((a,b)=>a+b,0)/gmds.length).toFixed(2)+' kg/dia' : '—';
+  document.getElementById('rodape-acima').textContent  = gmds.filter(g=>g>=1.0).length;
+  document.getElementById('rodape-abaixo').textContent = gmds.filter(g=>g<1.0).length;
+}
+
+function selecionarTodos(val) {
+  document.querySelectorAll('.cb-animal').forEach(cb => cb.checked = val);
+  const cbTodos = document.getElementById('cb-todos');
+  if (cbTodos) cbTodos.checked = val;
+  atualizarRodapeTabela();
+}
+
+async function registrarPesagensIndividuais() {
+  const loteId = loteConfSelecionado;
+  if (!loteId) { showToast('Selecione um lote', 'erro'); return; }
+  const data = document.getElementById('data-pesagem-ind').value;
+  const resp = document.getElementById('resp-pesagem-ind').value;
+  const pesagens = [];
+  document.querySelectorAll('.cb-animal:checked').forEach(cb => {
+    const brinco = cb.dataset.brinco;
+    const inp = document.querySelector(`.peso-input[data-brinco="${brinco}"]`);
+    if (inp && inp.value) pesagens.push({ brinco, peso_kg: parseFloat(inp.value) });
+  });
+  if (!pesagens.length) { showToast('Nenhum peso informado', 'erro'); return; }
+  try {
+    const r = await fetch(`/confinamento/lotes/${loteId}/pesagens/individuais`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ data, responsavel: resp, pesagens }),
+    });
+    const res = await r.json();
+    if (r.ok) {
+      renderResultadoPesagem(res);
+      showToast(`${res.salvos} pesagens registradas!`, 'sucesso');
+      await carregarRankingLote(loteId);
+      await carregarAnimaisLote(loteId);
+    } else {
+      showToast(res.detail || 'Erro ao salvar', 'erro');
+    }
+  } catch { showToast('Erro de conexão', 'erro'); }
+}
+
+function renderResultadoPesagem(res) {
+  const el = document.getElementById('ind-resultado');
+  document.getElementById('ind-res-titulo').textContent = `✅ ${res.salvos} pesagem(s) registrada(s) com sucesso`;
+  document.getElementById('ind-res-peso').textContent   = res.peso_medio_lote != null ? fmt(res.peso_medio_lote,1)+' kg' : '—';
+  const gmdCor = res.gmd_medio_lote > 1.0 ? '#059669' : res.gmd_medio_lote > 0.7 ? '#d97706' : '#dc2626';
+  const gmdTxt = res.gmd_medio_lote != null ? res.gmd_medio_lote.toFixed(2)+' kg/dia' : '—';
+  document.getElementById('ind-res-gmd').innerHTML = `<span style="color:${gmdCor};font-weight:700;">${gmdTxt}</span>`;
+  document.getElementById('ind-res-max').textContent    = res.gmd_max != null ? res.gmd_max.toFixed(2)+' kg/dia' : '—';
+  document.getElementById('ind-res-min').textContent    = res.gmd_min != null ? res.gmd_min.toFixed(2)+' kg/dia' : '—';
+  document.getElementById('ind-res-abaixo').textContent = (res.animais_abaixo_meta || 0)+' animais';
+  const errosEl = document.getElementById('ind-res-erros');
+  if (res.erros && res.erros.length) {
+    errosEl.innerHTML = '⚠️ Erros: ' + res.erros.map(e => `${e.brinco}: ${e.erro}`).join(' | ');
+  } else { errosEl.textContent = ''; }
+  el.style.display = 'block';
+}
+
+async function carregarRankingLote(loteId) {
+  const lote = _lotes.find(l => l.id == loteId);
+  document.getElementById('ranking-subtitulo').textContent = lote ? lote.nome : '—';
+  try {
+    const r = await fetch(`/confinamento/lotes/${loteId}/animais`);
+    _animaisLote = await r.json();
+    if (_animaisLote.length) {
+      renderRanking(_animaisLote, lote);
+      document.getElementById('ind-ranking-wrap').style.display = 'block';
+      document.getElementById('ind-ranking-vazio').style.display = 'none';
+    } else {
+      document.getElementById('ind-ranking-wrap').style.display = 'none';
+      document.getElementById('ind-ranking-vazio').style.display = 'block';
+    }
+  } catch { console.error('Erro ao carregar ranking'); }
+}
+
+function renderRanking(animais, lote) {
+  const medalhas = ['🥇','🥈','🥉'];
+  const tbody = document.getElementById('tbody-ranking');
+  tbody.innerHTML = '';
+  animais.forEach((a, i) => {
+    const rank = i < 3 ? medalhas[i] : (i + 1);
+    const gmd  = a.gmd_acumulado;
+    const gmdCor = gmd > 1.4 ? '#16a34a' : gmd > 1.0 ? '#2563eb' : gmd > 0.7 ? '#b45309' : '#dc2626';
+    const gmdTxt = gmd > 1.4 ? 'ÓTIMO' : gmd > 1.0 ? 'BOM' : gmd > 0.7 ? 'REGULAR' : 'RUIM';
+    const ganho = (a.peso_atual - a.peso_entrada).toFixed(1);
+    const diasRest = a.dias_restantes;
+    const saidaCor = diasRest == null ? '#9ca3af' : diasRest <= 90 ? '#059669' : diasRest <= 120 ? '#d97706' : '#dc2626';
+    const saidaIco = diasRest == null ? '' : diasRest <= 120 ? ' ✓' : ' ⚠️';
+    const saidaTxt = a.data_saida_prevista ? fmtData(a.data_saida_prevista) + saidaIco : '—';
+
+    // Row principal
+    const tr = document.createElement('tr');
+    tr.className = 'ranking-row';
+    tr.innerHTML = `
+      <td style="padding:8px 10px;text-align:center;font-size:${i<3?'16px':'12px'};">${rank}</td>
+      <td style="padding:8px 10px;font-weight:700;color:#1B5E20;">${a.brinco}${a.nome ? '<br><small style="color:#9ca3af;font-weight:400;">'+a.nome+'</small>' : ''}</td>
+      <td style="padding:8px 10px;text-align:center;"><span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:#f3f4f6;color:#374151;">${a.tipo||'—'}</span></td>
+      <td style="padding:8px 10px;text-align:right;">${fmt(a.peso_entrada,1)} kg</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:600;">${fmt(a.peso_atual,1)} kg</td>
+      <td style="padding:8px 10px;text-align:right;color:#059669;">+${ganho} kg</td>
+      <td style="padding:8px 10px;text-align:center;">
+        <span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:${gmdCor}20;color:${gmdCor};">${fmt(gmd,2)} · ${gmdTxt}</span>
+      </td>
+      <td style="padding:8px 10px;text-align:right;">${fmt(a.falta_kg,1)} kg</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:600;color:${saidaCor};">${saidaTxt}</td>`;
+
+    // Row de histórico (expandível)
+    const trHist = document.createElement('tr');
+    trHist.className = 'historico-row';
+    trHist.dataset.brincoHist = a.brinco;
+    trHist.innerHTML = `<td colspan="9" style="padding:0;background:#f8fafc;">
+      <div style="padding:10px 16px;font-size:12px;color:#374151;">
+        <b>Histórico de pesagens — ${a.brinco}</b>
+        <div id="hist-${a.brinco}" style="margin-top:8px;">Carregando...</div>
+      </div></td>`;
+
+    tr.addEventListener('click', () => {
+      const open = trHist.classList.toggle('open');
+      if (open) carregarHistoricoAnimal(a.brinco, lote?.id || loteConfSelecionado);
+    });
+
+    tbody.appendChild(tr);
+    tbody.appendChild(trHist);
+  });
+
+  renderGraficoDispersao(animais, lote);
+}
+
+async function carregarHistoricoAnimal(brinco, loteId) {
+  const el = document.getElementById(`hist-${brinco}`);
+  if (!el) return;
+  try {
+    const r = await fetch(`/confinamento/lotes/${loteId}/pesagens/individuais`);
+    const todas = await r.json();
+    const do_animal = todas.filter(p => p.brinco === brinco).slice(0, 10);
+    if (!do_animal.length) { el.textContent = 'Nenhuma pesagem individual registrada.'; return; }
+    el.innerHTML = `<table style="border-collapse:collapse;font-size:11px;">
+      <tr style="color:#9ca3af;font-weight:700;">
+        <td style="padding:3px 10px 3px 0;">Data</td>
+        <td style="padding:3px 10px;">Peso</td>
+        <td style="padding:3px 10px;">GMD período</td>
+        <td style="padding:3px 10px;">Dias</td>
+      </tr>
+      ${do_animal.map(p => `<tr>
+        <td style="padding:3px 10px 3px 0;">${fmtData(p.data)}</td>
+        <td style="padding:3px 10px;font-weight:600;">${fmt(p.peso_kg,1)} kg</td>
+        <td style="padding:3px 10px;color:${p.gmd_periodo>1?'#059669':p.gmd_periodo>0.7?'#d97706':'#dc2626'};">${p.gmd_periodo!=null?fmt(p.gmd_periodo,3)+' kg/d':'—'}</td>
+        <td style="padding:3px 10px;color:#9ca3af;">${p.dias_periodo!=null?p.dias_periodo+'d':'—'}</td>
+      </tr>`).join('')}
+    </table>`;
+  } catch { el.textContent = 'Erro ao carregar histórico.'; }
+}
+
+function renderGraficoDispersao(animais, lote) {
+  const ctx = document.getElementById('chartDispersao').getContext('2d');
+  if (_chartDispersao) { _chartDispersao.destroy(); _chartDispersao = null; }
+  if (!animais.length) return;
+
+  const gmdIdeal = lote ? (lote.peso_alvo_saida - lote.peso_medio_entrada) / 90 : 1.0;
+  const pesoEntrada = lote ? lote.peso_medio_entrada : (animais[0]?.peso_entrada || 380);
+  const maxDias = Math.max(...animais.map(a => a.dias_confinamento || 0), 10);
+  const linhaIdeal = [
+    { x: 0,       y: pesoEntrada },
+    { x: maxDias + 10, y: pesoEntrada + gmdIdeal * (maxDias + 10) },
+  ];
+
+  const cores = { EXCELENTE:'#16a34a', BOM:'#2563eb', REGULAR:'#d97706', RUIM:'#dc2626', SEM_DADOS:'#9ca3af' };
+  const pontos = animais.map(a => ({
+    x: a.dias_confinamento || 0,
+    y: a.peso_atual,
+    label: a.brinco,
+    backgroundColor: cores[a.status_gmd] || '#9ca3af',
+  }));
+
+  _chartDispersao = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Animais',
+          data: pontos,
+          backgroundColor: pontos.map(p => p.backgroundColor),
+          pointRadius: 7,
+          pointHoverRadius: 9,
+        },
+        {
+          label: 'Trajetória ideal',
+          data: linhaIdeal,
+          type: 'line',
+          borderColor: '#e11d48',
+          borderDash: [6, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const p = pontos[ctx.dataIndex];
+              return p ? `${p.label}: ${ctx.parsed.y} kg (dia ${ctx.parsed.x})` : '';
+            },
+          },
+        },
+      },
+      scales: {
+        x: { title: { display: true, text: 'Dias de confinamento' } },
+        y: { title: { display: true, text: 'Peso (kg)' }, beginAtZero: false },
+      },
+    },
+  });
+}
+
+// ── Carregar tudo ─────────────────────────────────────────────────────────
+async function carregarTudo() {
+  await carregarDashboard();
+  await carregarLotes();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('confDataAtual').textContent =
+    new Date().toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+  carregarTudo();
+});
+
+// Atualizar ao trocar fazenda
+window.addEventListener('fazenda-contexto', () => carregarTudo());
+</script>
+{% endblock %}

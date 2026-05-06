@@ -1,110 +1,126 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import Optional, List
+from fastapi import APIRouter, HTTPException, Query, Request
+from typing import Optional
 from datetime import date
 
-from database import get_db
-from models import Animal, Pesagem
-from schemas import PesagemCreate, PesagemOut
+from database import supabase, get_fazenda_id
 
 router = APIRouter()
 
 
-@router.get("", response_model=List[PesagemOut])
+@router.get("")
 def listar_pesagens(
+    request: Request,
     brinco: Optional[str] = Query(None),
     mes: Optional[int] = Query(None),
     ano: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    q = db.query(Pesagem)
+    fid = get_fazenda_id(request)
+    q = supabase.table("pesagens").select("*")
+    if fid > 0:
+        q = q.eq("fazenda_id", fid)
     if brinco:
-        q = q.filter(Pesagem.brinco.ilike(brinco))
-    if mes:
-        q = q.filter(Pesagem.mes == mes)
+        q = q.ilike("brinco", brinco)
     if ano:
-        q = q.filter(Pesagem.ano == ano)
-    return q.order_by(Pesagem.data_pesagem.desc()).all()
+        q = q.like("data", f"{ano}-%")
+    if mes and ano:
+        q = q.like("data", f"{ano}-{mes:02d}-%")
+    rows = q.order("data", desc=True).execute().data
+    # Normalize output to keep backward compat with frontend
+    return [_normalize(r) for r in rows]
 
 
-@router.post("", response_model=PesagemOut, status_code=201)
-def criar_pesagem(payload: PesagemCreate, db: Session = Depends(get_db)):
-    animal = db.query(Animal).filter(Animal.brinco.ilike(payload.brinco)).first()
-    if not animal:
+def _normalize(r: dict) -> dict:
+    """Map Supabase column names to the names the frontend expects."""
+    return {
+        **r,
+        "data_pesagem": r.get("data"),
+        "peso": r.get("peso_kg"),
+        "media_dia_kg": r.get("gmd"),
+    }
+
+
+@router.post("", status_code=201)
+def criar_pesagem(request: Request, body: dict):
+    fid = get_fazenda_id(request)
+    brinco = body.get("brinco")
+    # Accept both old (data_pesagem/peso) and new (data/peso_kg) field names
+    data_str = body.get("data") or body.get("data_pesagem")
+    peso = body.get("peso_kg") or body.get("peso")
+    pasto = body.get("pasto")
+
+    if not brinco or not data_str or peso is None:
+        raise HTTPException(status_code=400, detail="brinco, data e peso_kg são obrigatórios.")
+
+    animal_rows = supabase.table("animais").select("*").ilike("brinco", brinco).limit(1).execute().data
+    if not animal_rows:
         raise HTTPException(status_code=404, detail="Animal não encontrado")
+    animal = animal_rows[0]
 
     try:
-        dt_atual = date.fromisoformat(payload.data_pesagem)
+        dt_atual = date.fromisoformat(data_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail="data_pesagem inválida, use YYYY-MM-DD")
+        raise HTTPException(status_code=400, detail="data inválida, use YYYY-MM-DD")
 
-    anterior = (
-        db.query(Pesagem)
-        .filter(Pesagem.brinco.ilike(payload.brinco))
-        .filter(Pesagem.data_pesagem < payload.data_pesagem)
-        .order_by(Pesagem.data_pesagem.desc())
-        .first()
-    )
+    ant_rows = supabase.table("pesagens").select("*").ilike("brinco", brinco).lt("data", data_str).order("data", desc=True).limit(1).execute().data
+    anterior = ant_rows[0] if ant_rows else None
 
-    ganho_kg = 0.0
-    ganho_pct = 0.0
-    media_dia_kg = 0.0
-
+    ganho_kg = gmd = 0.0
+    dias_periodo = 0
     if anterior:
-        ganho_kg = round(payload.peso - anterior.peso, 2)
-        if anterior.peso:
-            ganho_pct = round((ganho_kg / anterior.peso) * 100, 1)
+        ganho_kg = round(peso - (anterior.get("peso_kg") or 0), 2)
         try:
-            dt_anterior = date.fromisoformat(anterior.data_pesagem)
-            dias = (dt_atual - dt_anterior).days
-            if dias > 0:
-                media_dia_kg = round(ganho_kg / dias, 1)
+            dias_periodo = (dt_atual - date.fromisoformat(anterior["data"])).days
+            if dias_periodo > 0:
+                gmd = round(ganho_kg / dias_periodo, 3)
         except Exception:
             pass
 
-    pesagem = Pesagem(
-        brinco=payload.brinco,
-        data_pesagem=payload.data_pesagem,
-        peso=payload.peso,
-        ganho_kg=ganho_kg,
-        ganho_pct=ganho_pct,
-        media_dia_kg=media_dia_kg,
-        mes=dt_atual.month,
-        ano=dt_atual.year,
-        pasto=payload.pasto or animal.pasto,
-    )
-    db.add(pesagem)
+    fid_final = fid if fid > 0 else (animal.get("fazenda_id") or 1)
+    row = supabase.table("pesagens").insert({
+        "brinco": brinco,
+        "data": data_str,
+        "peso_kg": peso,
+        "ganho_kg": ganho_kg,
+        "gmd": gmd,
+        "dias_periodo": dias_periodo,
+        "pasto": pasto or animal.get("pasto_atual"),
+        "fazenda_id": fid_final,
+    }).execute().data[0]
 
-    animal.peso_atual = payload.peso
-    if animal.valor_compra and animal.valor_compra > 0 and payload.peso > 0:
-        animal.custo_kg = round(animal.valor_compra / payload.peso, 2)
-        animal.custo_arroba = round(animal.valor_compra / (payload.peso / 15), 2)
-    db.add(animal)
+    update = {"peso_atual": peso}
+    vc = animal.get("valor_compra")
+    if vc and vc > 0 and peso > 0:
+        update["custo_kg"] = round(vc / peso, 2)
+        update["custo_arroba"] = round(vc / (peso / 15), 2)
+    supabase.table("animais").update(update).eq("id", animal["id"]).execute()
 
-    db.commit()
-    db.refresh(pesagem)
-    return pesagem
+    return _normalize(row)
 
 
-@router.put("/{id}", response_model=PesagemOut)
-def atualizar_pesagem(id: int, payload: PesagemCreate, db: Session = Depends(get_db)):
-    pesagem = db.query(Pesagem).filter(Pesagem.id == id).first()
-    if not pesagem:
+@router.put("/{id}")
+def atualizar_pesagem(id: int, body: dict):
+    rows = supabase.table("pesagens").select("*").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Pesagem não encontrada")
-
-    for k, v in payload.model_dump(exclude_unset=True).items():
-        setattr(pesagem, k, v)
-
-    db.commit()
-    db.refresh(pesagem)
-    return pesagem
+    update_data = {}
+    if "data" in body or "data_pesagem" in body:
+        update_data["data"] = body.get("data") or body.get("data_pesagem")
+    if "peso_kg" in body or "peso" in body:
+        update_data["peso_kg"] = body.get("peso_kg") or body.get("peso")
+    if "pasto" in body:
+        update_data["pasto"] = body["pasto"]
+    if "obs" in body:
+        update_data["obs"] = body["obs"]
+    if update_data:
+        supabase.table("pesagens").update(update_data).eq("id", id).execute()
+    result = supabase.table("pesagens").select("*").eq("id", id).limit(1).execute().data[0]
+    return _normalize(result)
 
 
 @router.delete("/{id}")
-def deletar_pesagem(id: int, db: Session = Depends(get_db)):
-    pesagem = db.query(Pesagem).filter(Pesagem.id == id).first()
-    if not pesagem:
+def deletar_pesagem(id: int):
+    rows = supabase.table("pesagens").select("id").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Pesagem não encontrada")
-    db.delete(pesagem)
-    db.commit()
+    supabase.table("pesagens").delete().eq("id", id).execute()
     return {"mensagem": "Pesagem removida com sucesso"}

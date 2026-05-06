@@ -1,16 +1,10 @@
-from datetime import date, timedelta
+from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlalchemy.orm import Session
 
-from database import get_db
-from models import (
-    Animal, Fazenda, LancamentoRacao, LoteAnimal, Pesagem,
-    Piquete, PlanoNutricional,
-)
+from database import supabase
 
 router = APIRouter()
 
@@ -24,126 +18,122 @@ class FazendaIn(BaseModel):
     cor: Optional[str] = '#1B5E20'
 
 
-def _kpis(f: Fazenda, db: Session) -> dict:
-    total_animais = db.query(Animal).filter(Animal.fazenda_id == f.id).count()
-    total_ativos  = db.query(Animal).filter(
-        Animal.fazenda_id == f.id, Animal.status == "ATIVO"
-    ).count()
-    total_piquetes = db.query(Piquete).filter(Piquete.fazenda_id == f.id).count()
-
-    # UA/ha média dos lotes vinculados aos piquetes desta fazenda
-    piq_ids = [p.id for p in db.query(Piquete).filter(Piquete.fazenda_id == f.id).all()]
-    ua_ha_media = None
-    if piq_ids:
-        from models import LotePasto
-        lotes_pasto = db.query(LotePasto).filter(
-            LotePasto.piquete_id.in_(piq_ids),
-            LotePasto.status == "ATIVO",
-        ).all()
-        if lotes_pasto:
-            # estimate UA/ha from total animals and farm area
-            pass
-
+def _kpis(f: dict) -> dict:
+    fid = f["id"]
+    animais = supabase.table("animais").select("id,status").eq("fazenda_id", fid).execute().data
+    total_animais = len(animais)
+    total_ativos = sum(1 for a in animais if (a.get("status") or "").upper() == "ATIVO")
+    piquetes = supabase.table("piquetes").select("id").eq("fazenda_id", fid).execute().data
+    total_piquetes = len(piquetes)
     return {
-        "id": f.id, "nome": f.nome, "apelido": f.apelido,
-        "cidade": f.cidade, "uf": f.uf, "area_ha": f.area_ha,
-        "cor": f.cor, "ativo": f.ativo,
+        "id": f["id"], "nome": f["nome"], "apelido": f.get("apelido"),
+        "cidade": f.get("cidade"), "uf": f.get("uf"), "area_ha": f.get("area_ha"),
+        "cor": f.get("cor"), "ativo": f.get("ativo"),
         "total_animais": total_animais, "total_ativos": total_ativos,
-        "total_piquetes": total_piquetes, "ua_ha_media": ua_ha_media,
+        "total_piquetes": total_piquetes, "ua_ha_media": None,
     }
 
 
 @router.get("")
-def listar_fazendas(db: Session = Depends(get_db)):
-    fazendas = db.query(Fazenda).filter(Fazenda.ativo == True).order_by(Fazenda.id).all()
-    return [_kpis(f, db) for f in fazendas]
+def listar_fazendas():
+    fazendas = supabase.table("fazendas").select("*").eq("ativo", True).order("id").execute().data
+    return [_kpis(f) for f in fazendas]
 
 
 @router.post("")
-def criar_fazenda(body: FazendaIn, db: Session = Depends(get_db)):
-    if db.query(Fazenda).filter(Fazenda.nome == body.nome).first():
+def criar_fazenda(body: FazendaIn):
+    existing = supabase.table("fazendas").select("id").eq("nome", body.nome).limit(1).execute().data
+    if existing:
         raise HTTPException(400, "Já existe uma fazenda com esse nome")
-    f = Fazenda(**body.model_dump())
-    db.add(f); db.commit(); db.refresh(f)
-    return {"id": f.id, "ok": True}
+    data = body.model_dump()
+    data["ativo"] = True
+    result = supabase.table("fazendas").insert(data).execute().data[0]
+    return {"id": result["id"], "ok": True}
 
 
 @router.put("/{fid}")
-def editar_fazenda(fid: int, body: FazendaIn, db: Session = Depends(get_db)):
-    f = db.query(Fazenda).filter(Fazenda.id == fid).first()
-    if not f:
+def editar_fazenda(fid: int, body: FazendaIn):
+    rows = supabase.table("fazendas").select("id").eq("id", fid).limit(1).execute().data
+    if not rows:
         raise HTTPException(404, "Fazenda não encontrada")
-    for k, v in body.model_dump().items():
-        setattr(f, k, v)
-    db.commit()
+    supabase.table("fazendas").update(body.model_dump()).eq("id", fid).execute()
     return {"ok": True}
 
 
 @router.delete("/{fid}")
-def excluir_fazenda(fid: int, db: Session = Depends(get_db)):
-    f = db.query(Fazenda).filter(Fazenda.id == fid).first()
-    if not f:
+def excluir_fazenda(fid: int):
+    rows = supabase.table("fazendas").select("id").eq("id", fid).limit(1).execute().data
+    if not rows:
         raise HTTPException(404, "Fazenda não encontrada")
-    tem_animais  = db.query(Animal).filter(Animal.fazenda_id == fid).first()
-    tem_piquetes = db.query(Piquete).filter(Piquete.fazenda_id == fid).first()
+    tem_animais = supabase.table("animais").select("id").eq("fazenda_id", fid).limit(1).execute().data
+    tem_piquetes = supabase.table("piquetes").select("id").eq("fazenda_id", fid).limit(1).execute().data
     if tem_animais or tem_piquetes:
         raise HTTPException(400, "Fazenda possui animais ou piquetes vinculados. Remova-os primeiro.")
-    db.delete(f); db.commit()
+    supabase.table("fazendas").delete().eq("id", fid).execute()
     return {"ok": True}
 
 
 @router.get("/{fid}/resumo")
-def resumo_fazenda(fid: int, db: Session = Depends(get_db)):
-    f = db.query(Fazenda).filter(Fazenda.id == fid).first()
-    if not f:
+def resumo_fazenda(fid: int):
+    rows = supabase.table("fazendas").select("*").eq("id", fid).limit(1).execute().data
+    if not rows:
         raise HTTPException(404, "Fazenda não encontrada")
-
+    f = rows[0]
     hoje = date.today()
     mes_str = hoje.strftime("%Y-%m")
 
-    total_ativos = db.query(Animal).filter(
-        Animal.fazenda_id == fid, Animal.status == "ATIVO"
-    ).count()
+    ativos = supabase.table("animais").select("id").eq("fazenda_id", fid).eq("status", "ATIVO").execute().data
+    total_ativos = len(ativos)
 
-    from models import Compra, Despesa, Venda
-    receita = db.query(func.sum(Venda.valor_total)).filter(
-        Venda.data.like(f"{mes_str}%")
-    ).scalar() or 0
-    despesa = db.query(func.sum(Despesa.valor)).filter(
-        Despesa.vencimento.like(f"{mes_str}%"),
-        Despesa.status == "PENDENTE",
-    ).scalar() or 0
+    vendas = supabase.table("vendas").select("valor_total").ilike("data", f"{mes_str}%").execute().data
+    receita = sum(v["valor_total"] or 0 for v in vendas)
+    despesas_rows = supabase.table("despesas").select("valor").ilike("vencimento", f"{mes_str}%").eq("status", "PENDENTE").execute().data
+    despesa = sum(d["valor"] or 0 for d in despesas_rows)
 
-    ultima_pes = db.query(Pesagem).filter(
-        Pesagem.fazenda_id == fid
-    ).order_by(Pesagem.data_pesagem.desc()).first()
+    ultima_pes_rows = supabase.table("pesagens").select("data_pesagem").eq("fazenda_id", fid).order("data_pesagem", desc=True).limit(1).execute().data
+    ultima_pes = ultima_pes_rows[0] if ultima_pes_rows else None
 
-    piquetes = db.query(Piquete).filter(Piquete.fazenda_id == fid).all()
+    piquetes = supabase.table("piquetes").select("id,status").eq("fazenda_id", fid).execute().data
     from routers.pastagem import semaforo_piquete
-    verde = sum(1 for p in piquetes if semaforo_piquete(p.id, db)["semaforo"] == "VERDE")
-    ocupado = sum(1 for p in piquetes if semaforo_piquete(p.id, db)["semaforo"] == "OCUPADO")
+    verde = sum(1 for p in piquetes if semaforo_piquete(p["id"], None)["semaforo"] == "VERDE")
+    ocupado = sum(1 for p in piquetes if semaforo_piquete(p["id"], None)["semaforo"] == "OCUPADO")
+
+    lotes_conf = supabase.table("lotes_confinamento").select("*").eq("fazenda_id", fid).eq("status", "ATIVO").execute().data
+    animais_conf = sum(l["qtd_animais"] for l in lotes_conf)
+    gmds_conf = []
+    for lc in lotes_conf:
+        try:
+            ult = supabase.table("pesagem_confinamento").select("peso_medio_kg").eq("lote_conf_id", lc["id"]).order("data", desc=True).limit(1).execute().data
+            peso_at = ult[0]["peso_medio_kg"] if ult else lc["peso_medio_entrada"]
+            dias_lc = max((hoje - date.fromisoformat(lc["data_entrada"])).days, 1)
+            gmd_lc = (peso_at - lc["peso_medio_entrada"]) / dias_lc
+            if gmd_lc > 0:
+                gmds_conf.append(gmd_lc)
+        except Exception:
+            pass
 
     return {
-        "fazenda": {"id": f.id, "nome": f.nome, "cor": f.cor, "apelido": f.apelido,
-                    "cidade": f.cidade, "uf": f.uf, "area_ha": f.area_ha},
+        "fazenda": {"id": f["id"], "nome": f["nome"], "cor": f.get("cor"), "apelido": f.get("apelido"),
+                    "cidade": f.get("cidade"), "uf": f.get("uf"), "area_ha": f.get("area_ha")},
         "rebanho": {"total_ativo": total_ativos},
         "pastagem": {"verde": verde, "ocupado": ocupado},
         "financeiro": {"receita_mes": round(float(receita), 2),
                        "despesa_mes": round(float(despesa), 2),
-                       "saldo_mes":   round(float(receita) - float(despesa), 2)},
-        "ultima_pesagem": ultima_pes.data_pesagem if ultima_pes else None,
+                       "saldo_mes": round(float(receita) - float(despesa), 2)},
+        "ultima_pesagem": ultima_pes["data_pesagem"] if ultima_pes else None,
+        "confinamento": {
+            "lotes_ativos": len(lotes_conf),
+            "animais_confinados": animais_conf,
+            "gmd_medio": round(sum(gmds_conf) / len(gmds_conf), 2) if gmds_conf else None,
+        },
     }
 
 
-def seed_fazendas(db: Session):
-    if db.query(Fazenda).first():
+def seed_fazendas(db=None):
+    rows = supabase.table("fazendas").select("id").limit(1).execute().data
+    if rows:
         return
-    db.add(Fazenda(
-        nome="Fazenda Ipanema", apelido="IPM",
-        cidade="Luziânia", uf="GO", area_ha=500, cor="#0d1f3c",
-    ))
-    db.add(Fazenda(
-        nome="Fazenda São João", apelido="SJO",
-        cidade="Cristalina", uf="GO", area_ha=300, cor="#14532d",
-    ))
-    db.commit()
+    supabase.table("fazendas").insert([
+        {"nome": "Fazenda Ipanema", "apelido": "IPM", "cidade": "Luziânia", "uf": "GO", "area_ha": 500, "cor": "#0d1f3c", "ativo": True},
+        {"nome": "Fazenda São João", "apelido": "SJO", "cidade": "Cristalina", "uf": "GO", "area_ha": 300, "cor": "#14532d", "ativo": True},
+    ]).execute()

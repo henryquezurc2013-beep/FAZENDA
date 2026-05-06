@@ -1,757 +1,749 @@
 {% extends "base.html" %}
 {% block title %}Nutrição · Fazenda Ipanema{% endblock %}
-{% block page_title %}Nutrição{% endblock %}
-{% block page_sub %}Suplementação, planos e estoque{% endblock %}
+{% block page_title %}🌾 Nutrição Animal{% endblock %}
 
 {% block content %}
-<div x-data="{ aba: 'planos' }" class="nut-wrap">
+<div x-data="{ aba: 'planos' }">
 
-  <!-- ── KPI strip ── -->
-  <div class="nut-kpi-strip" id="nut-kpi-strip">
-    <div class="nut-kpi"><div class="nut-kpi-num" id="kpi-planos">—</div><div class="nut-kpi-lbl">Planos ativos</div></div>
-    <div class="nut-kpi"><div class="nut-kpi-num" id="kpi-custo">—</div><div class="nut-kpi-lbl">Custo/mês</div></div>
-    <div class="nut-kpi nut-kpi-alert" id="kpi-critico-wrap"><div class="nut-kpi-num" id="kpi-critico">—</div><div class="nut-kpi-lbl">Estoque crítico</div></div>
-    <div class="nut-kpi"><div class="nut-kpi-num" id="kpi-sups">—</div><div class="nut-kpi-lbl">Suplementos</div></div>
+  <!-- ── KPI strip ─────────────────────────────────────────────────── -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;" id="nut-kpis">
+    <div class="kpi" onclick="mudarAba('planos')">
+      <div class="kpi-label">Planos Ativos</div>
+      <div class="kpi-value" id="kn-planos">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Custo/dia total</div>
+      <div class="kpi-value" id="kn-custo-dia">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Real vs Planejado hoje</div>
+      <div class="kpi-value" id="kn-pct">—</div>
+    </div>
+    <div class="kpi" id="kn-critico-card">
+      <div class="kpi-label">Estoque Crítico</div>
+      <div class="kpi-value" id="kn-critico">—</div>
+    </div>
   </div>
 
-  <!-- ── Tabs ── -->
-  <div class="past-tabs" style="margin-top:12px;">
-    <button :class="aba==='planos' ? 'past-tab ativo' : 'past-tab'" @click="aba='planos'">📋 Planos</button>
-    <button :class="aba==='lancamento' ? 'past-tab ativo' : 'past-tab'" @click="aba='lancamento'">⚖️ Lançamento</button>
-    <button :class="aba==='estoque' ? 'past-tab ativo' : 'past-tab'" @click="aba='estoque'">📦 Estoque</button>
-    <button :class="aba==='relatorios' ? 'past-tab ativo' : 'past-tab'" @click="aba='relatorios'">📊 Relatórios</button>
-    <button :class="aba==='suplementos' ? 'past-tab ativo' : 'past-tab'" @click="aba='suplementos'">🧪 Suplementos</button>
+  <!-- ── Tabs ─────────────────────────────────────────────────────── -->
+  <div class="past-tabs">
+    <button :class="aba==='planos'      ? 'past-tab ativo':'past-tab'" @click="aba='planos';      carregarPlanos()">📋 Planos</button>
+    <button :class="aba==='lancamento'  ? 'past-tab ativo':'past-tab'" @click="aba='lancamento';  atualizarSelectPlanos()">⚖️ Lançamento</button>
+    <button :class="aba==='estoque'     ? 'past-tab ativo':'past-tab'" @click="aba='estoque';     carregarEstoque()">📦 Estoque</button>
+    <button :class="aba==='relatorios'  ? 'past-tab ativo':'past-tab'" @click="aba='relatorios';  carregarRelatorios()">📊 Relatórios</button>
+    <button :class="aba==='suplementos' ? 'past-tab ativo':'past-tab'" @click="aba='suplementos'; renderizarSuplementos()">🧪 Suplementos</button>
   </div>
 
-  <!-- ──────────────────────── ABA PLANOS ──────────────────────────────── -->
-  <div x-show="aba==='planos'" class="tab-panel ativo" style="margin-top:16px;">
+  <!-- ══════════════════ ABA PLANOS ══════════════════════════════════ -->
+  <div x-show="aba==='planos'" style="margin-top:16px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <h3 style="font-size:15px;font-weight:700;color:#1e293b;margin:0;">Planos Nutricionais</h3>
+      <span style="font-size:13px;color:var(--muted);">Suplementação planejada por lote</span>
       <button class="btn btn-primary" onclick="abrirModalPlano()">+ Novo Plano</button>
     </div>
-    <div id="tabela-planos" class="nut-table-wrap">
-      <p style="color:#94a3b8;font-size:13px;">Carregando...</p>
+    <div id="grid-planos" style="display:flex;flex-direction:column;gap:14px;">
+      <p style="color:var(--muted);">Carregando planos...</p>
     </div>
   </div>
 
-  <!-- ──────────────────────── ABA LANÇAMENTO ──────────────────────────── -->
-  <div x-show="aba==='lancamento'" class="tab-panel" style="margin-top:16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <h3 style="font-size:15px;font-weight:700;color:#1e293b;margin:0;">Lançamentos de Ração</h3>
-      <button class="btn btn-primary" onclick="abrirModalLancamento()">+ Lançar</button>
+  <!-- ══════════════════ ABA LANÇAMENTO ══════════════════════════════ -->
+  <div x-show="aba==='lancamento'" style="margin-top:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+      <!-- Formulário -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚖️ Registrar Fornecimento</div>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Plano (lote / suplemento)</label>
+            <select id="lanc-plano" class="form-control" onchange="onLancPlano()">
+              <option value="">Selecione o plano...</option>
+            </select>
+          </div>
+          <!-- Card referência -->
+          <div id="lanc-ref" style="display:none;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:var(--ink-2);line-height:1.8;">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group">
+              <label class="form-label">Data *</label>
+              <input type="date" id="lanc-data" class="form-control">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Qtd fornecida (kg) *</label>
+              <input type="number" id="lanc-qtd" class="form-control" step="0.01" min="0.01" oninput="onLancQtd()">
+            </div>
+          </div>
+          <!-- Preview em tempo real -->
+          <div id="lanc-preview" style="display:none;padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:12px;line-height:1.8;"></div>
+          <div class="form-group">
+            <label class="form-label">Responsável</label>
+            <input type="text" id="lanc-resp" class="form-control" placeholder="Nome do operador">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Observação</label>
+            <input type="text" id="lanc-obs" class="form-control">
+          </div>
+          <button class="btn btn-primary" style="width:100%;padding:10px;" onclick="salvarLancamento()">
+            ✓ Registrar Fornecimento
+          </button>
+        </div>
+      </div>
+
+      <!-- Lançamentos de hoje -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📅 Lançamentos de Hoje</div>
+          <button class="btn btn-sm" onclick="carregarLancHoje()">↻</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div id="tabela-lanc-hoje" style="overflow-x:auto;">
+            <p style="padding:14px;color:var(--muted);">Carregando...</p>
+          </div>
+        </div>
+      </div>
     </div>
-    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-      <select id="filtro-lote-lanc" class="form-control" style="width:180px;" onchange="carregarLancamentos()">
-        <option value="">Todos os lotes</option>
+
+    <!-- Histórico completo -->
+    <div class="card" style="margin-top:16px;">
+      <div class="card-header">
+        <div class="card-title">📋 Histórico de Lançamentos</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="filtro-lote-lanc" class="form-control" style="width:160px;" onchange="carregarLancamentos()">
+            <option value="">Todos os lotes</option>
+          </select>
+          <input type="date" id="filtro-ini-lanc" class="form-control" style="width:140px;" onchange="carregarLancamentos()">
+          <input type="date" id="filtro-fim-lanc" class="form-control" style="width:140px;" onchange="carregarLancamentos()">
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div id="tabela-lancamentos" style="overflow-x:auto;">
+          <p style="padding:14px;color:var(--muted);">Carregando...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ ABA ESTOQUE ═════════════════════════════════ -->
+  <div x-show="aba==='estoque'" style="margin-top:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <span style="font-size:13px;color:var(--muted);">Posição atual de estoque por suplemento</span>
+      <button class="btn btn-primary" onclick="abrirModalEntrada()">+ Entrada de Estoque</button>
+    </div>
+    <div id="grid-estoque" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
+      <p style="color:var(--muted);">Carregando...</p>
+    </div>
+
+    <!-- Histórico de movimentações -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header">
+        <div class="card-title">📜 Movimentações de Estoque</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="filtro-sup-hist" class="form-control" style="width:180px;" onchange="carregarHistoricoGeral()">
+            <option value="">Todos os suplementos</option>
+          </select>
+          <select id="filtro-tipo-mov" class="form-control" style="width:140px;" onchange="carregarHistoricoGeral()">
+            <option value="">Todos</option>
+            <option value="ENTRADA">Entradas</option>
+            <option value="SAIDA">Saídas</option>
+            <option value="AJUSTE">Ajustes</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;" id="tabela-mov-wrap">
+        <p style="padding:14px;color:var(--muted);">Selecione um suplemento para ver o histórico</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ ABA RELATÓRIOS ══════════════════════════════ -->
+  <div x-show="aba==='relatorios'" style="margin-top:16px;">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <label class="form-label" style="margin:0;">Lote:</label>
+      <select id="rel-lote" class="form-control" style="width:180px;" onchange="carregarRelatorios()">
+        <option value="">Todos</option>
       </select>
-      <input type="date" id="filtro-ini-lanc" class="form-control" style="width:150px;" onchange="carregarLancamentos()">
-      <input type="date" id="filtro-fim-lanc" class="form-control" style="width:150px;" onchange="carregarLancamentos()">
+      <label class="form-label" style="margin:0;">Período:</label>
+      <select id="rel-periodo" class="form-control" style="width:130px;" onchange="carregarRelatorios()">
+        <option value="30">30 dias</option>
+        <option value="60">60 dias</option>
+        <option value="90">90 dias</option>
+      </select>
     </div>
-    <div id="tabela-lancamentos" class="nut-table-wrap">
-      <p style="color:#94a3b8;font-size:13px;">Carregando...</p>
-    </div>
-  </div>
 
-  <!-- ──────────────────────── ABA ESTOQUE ─────────────────────────────── -->
-  <div x-show="aba==='estoque'" class="tab-panel" style="margin-top:16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <h3 style="font-size:15px;font-weight:700;color:#1e293b;margin:0;">Estoque de Suplementos</h3>
-      <button class="btn btn-primary" onclick="abrirModalMovimento()">+ Entrada/Ajuste</button>
-    </div>
-    <div id="grid-estoque" class="nut-estoque-grid">
-      <p style="color:#94a3b8;font-size:13px;">Carregando...</p>
-    </div>
-    <div id="historico-wrap" style="margin-top:20px;display:none;">
-      <h4 id="historico-titulo" style="font-size:13px;font-weight:700;color:#475569;margin-bottom:8px;"></h4>
-      <div id="tabela-historico" class="nut-table-wrap"></div>
-    </div>
-  </div>
-
-  <!-- ──────────────────────── ABA RELATÓRIOS ──────────────────────────── -->
-  <div x-show="aba==='relatorios'" class="tab-panel" style="margin-top:16px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <!-- Consumo planejado vs real -->
       <div class="card">
-        <div class="card-header" style="font-size:13px;font-weight:700;">Custo de Suplementação por Mês</div>
+        <div class="card-header"><div class="card-title">📊 Planejado vs Real</div></div>
         <div class="card-body">
-          <canvas id="grafico-custo-mensal" height="200"></canvas>
+          <canvas id="graf-plvsr" height="220"></canvas>
         </div>
       </div>
+      <!-- CA gauge -->
       <div class="card">
-        <div class="card-header" style="font-size:13px;font-weight:700;">Conversão Alimentar (CA) por Lote</div>
+        <div class="card-header"><div class="card-title">⚡ Conversão Alimentar (CA)</div></div>
         <div class="card-body">
-          <div id="tabela-ca"></div>
+          <div id="ca-display" style="text-align:center;padding:20px 0;">
+            <div id="ca-valor" style="font-size:52px;font-weight:700;letter-spacing:-2px;color:var(--ink);">—</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:4px;">kg ração / kg ganho</div>
+            <div id="ca-badge" style="margin-top:12px;"></div>
+            <div id="ca-bar" style="height:10px;background:var(--bg-2);border-radius:5px;margin-top:16px;overflow:hidden;">
+              <div id="ca-fill" style="height:100%;width:0%;border-radius:5px;transition:width .5s;"></div>
+            </div>
+            <div id="ca-ref" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Custo nutricional -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">💰 Custo Nutricional</div></div>
+        <div class="card-body" id="custo-detalhe">
+          <p style="color:var(--muted);">—</p>
+        </div>
+      </div>
+      <!-- Custo mensal histórico -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">📈 Custo Mensal (12 meses)</div></div>
+        <div class="card-body">
+          <canvas id="graf-custo-mensal" height="220"></canvas>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ──────────────────────── ABA SUPLEMENTOS ─────────────────────────── -->
-  <div x-show="aba==='suplementos'" class="tab-panel" style="margin-top:16px;">
+  <!-- ══════════════════ ABA SUPLEMENTOS ═════════════════════════════ -->
+  <div x-show="aba==='suplementos'" style="margin-top:16px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <h3 style="font-size:15px;font-weight:700;color:#1e293b;margin:0;">Cadastro de Suplementos</h3>
+      <span style="font-size:13px;color:var(--muted);">Cadastro e gestão de suplementos minerais/proteicos</span>
       <button class="btn btn-primary" onclick="abrirModalSuplemento()">+ Novo Suplemento</button>
     </div>
-    <div id="grid-suplementos" class="nut-estoque-grid">
-      <p style="color:#94a3b8;font-size:13px;">Carregando...</p>
+    <div class="card">
+      <div class="card-body" style="padding:0;">
+        <div style="overflow-x:auto;" id="tabela-suplementos">
+          <p style="padding:14px;color:var(--muted);">Carregando...</p>
+        </div>
+      </div>
     </div>
   </div>
 
-</div><!-- /nut-wrap -->
+</div><!-- x-data -->
 
-<!-- ──────────────────────── MODAL NOVO PLANO ────────────────────────────── -->
-<div id="modal-plano" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;align-items:center;justify-content:center;">
-  <div class="nut-modal">
-    <div class="nut-modal-hdr"><span>📋 Novo Plano Nutricional</span><button onclick="fecharModalPlano()" class="nut-modal-close">✕</button></div>
-    <form id="form-plano" onsubmit="salvarPlano(event)">
-      <div class="nut-modal-body">
+<!-- ══════════════ MODAL NOVO PLANO ════════════════════════════════════ -->
+<div id="modal-plano" style="display:none;" class="modal-overlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Novo Plano Nutricional</div>
+      <button onclick="fecharModalPlano()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Lote *</label>
+        <select id="plano-lote" class="form-control" required onchange="onPlanoLote()"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Suplemento *</label>
+        <select id="plano-sup" class="form-control" required onchange="calcPreview()"></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group">
-          <label>Lote</label>
-          <select id="plano-lote" class="form-control" required></select>
+          <label class="form-label">Qtd. animais *</label>
+          <input type="number" id="plano-qtd" class="form-control" min="1" required oninput="calcPreview()">
         </div>
         <div class="form-group">
-          <label>Suplemento</label>
-          <select id="plano-sup" class="form-control" required onchange="calcularConsumo()"></select>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label>Qtd. animais</label>
-            <input type="number" id="plano-qtd" class="form-control" min="1" required onchange="calcularConsumo()">
-          </div>
-          <div class="form-group">
-            <label>Peso médio (kg)</label>
-            <input type="number" id="plano-peso" class="form-control" step="0.1" required onchange="calcularConsumo()">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label>Data início</label>
-            <input type="date" id="plano-ini" class="form-control" required>
-          </div>
-          <div class="form-group">
-            <label>Data fim (opcional)</label>
-            <input type="date" id="plano-fim" class="form-control">
-          </div>
-        </div>
-        <div id="plano-preview" class="nut-preview" style="display:none;"></div>
-        <div class="form-group">
-          <label>Obs.</label>
-          <input type="text" id="plano-obs" class="form-control">
+          <label class="form-label">Peso médio (kg) *</label>
+          <input type="number" id="plano-peso" class="form-control" step="0.1" required oninput="calcPreview()">
         </div>
       </div>
-      <div class="nut-modal-ftr">
-        <button type="button" class="btn" onclick="fecharModalPlano()">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Salvar Plano</button>
+      <div class="form-group">
+        <label class="form-label">Data início *</label>
+        <input type="date" id="plano-ini" class="form-control" required>
       </div>
-    </form>
+      <div id="plano-preview" style="display:none;background:var(--good-soft);border:1px solid var(--good);border-radius:8px;padding:12px;font-size:12px;color:var(--ink-2);line-height:1.9;margin-bottom:10px;"></div>
+      <div class="form-group">
+        <label class="form-label">Observação</label>
+        <input type="text" id="plano-obs" class="form-control">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="fecharModalPlano()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="salvarPlano()">Salvar Plano</button>
+    </div>
   </div>
 </div>
 
-<!-- ──────────────────────── MODAL LANÇAMENTO ────────────────────────────── -->
-<div id="modal-lancamento" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;align-items:center;justify-content:center;">
-  <div class="nut-modal">
-    <div class="nut-modal-hdr"><span>⚖️ Lançar Ração</span><button onclick="fecharModalLancamento()" class="nut-modal-close">✕</button></div>
-    <form id="form-lancamento" onsubmit="salvarLancamento(event)">
-      <div class="nut-modal-body">
+<!-- ══════════════ MODAL ENTRADA ESTOQUE ═══════════════════════════════ -->
+<div id="modal-entrada" style="display:none;" class="modal-overlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">📦 Entrada de Estoque</div>
+      <button onclick="fecharModalEntrada()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Suplemento *</label>
+        <select id="ent-sup" class="form-control" required></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group">
-          <label>Plano</label>
-          <select id="lanc-plano" class="form-control" required onchange="preencherLancPlano()"></select>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label>Data</label>
-            <input type="date" id="lanc-data" class="form-control" required>
-          </div>
-          <div class="form-group">
-            <label>Qtd. fornecida (kg)</label>
-            <input type="number" id="lanc-qtd" class="form-control" step="0.01" required>
-          </div>
+          <label class="form-label">Data *</label>
+          <input type="date" id="ent-data" class="form-control" required>
         </div>
         <div class="form-group">
-          <label>Qtd. planejada (kg)</label>
-          <input type="number" id="lanc-planej" class="form-control" step="0.01">
-        </div>
-        <div class="form-group">
-          <label>Responsável</label>
-          <input type="text" id="lanc-resp" class="form-control">
-        </div>
-        <div class="form-group">
-          <label>Obs.</label>
-          <input type="text" id="lanc-obs" class="form-control">
+          <label class="form-label">Quantidade (kg) *</label>
+          <input type="number" id="ent-qtd" class="form-control" step="0.001" required oninput="calcValorEntrada()">
         </div>
       </div>
-      <div class="nut-modal-ftr">
-        <button type="button" class="btn" onclick="fecharModalLancamento()">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Registrar</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Preço/kg (R$) *</label>
+          <input type="number" id="ent-preco" class="form-control" step="0.01" required oninput="calcValorEntrada()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor total</label>
+          <input type="text" id="ent-valor" class="form-control" readonly style="background:var(--surface-2);">
+        </div>
       </div>
-    </form>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Fornecedor</label>
+          <input type="text" id="ent-fornec" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nota Fiscal</label>
+          <input type="text" id="ent-nf" class="form-control">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observação</label>
+        <input type="text" id="ent-obs" class="form-control">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="fecharModalEntrada()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="salvarEntrada()">Registrar Entrada</button>
+    </div>
   </div>
 </div>
 
-<!-- ──────────────────────── MODAL MOVIMENTO ESTOQUE ─────────────────────── -->
-<div id="modal-movimento" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;align-items:center;justify-content:center;">
-  <div class="nut-modal">
-    <div class="nut-modal-hdr"><span>📦 Movimento de Estoque</span><button onclick="fecharModalMovimento()" class="nut-modal-close">✕</button></div>
-    <form id="form-movimento" onsubmit="salvarMovimento(event)">
-      <div class="nut-modal-body">
-        <div class="form-group">
-          <label>Suplemento</label>
-          <select id="mov-sup" class="form-control" required></select>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label>Tipo</label>
-            <select id="mov-tipo" class="form-control" required>
-              <option value="ENTRADA">Entrada</option>
-              <option value="SAIDA">Saída manual</option>
-              <option value="AJUSTE">Ajuste de inventário</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Data</label>
-            <input type="date" id="mov-data" class="form-control" required>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label>Quantidade (kg)</label>
-            <input type="number" id="mov-qtd" class="form-control" step="0.001" required>
-          </div>
-          <div class="form-group">
-            <label>Preço/kg (R$)</label>
-            <input type="number" id="mov-preco" class="form-control" step="0.01">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Fornecedor</label>
-          <input type="text" id="mov-fornec" class="form-control">
-        </div>
-        <div class="form-group">
-          <label>Nota Fiscal</label>
-          <input type="text" id="mov-nf" class="form-control">
-        </div>
-        <div class="form-group">
-          <label>Obs.</label>
-          <input type="text" id="mov-obs" class="form-control">
-        </div>
-      </div>
-      <div class="nut-modal-ftr">
-        <button type="button" class="btn" onclick="fecharModalMovimento()">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Salvar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ──────────────────────── MODAL SUPLEMENTO ────────────────────────────── -->
-<div id="modal-suplemento" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;align-items:center;justify-content:center;">
-  <div class="nut-modal">
-    <div class="nut-modal-hdr"><span id="sup-modal-titulo">🧪 Novo Suplemento</span><button onclick="fecharModalSuplemento()" class="nut-modal-close">✕</button></div>
-    <form id="form-suplemento" onsubmit="salvarSuplemento(event)">
+<!-- ══════════════ MODAL SUPLEMENTO ════════════════════════════════════ -->
+<div id="modal-sup" style="display:none;" class="modal-overlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="sup-modal-titulo">🧪 Novo Suplemento</div>
+      <button onclick="fecharModalSuplemento()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+    <div class="modal-body">
       <input type="hidden" id="sup-id">
-      <div class="nut-modal-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group" style="grid-column:1/-1;">
-            <label>Nome *</label>
-            <input type="text" id="sup-nome" class="form-control" required>
-          </div>
-          <div class="form-group">
-            <label>Tipo *</label>
-            <select id="sup-tipo" class="form-control" required>
-              <option value="MINERAL">Mineral</option>
-              <option value="PROTEICO">Proteico</option>
-              <option value="ENERGETICO">Energético</option>
-              <option value="PROTEINADO">Proteinado</option>
-              <option value="OUTRO">Outro</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Fabricante</label>
-            <input type="text" id="sup-fab" class="form-control">
-          </div>
-          <div class="form-group">
-            <label>Preço/kg (R$) *</label>
-            <input type="number" id="sup-preco" class="form-control" step="0.01" required>
-          </div>
-          <div class="form-group">
-            <label>Objetivo</label>
-            <input type="text" id="sup-obj" class="form-control">
-          </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Nome *</label>
+          <input type="text" id="sup-nome" class="form-control" required>
         </div>
-        <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-top:4px;">
-          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px;">DOSAGEM (deixe em branco para usar g fixo)</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
-            <div class="form-group" style="margin:0;">
-              <label style="font-size:11px;">% PV mín</label>
-              <input type="number" id="sup-pct-min" class="form-control" step="0.001" placeholder="ex: 0.05">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label style="font-size:11px;">% PV máx</label>
-              <input type="number" id="sup-pct-max" class="form-control" step="0.001" placeholder="ex: 0.08">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label style="font-size:11px;">g/dia mín</label>
-              <input type="number" id="sup-g-min" class="form-control" step="1" placeholder="g/dia">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label style="font-size:11px;">g/dia máx</label>
-              <input type="number" id="sup-g-max" class="form-control" step="1" placeholder="g/dia">
-            </div>
-          </div>
+        <div class="form-group">
+          <label class="form-label">Tipo *</label>
+          <select id="sup-tipo" class="form-control" required onchange="onSupTipo()">
+            <option value="SAL_MINERAL">Sal Mineral</option>
+            <option value="SAL_PROTEINADO">Sal Proteinado</option>
+            <option value="PROT_ENERGETICO">Proteico Energético</option>
+            <option value="RACAO_SEMICONFINADO">Ração Semiconfinamento</option>
+            <option value="VOLUMOSO_SILAGEM">Volumoso / Silagem</option>
+            <option value="CONCENTRADO_LEITE">Concentrado Leite</option>
+          </select>
         </div>
-        <div class="form-group" style="margin-top:10px;">
-          <label>Obs.</label>
-          <input type="text" id="sup-obs" class="form-control">
+        <div class="form-group">
+          <label class="form-label">Fabricante</label>
+          <input type="text" id="sup-fab" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preço/kg (R$) *</label>
+          <input type="number" id="sup-preco" class="form-control" step="0.01" required oninput="simularSup()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Objetivo</label>
+          <input type="text" id="sup-obj" class="form-control">
         </div>
       </div>
-      <div class="nut-modal-ftr">
-        <button type="button" class="btn" onclick="fecharModalSuplemento()">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Salvar</button>
+      <!-- Dosagem -->
+      <div style="background:var(--bg-2);border-radius:8px;padding:12px;margin:10px 0;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Dosagem</div>
+        <div id="dosagem-pct" style="display:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">% PV mínimo</label>
+            <input type="number" id="sup-pct-min" class="form-control" step="0.0001" placeholder="ex: 0.001" oninput="simularSup()">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">% PV máximo</label>
+            <input type="number" id="sup-pct-max" class="form-control" step="0.0001" placeholder="ex: 0.003" oninput="simularSup()">
+          </div>
+        </div>
+        <div id="dosagem-g" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">g/cab/dia mínimo</label>
+            <input type="number" id="sup-g-min" class="form-control" step="1" placeholder="g/dia" oninput="simularSup()">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">g/cab/dia máximo</label>
+            <input type="number" id="sup-g-max" class="form-control" step="1" placeholder="g/dia" oninput="simularSup()">
+          </div>
+        </div>
       </div>
-    </form>
+      <!-- Simulador integrado -->
+      <div style="background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:var(--accent-ink);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Simulador (sem salvar)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <label class="form-label">Peso médio (kg)</label>
+            <input type="number" id="sim-peso" class="form-control" placeholder="380" oninput="simularSup()">
+          </div>
+          <div>
+            <label class="form-label">Qtd. animais</label>
+            <input type="number" id="sim-qtd" class="form-control" placeholder="20" oninput="simularSup()">
+          </div>
+        </div>
+        <div id="sim-result" style="font-size:12px;color:var(--accent-ink);line-height:1.8;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observação</label>
+        <input type="text" id="sup-obs" class="form-control">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="fecharModalSuplemento()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="salvarSuplemento()">Salvar Suplemento</button>
+    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <style>
-/* ── Nutrição ──────────────────────────────────────────────────────────── */
-.nut-wrap { padding: 0 0 40px; }
-.nut-kpi-strip {
-  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
+/* ── Nutrição extra ───────────────────────────────────────────── */
+.nut-plano-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
 }
-.nut-kpi {
-  flex: 1; min-width: 120px;
-  background: #fff; border: 1px solid #e2e8f0;
-  border-radius: 10px; padding: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+.nut-plano-hdr {
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  padding: 14px 18px; display: flex; align-items: flex-start;
+  justify-content: space-between;
 }
-.nut-kpi-alert { border-color: #fca5a5; background: #fff5f5; }
-.nut-kpi-num {
-  font-size: 24px; font-weight: 800;
-  color: #1e293b; line-height: 1;
+.nut-plano-hdr-left h3 {
+  font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 4px;
 }
-.nut-kpi-lbl { font-size: 11px; color: #94a3b8; margin-top: 4px; }
-
-.nut-table-wrap { overflow-x: auto; }
-.nut-table {
-  width: 100%; border-collapse: collapse; font-size: 13px;
+.nut-plano-body { padding: 16px 18px; }
+.nut-cons-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; margin: 12px 0;
 }
-.nut-table th {
-  text-align: left; padding: 8px 10px;
-  background: #f8fafc; color: #64748b;
-  font-size: 11px; font-weight: 700; border-bottom: 1px solid #e2e8f0;
+.nut-cons-cell {
+  background: var(--surface-2); padding: 10px 12px; text-align: center;
 }
-.nut-table td {
-  padding: 9px 10px; border-bottom: 1px solid #f1f5f9;
-  color: #334155; vertical-align: middle;
+.nut-cons-cell-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing:.05em; }
+.nut-cons-cell-val { font-size: 15px; font-weight: 700; color: var(--ink); margin: 3px 0 1px; }
+.nut-cons-cell-sub { font-size: 11px; color: var(--muted-2); }
+.nut-prog-wrap { margin: 10px 0; }
+.nut-prog-bar { height: 8px; background: var(--bg-2); border-radius: 4px; overflow: hidden; margin: 4px 0; }
+.nut-prog-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+.nut-plano-footer {
+  padding: 10px 18px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: center;
 }
-.nut-table tr:hover td { background: #f8fafc; }
-
-.nut-estoque-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
+.nut-custo-row {
+  display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted);
+  margin-top: 8px;
 }
-.nut-est-card {
-  background: #fff; border: 1px solid #e2e8f0;
-  border-radius: 10px; padding: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+.nut-custo-row b { color: var(--ink); }
+.est-card-crit { border-color: var(--bad)!important; animation: est-pulse 1.5s ease-in-out infinite; }
+@keyframes est-pulse {
+  0%,100% { box-shadow: 0 0 0 0 oklch(0.78 0.16 25 / 0); }
+  50%      { box-shadow: 0 0 0 4px oklch(0.78 0.16 25 / 0.25); }
 }
-.nut-est-card.critico { border-color: #fca5a5; background: #fff5f5; }
-.nut-est-card.baixo   { border-color: #fde68a; background: #fffbeb; }
-.nut-est-card-nome    { font-size: 13px; font-weight: 700; color: #1e293b; }
-.nut-est-card-tipo    { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing:.5px; }
-.nut-est-card-saldo   { font-size: 22px; font-weight: 800; color: #1e293b; margin: 8px 0 2px; }
-.nut-est-card-dias    { font-size: 12px; color: #64748b; }
-.nut-est-card-sit     { font-size: 10px; font-weight: 700; margin-top:6px; padding: 2px 8px;
-                         border-radius: 99px; display:inline-block; }
-.sit-OK      { background:#d1fae5; color:#065f46; }
-.sit-BAIXO   { background:#fef9c3; color:#78350f; }
-.sit-CRITICO { background:#fee2e2; color:#991b1b; }
-.sit-SEM_DADOS { background:#f3f4f6; color:#6b7280; }
-.nut-est-card-btn { margin-top:8px; font-size:11px; }
-
-.ca-EXCELENTE { color:#065f46; font-weight:700; }
-.ca-BOM       { color:#1d4ed8; font-weight:700; }
-.ca-REGULAR   { color:#92400e; font-weight:700; }
-.ca-RUIM      { color:#991b1b; font-weight:700; }
-.ca-SEM_DADOS { color:#9ca3af; }
-
-.nut-modal {
-  background:#fff; border-radius:14px;
-  width:min(520px,95vw); max-height:90vh; overflow-y:auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,.25);
-  display:flex; flex-direction:column;
-}
-.nut-modal-hdr {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:16px 20px 12px; border-bottom:1px solid #e2e8f0;
-  font-size:14px; font-weight:700; color:#1e293b;
-}
-.nut-modal-close {
-  background:none; border:none; font-size:18px; cursor:pointer;
-  color:#94a3b8; padding:0 4px;
-}
-.nut-modal-body { padding:16px 20px; flex:1; }
-.nut-modal-ftr  { padding:12px 20px; border-top:1px solid #e2e8f0;
-                   display:flex; gap:8px; justify-content:flex-end; }
-
-.nut-preview {
-  background:#f0fdf4; border:1px solid #bbf7d0;
-  border-radius:8px; padding:12px; margin-top:8px; font-size:12px;
-  color:#065f46; line-height:1.7;
-}
+.mov-ENTRADA { color: var(--good); }
+.mov-SAIDA   { color: var(--bad); }
+.mov-AJUSTE  { color: var(--warn); }
 </style>
 
 <script>
-let _suplementos = [];
-let _planos      = [];
-let _lotes       = [];
-let _graficoCusto = null;
+let _sups   = [];
+let _planos = [];
+let _lotes  = [];
+let _grafPlvsr = null;
+let _grafMensal = null;
 
-async function carregarTudo() {
+/* ── inicialização ─────────────────────────────────────────────── */
+async function nutInit() {
   const [ks, kp, kl] = await Promise.all([
-    fetch('/nutricao/suplementos').then(r=>r.json()),
-    fetch('/nutricao/planos').then(r=>r.json()),
+    fetch('/nutricao/suplementos').then(r=>r.json()).catch(()=>[]),
+    fetch('/nutricao/planos').then(r=>r.json()).catch(()=>[]),
     fetch('/pastagem/lotes').then(r=>r.json()).catch(()=>[]),
   ]);
-  _suplementos = ks;
-  _planos = kp;
-  _lotes  = Array.isArray(kl) ? kl : (kl.lista || []);
-  _preencherSelects();
+  _sups   = Array.isArray(ks) ? ks : [];
+  _planos = Array.isArray(kp) ? kp : [];
+  _lotes  = Array.isArray(kl) ? kl : (kl?.lista || []);
+  _populateSelects();
   carregarKpis();
-  renderizarPlanos();
-  carregarLancamentos();
-  carregarEstoque();
-  carregarRelatorios();
-  renderizarSuplemetos();
+  carregarPlanos();
 }
 
+function mudarAba(nome) {
+  // Trigger Alpine tab change via click
+  const btn = [...document.querySelectorAll('.past-tab')].find(b => b.textContent.toLowerCase().includes(nome));
+  if (btn) btn.click();
+}
+
+/* ── KPIs ──────────────────────────────────────────────────────── */
 async function carregarKpis() {
-  const r = await fetch('/nutricao/relatorios/resumo').then(r=>r.json()).catch(()=>({}));
-  document.getElementById('kpi-planos').textContent   = r.planos_ativos ?? '—';
-  document.getElementById('kpi-custo').textContent    = r.custo_mes != null ? fmtMoeda(r.custo_mes) : '—';
-  document.getElementById('kpi-critico').textContent  = r.estoque_critico ?? '—';
-  document.getElementById('kpi-sups').textContent     = r.total_suplementos ?? '—';
-  const cw = document.getElementById('kpi-critico-wrap');
-  if (r.estoque_critico > 0) cw.classList.add('nut-kpi-alert');
-  else cw.classList.remove('nut-kpi-alert');
+  const r = await fetch('/nutricao/relatorio/dashboard').then(r=>r.json()).catch(()=>({}));
+  const el = id => document.getElementById(id);
+  el('kn-planos').textContent    = r.lotes_com_plano ?? '—';
+  el('kn-custo-dia').textContent = r.custo_dia_total != null ? fmtMoeda(r.custo_dia_total) : '—';
+  el('kn-pct').textContent       = r.consumo_real_vs_planejado_pct != null ? r.consumo_real_vs_planejado_pct+'%' : '—';
+  const crit = (r.estoque_critico||[]).length;
+  el('kn-critico').textContent   = crit || '—';
+  const cc = el('kn-critico-card');
+  if (crit > 0) { cc.style.borderColor = 'var(--bad)'; cc.style.background = 'var(--bad-soft)'; }
 }
 
-function _preencherSelects() {
-  // Lotes
-  const selLote = document.getElementById('plano-lote');
-  const filtLote = document.getElementById('filtro-lote-lanc');
-  if (selLote) {
-    selLote.innerHTML = '<option value="">Selecione...</option>' +
-      _lotes.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('');
-  }
-  if (filtLote) {
-    filtLote.innerHTML = '<option value="">Todos os lotes</option>' +
-      _lotes.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('');
-  }
-  // Suplementos
-  const sups = _suplementos.filter(s=>s.ativo);
-  ['plano-sup','mov-sup'].forEach(id=>{
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = '<option value="">Selecione...</option>' +
-      sups.map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
-  });
-  // Planos
-  const selPlano = document.getElementById('lanc-plano');
-  if (selPlano) {
-    selPlano.innerHTML = '<option value="">Selecione...</option>' +
-      _planos.filter(p=>p.status==='ATIVO').map(p=>
-        `<option value="${p.id}">[${p.lote_nome}] ${p.suplemento_nome}</option>`
-      ).join('');
-  }
+/* ── selects ───────────────────────────────────────────────────── */
+function _populateSelects() {
+  const loteOpts = '<option value="">Selecione...</option>' + _lotes.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('');
+  const supOpts  = '<option value="">Selecione...</option>' + _sups.filter(s=>s.ativo).map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
+  const supOptsAll = '<option value="">Todos</option>' + _sups.map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
+
+  _setIf('plano-lote', loteOpts);
+  _setIf('plano-sup',  supOpts);
+  _setIf('ent-sup',    supOpts);
+  _setIf('filtro-sup-hist', supOptsAll);
+
+  const loteOptsAll = '<option value="">Todos os lotes</option>' + _lotes.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('');
+  _setIf('filtro-lote-lanc', loteOptsAll);
+  _setIf('rel-lote', '<option value="">Todos</option>' + _lotes.map(l=>`<option value="${l.id}">${l.nome}</option>`).join(''));
+
+  atualizarSelectPlanos();
+}
+function _setIf(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
+
+function atualizarSelectPlanos() {
+  const ativos = _planos.filter(p=>p.status==='ATIVO');
+  _setIf('lanc-plano', '<option value="">Selecione o plano...</option>' + ativos.map(p=>`<option value="${p.id}">[${p.lote_nome}] ${p.suplemento_nome}</option>`).join(''));
 }
 
-// ── Planos ────────────────────────────────────────────────────────────────────
+/* ── ABA PLANOS ────────────────────────────────────────────────── */
+async function carregarPlanos() {
+  const kp = await fetch('/nutricao/planos').then(r=>r.json()).catch(()=>[]);
+  _planos = Array.isArray(kp) ? kp : [];
+  atualizarSelectPlanos();
+  renderizarPlanos();
+}
 
 function renderizarPlanos() {
-  const el = document.getElementById('tabela-planos');
+  const el = document.getElementById('grid-planos');
   if (!_planos.length) {
-    el.innerHTML = '<p style="color:#94a3b8;font-size:13px;">Nenhum plano cadastrado.</p>';
+    el.innerHTML = '<p style="color:var(--muted);">Nenhum plano cadastrado. Crie o primeiro plano clicando em "+ Novo Plano".</p>';
     return;
   }
-  el.innerHTML = `
-    <table class="nut-table">
-      <thead><tr>
-        <th>Lote</th><th>Suplemento</th><th>Início</th><th>Fim</th>
-        <th>Animais</th><th>Consumo méd.</th><th>Custo/dia</th><th>Custo/mês</th>
-        <th>Status</th><th></th>
-      </tr></thead>
-      <tbody>${_planos.map(p=>`
-        <tr>
-          <td>${p.lote_nome}</td>
-          <td>${p.suplemento_nome}</td>
-          <td>${fmtData(p.data_inicio)}</td>
-          <td>${p.data_fim ? fmtData(p.data_fim) : '—'}</td>
-          <td>${p.qtd_animais}</td>
-          <td>${p.consumo_med_g ? p.consumo_med_g+'g' : '—'}</td>
-          <td>${p.custo_dia_est ? fmtMoeda(p.custo_dia_est) : '—'}</td>
-          <td>${p.custo_mes_est ? fmtMoeda(p.custo_mes_est) : '—'}</td>
-          <td><span class="badge ${p.status==='ATIVO'?'badge-verde':'badge-cinza'}">${p.status}</span></td>
-          <td><button class="btn btn-sm btn-danger" onclick="excluirPlano(${p.id})">🗑</button></td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+  el.innerHTML = _planos.map(p => {
+    const consumoMedLote = p.consumo_med_lote_dia_kg || 0;
+    const hoje = p.consumo_hoje_kg || 0;
+    const pctBarra = consumoMedLote > 0 ? Math.min(100, Math.round(hoje/consumoMedLote*100)) : 0;
+    const barColor  = hoje===0 ? 'var(--border)' : (hoje > consumoMedLote*1.05 ? 'var(--warn)' : 'var(--good)');
+    const badgeLanc = hoje===0 ? `<span class="badge badge-gray">Não lançado hoje</span>`
+                    : hoje > consumoMedLote*1.05 ? `<span class="badge badge-amber">Excesso</span>`
+                    : `<span class="badge badge-green">${pctBarra}% planejado</span>`;
+    const caColor   = {'EXCELENTE':'var(--good)','BOM':'oklch(0.78 0.10 250)','REGULAR':'var(--warn)','RUIM':'var(--bad)','SEM_DADOS':'var(--muted)'}[p.ca_classificacao];
+    const estColor  = {'OK':'var(--good)','BAIXO':'var(--warn)','CRITICO':'var(--bad)','SEM_DADOS':'var(--muted)'}[p.estoque_situacao];
+    const tipoBadge = p.suplemento_tipo ? `<span class="badge badge-accent">${p.suplemento_tipo.replace(/_/g,' ')}</span>` : '';
+    return `
+    <div class="nut-plano-card">
+      <div class="nut-plano-hdr">
+        <div class="nut-plano-hdr-left">
+          <h3>${p.lote_nome}</h3>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            ${tipoBadge}
+            <span class="badge ${p.status==='ATIVO'?'badge-green':'badge-gray'}">${p.status}</span>
+            <span style="font-size:11px;color:var(--muted);">${p.qtd_animais} animais · ${p.peso_medio_kg} kg médio · ${p.dias_em_vigor}d em vigor</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-primary" onclick="abrirLancDe(${p.id})">+ Lançar</button>
+          <button class="btn btn-sm btn-danger" onclick="encerrarPlano(${p.id})" title="Encerrar plano">✕</button>
+        </div>
+      </div>
+      <div class="nut-plano-body">
+        <div style="font-weight:600;color:var(--ink);">${p.suplemento_nome}</div>
+        <div class="nut-cons-grid">
+          <div class="nut-cons-cell">
+            <div class="nut-cons-cell-lbl">Mínimo</div>
+            <div class="nut-cons-cell-val">${p.consumo_min_g}g</div>
+            <div class="nut-cons-cell-sub">${(p.consumo_min_g/1000*p.qtd_animais).toFixed(2)} kg/lote</div>
+          </div>
+          <div class="nut-cons-cell">
+            <div class="nut-cons-cell-lbl">Médio</div>
+            <div class="nut-cons-cell-val" style="color:var(--accent-ink);">${p.consumo_med_g}g</div>
+            <div class="nut-cons-cell-sub">${consumoMedLote.toFixed(2)} kg/lote</div>
+          </div>
+          <div class="nut-cons-cell">
+            <div class="nut-cons-cell-lbl">Máximo</div>
+            <div class="nut-cons-cell-val">${p.consumo_max_g}g</div>
+            <div class="nut-cons-cell-sub">${(p.consumo_max_g/1000*p.qtd_animais).toFixed(2)} kg/lote</div>
+          </div>
+        </div>
+        <!-- Progresso hoje -->
+        <div class="nut-prog-wrap">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
+            <span>Hoje: ${hoje} kg fornecido de ${consumoMedLote.toFixed(2)} kg planejados</span>
+            ${badgeLanc}
+          </div>
+          <div class="nut-prog-bar">
+            <div class="nut-prog-fill" style="width:${pctBarra}%;background:${barColor};"></div>
+          </div>
+        </div>
+        <!-- Custo -->
+        <div class="nut-custo-row">
+          <span><b>${fmtMoeda(p.custo_dia_est||0)}</b>/lote/dia</span>
+          <span><b>${fmtMoeda((p.custo_dia_est||0)/p.qtd_animais)}</b>/cab/dia</span>
+          <span><b>${fmtMoeda(p.custo_mes_est||0)}</b>/lote/mês</span>
+        </div>
+        <!-- CA -->
+        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          ${p.ca != null
+            ? `<span style="font-size:12px;color:var(--muted);">CA: <b style="color:${caColor};">${p.ca}</b> kg ração/kg ganho · <span style="color:${caColor};font-weight:700;">${p.ca_classificacao}</span></span>`
+            : `<span style="font-size:12px;color:var(--muted);">CA: registre pesagens para calcular</span>`}
+          <span style="font-size:12px;color:${estColor};font-weight:600;">Estoque: ${p.estoque_saldo_kg ?? 0} kg${p.estoque_dias ? ' · '+p.estoque_dias+'d' : ''} · ${p.estoque_situacao}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── ABA LANÇAMENTO ────────────────────────────────────────────── */
+function onLancPlano() {
+  const pid = parseInt(document.getElementById('lanc-plano').value);
+  const p   = _planos.find(x=>x.id===pid);
+  const ref = document.getElementById('lanc-ref');
+  if (!p) { ref.style.display='none'; return; }
+  ref.style.display = 'block';
+  ref.innerHTML = `
+    <b>Lote:</b> ${p.lote_nome} · ${p.qtd_animais} animais · ${p.peso_medio_kg} kg médio<br>
+    <b>Suplemento:</b> ${p.suplemento_nome}<br>
+    <b>Consumo planejado hoje:</b> <span style="color:var(--accent-ink);font-weight:700;">${p.consumo_med_lote_dia_kg?.toFixed(2)} kg</span>
+    &nbsp;|&nbsp; min: ${(p.consumo_min_g/1000*p.qtd_animais).toFixed(2)} kg &nbsp;max: ${(p.consumo_max_g/1000*p.qtd_animais).toFixed(2)} kg<br>
+    <b>Custo estimado:</b> ${fmtMoeda(p.custo_dia_est||0)}/dia
+    &nbsp;|&nbsp; Estoque: <span style="color:${p.estoque_situacao==='CRITICO'?'var(--bad)':'var(--good)'};">
+      ${p.estoque_saldo_kg ?? 0} kg${p.estoque_dias ? ' ('+p.estoque_dias+' dias)' : ''}
+    </span>`;
+  // sugerir qtd planejada
+  const qtdEl = document.getElementById('lanc-qtd');
+  if (!qtdEl.value) qtdEl.value = p.consumo_med_lote_dia_kg?.toFixed(2) || '';
+  onLancQtd();
+}
+
+function onLancQtd() {
+  const pid = parseInt(document.getElementById('lanc-plano').value);
+  const p   = _planos.find(x=>x.id===pid);
+  const qtd = parseFloat(document.getElementById('lanc-qtd').value);
+  const prev = document.getElementById('lanc-preview');
+  if (!p || !qtd) { prev.style.display='none'; return; }
+  const plan = p.consumo_med_lote_dia_kg || 0;
+  const dif  = qtd - plan;
+  const pct  = plan > 0 ? Math.round(qtd/plan*100) : 0;
+  const custo = qtd * (p.preco_kg_snap || 0);
+  const difColor = dif >= 0 ? 'var(--good)' : 'var(--bad)';
+  const bgColor  = Math.abs(dif) < 0.1 ? 'var(--good-soft)' : 'var(--warn-soft)';
+  prev.style.display = 'block';
+  prev.style.background = bgColor;
+  prev.style.border = '1px solid var(--border)';
+  prev.style.borderRadius = '8px';
+  prev.style.padding = '10px 12px';
+  prev.innerHTML = `
+    <span>Diferença: <b style="color:${difColor};">${dif>=0?'+':''}${dif.toFixed(3)} kg</b></span>
+    &nbsp;·&nbsp; <span>Custo real: <b>${fmtMoeda(custo)}</b></span>
+    &nbsp;·&nbsp; <span>% do planejado: <b>${pct}%</b></span>`;
+}
+
+async function abrirLancDe(planoId) {
+  document.getElementById('lanc-plano').value = planoId;
+  document.getElementById('lanc-data').value  = new Date().toISOString().slice(0,10);
+  onLancPlano();
+  // trocar para aba lançamento
+  mudarAba('lancamento');
+}
+
+async function carregarLancHoje() {
+  const hoje = new Date().toISOString().slice(0,10);
+  const rows = await fetch(`/nutricao/lancamentos?data_ini=${hoje}&data_fim=${hoje}`).then(r=>r.json()).catch(()=>[]);
+  const el = document.getElementById('tabela-lanc-hoje');
+  if (!rows.length) { el.innerHTML = '<p style="padding:14px;color:var(--muted);">Nenhum lançamento hoje.</p>'; return; }
+  el.innerHTML = `<table class="table"><thead><tr>
+    <th>Lote</th><th>Suplemento</th><th>Fornecido</th><th>Planejado</th><th>Diferença</th><th>Custo</th><th>Resp.</th>
+  </tr></thead><tbody>${rows.map(r=>{
+    const d = r.diferenca_kg;
+    const dc = d==null?'':d>=0?'color:var(--good)':'color:var(--bad)';
+    return `<tr>
+      <td>${r.lote_nome}</td><td>${r.suplemento_nome}</td>
+      <td>${r.qtd_fornecida_kg} kg</td>
+      <td>${r.qtd_planejada_kg!=null?r.qtd_planejada_kg+' kg':'—'}</td>
+      <td style="${dc}">${d!=null?(d>=0?'+':'')+d+' kg':'—'}</td>
+      <td>${r.custo_real?fmtMoeda(r.custo_real):'—'}</td>
+      <td>${r.responsavel||'—'}</td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
 }
 
 async function carregarLancamentos() {
-  const loteId  = document.getElementById('filtro-lote-lanc')?.value || '';
-  const dataIni = document.getElementById('filtro-ini-lanc')?.value || '';
-  const dataFim = document.getElementById('filtro-fim-lanc')?.value || '';
+  const loteId = document.getElementById('filtro-lote-lanc')?.value || '';
+  const ini    = document.getElementById('filtro-ini-lanc')?.value  || '';
+  const fim    = document.getElementById('filtro-fim-lanc')?.value  || '';
   let url = '/nutricao/lancamentos?';
-  if (loteId)  url += `lote_id=${loteId}&`;
-  if (dataIni) url += `data_ini=${dataIni}&`;
-  if (dataFim) url += `data_fim=${dataFim}&`;
+  if (loteId) url += `lote_id=${loteId}&`;
+  if (ini)    url += `data_ini=${ini}&`;
+  if (fim)    url += `data_fim=${fim}&`;
   const rows = await fetch(url).then(r=>r.json()).catch(()=>[]);
   const el = document.getElementById('tabela-lancamentos');
-  if (!rows.length) {
-    el.innerHTML = '<p style="color:#94a3b8;font-size:13px;">Nenhum lançamento encontrado.</p>';
-    return;
-  }
-  el.innerHTML = `
-    <table class="nut-table">
-      <thead><tr>
-        <th>Data</th><th>Lote</th><th>Suplemento</th>
-        <th>Fornecido</th><th>Planejado</th><th>Diferença</th>
-        <th>Custo Real</th><th>Responsável</th><th></th>
-      </tr></thead>
-      <tbody>${rows.map(r=>{
-        const dif = r.diferenca_kg;
-        const difCls = dif==null?'':dif>0?'style="color:#16a34a"':'style="color:#dc2626"';
-        return `<tr>
-          <td>${fmtData(r.data)}</td>
-          <td>${r.lote_nome}</td>
-          <td>${r.suplemento_nome}</td>
-          <td>${r.qtd_fornecida_kg} kg</td>
-          <td>${r.qtd_planejada_kg!=null ? r.qtd_planejada_kg+' kg' : '—'}</td>
-          <td ${difCls}>${dif!=null?(dif>0?'+':'')+dif+' kg':'—'}</td>
-          <td>${r.custo_real ? fmtMoeda(r.custo_real) : '—'}</td>
-          <td>${r.responsavel || '—'}</td>
-          <td><button class="btn btn-sm btn-danger" onclick="excluirLancamento(${r.id})">🗑</button></td>
-        </tr>`;
-      }).join('')}
-      </tbody>
-    </table>`;
+  if (!rows.length) { el.innerHTML = '<p style="padding:14px;color:var(--muted);">Nenhum lançamento encontrado.</p>'; return; }
+  el.innerHTML = `<table class="table"><thead><tr>
+    <th>Data</th><th>Lote</th><th>Suplemento</th><th>Fornecido</th><th>Planejado</th><th>Diferença</th><th>Custo</th><th>Resp.</th><th></th>
+  </tr></thead><tbody>${rows.map(r=>{
+    const d = r.diferenca_kg;
+    const dc = d==null?'':d>=0?'color:var(--good)':'color:var(--bad)';
+    return `<tr>
+      <td>${fmtData(r.data)}</td><td>${r.lote_nome}</td><td>${r.suplemento_nome}</td>
+      <td>${r.qtd_fornecida_kg} kg</td>
+      <td>${r.qtd_planejada_kg!=null?r.qtd_planejada_kg+' kg':'—'}</td>
+      <td style="${dc}">${d!=null?(d>=0?'+':'')+d+' kg':'—'}</td>
+      <td>${r.custo_real?fmtMoeda(r.custo_real):'—'}</td>
+      <td>${r.responsavel||'—'}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="excluirLancamento(${r.id})">🗑</button></td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
 }
 
-async function carregarEstoque() {
-  const rows = await fetch('/nutricao/estoque').then(r=>r.json()).catch(()=>[]);
-  const el = document.getElementById('grid-estoque');
-  if (!rows.length) {
-    el.innerHTML = '<p style="color:#94a3b8;font-size:13px;">Nenhum suplemento ativo.</p>';
-    return;
-  }
-  el.innerHTML = rows.map(s=>`
-    <div class="nut-est-card ${s.situacao==='CRITICO'?'critico':s.situacao==='BAIXO'?'baixo':''}">
-      <div class="nut-est-card-tipo">${s.tipo}</div>
-      <div class="nut-est-card-nome">${s.nome}</div>
-      <div class="nut-est-card-saldo">${s.saldo_kg} kg</div>
-      <div class="nut-est-card-dias">${s.dias_restantes!=null ? s.dias_restantes+' dias restantes' : 'Consumo não registrado'}</div>
-      <div class="nut-est-card-sit sit-${s.situacao}">${s.situacao.replace('_',' ')}</div>
-      <div style="margin-top:8px;font-size:11px;color:#64748b;">Valor: ${fmtMoeda(s.valor_estoque)}</div>
-      <button class="btn btn-sm nut-est-card-btn" onclick="verHistorico(${s.suplemento_id},'${s.nome}')">Ver histórico</button>
-    </div>`).join('');
-}
-
-async function verHistorico(supId, nome) {
-  const rows = await fetch(`/nutricao/estoque/historico/${supId}`).then(r=>r.json()).catch(()=>[]);
-  const hw = document.getElementById('historico-wrap');
-  const ht = document.getElementById('historico-titulo');
-  const htab = document.getElementById('tabela-historico');
-  hw.style.display = 'block';
-  ht.textContent = `Histórico: ${nome}`;
-  if (!rows.length) {
-    htab.innerHTML = '<p style="color:#94a3b8;font-size:13px;">Sem movimentos.</p>';
-    return;
-  }
-  htab.innerHTML = `
-    <table class="nut-table">
-      <thead><tr><th>Data</th><th>Tipo</th><th>Qtd (kg)</th><th>Preço/kg</th><th>Saldo</th><th>Fornecedor</th><th>NF</th></tr></thead>
-      <tbody>${rows.map(r=>`<tr>
-        <td>${fmtData(r.data)}</td>
-        <td>${r.tipo_mov}</td>
-        <td>${r.quantidade_kg}</td>
-        <td>${r.preco_kg ? fmtMoeda(r.preco_kg) : '—'}</td>
-        <td>${r.saldo_acumulado} kg</td>
-        <td>${r.fornecedor||'—'}</td>
-        <td>${r.nf||'—'}</td>
-      </tr>`).join('')}
-      </tbody>
-    </table>`;
-  hw.scrollIntoView({behavior:'smooth'});
-}
-
-async function carregarRelatorios() {
-  const [cm, ca] = await Promise.all([
-    fetch('/nutricao/relatorios/custo-mensal').then(r=>r.json()).catch(()=>[]),
-    fetch('/nutricao/relatorios/ca').then(r=>r.json()).catch(()=>[]),
-  ]);
-  // Gráfico custo
-  const ctx = document.getElementById('grafico-custo-mensal');
-  if (ctx) {
-    if (_graficoCusto) _graficoCusto.destroy();
-    _graficoCusto = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: cm.map(m=>m.mes),
-        datasets:[{ label:'Custo R$', data: cm.map(m=>m.custo),
-          backgroundColor:'rgba(99,102,241,.7)', borderRadius:4 }]
-      },
-      options: { plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
-    });
-  }
-  // Tabela CA
-  const elCA = document.getElementById('tabela-ca');
-  if (!ca.length) {
-    elCA.innerHTML = '<p style="color:#94a3b8;font-size:13px;">Sem dados de CA.</p>';
-    return;
-  }
-  elCA.innerHTML = `
-    <table class="nut-table">
-      <thead><tr><th>Lote</th><th>Consumo (kg)</th><th>Ganho (kg)</th><th>CA</th><th>Classe</th></tr></thead>
-      <tbody>${ca.map(r=>`<tr>
-        <td>${r.lote_nome}</td>
-        <td>${r.consumo_total_kg}</td>
-        <td>${r.ganho_total_kg ?? '—'}</td>
-        <td class="ca-${r.ca_classificacao}">${r.ca ?? '—'}</td>
-        <td class="ca-${r.ca_classificacao}">${r.ca_classificacao}</td>
-      </tr>`).join('')}
-      </tbody>
-    </table>`;
-}
-
-function renderizarSuplemetos() {
-  const el = document.getElementById('grid-suplementos');
-  if (!_suplementos.length) {
-    el.innerHTML = '<p style="color:#94a3b8;font-size:13px;">Nenhum suplemento cadastrado.</p>';
-    return;
-  }
-  el.innerHTML = _suplementos.map(s=>`
-    <div class="nut-est-card ${!s.ativo?'':''}">
-      <div class="nut-est-card-tipo">${s.tipo}</div>
-      <div class="nut-est-card-nome">${s.nome}</div>
-      ${s.fabricante?`<div style="font-size:11px;color:#94a3b8;">${s.fabricante}</div>`:''}
-      <div style="font-size:13px;font-weight:700;color:#6366f1;margin-top:6px;">R$ ${s.preco_kg}/kg</div>
-      ${s.objetivo?`<div style="font-size:11px;color:#64748b;margin-top:4px;">${s.objetivo}</div>`:''}
-      <div style="font-size:11px;color:#64748b;margin-top:4px;">
-        ${s.pct_min!=null?`${s.pct_min}–${s.pct_max}% PV`:s.g_min_fixo?`${s.g_min_fixo}–${s.g_max_fixo}g/dia`:'Sem dosagem'}
-      </div>
-      <div style="margin-top:8px;display:flex;gap:6px;">
-        <button class="btn btn-sm" onclick="editarSuplemento(${s.id})">✏️</button>
-        <button class="btn btn-sm btn-danger" onclick="excluirSuplemento(${s.id})">🗑</button>
-      </div>
-    </div>`).join('');
-}
-
-// ── Modais – Plano ────────────────────────────────────────────────────────────
-
-function abrirModalPlano() {
-  document.getElementById('form-plano').reset();
-  document.getElementById('plano-preview').style.display = 'none';
-  document.getElementById('modal-plano').style.display = 'flex';
-}
-function fecharModalPlano() { document.getElementById('modal-plano').style.display = 'none'; }
-
-function calcularConsumo() {
-  const supId = parseInt(document.getElementById('plano-sup').value);
-  const qtd   = parseFloat(document.getElementById('plano-qtd').value);
-  const peso  = parseFloat(document.getElementById('plano-peso').value);
-  const prev  = document.getElementById('plano-preview');
-  if (!supId || !qtd || !peso) { prev.style.display='none'; return; }
-  const s = _suplementos.find(x=>x.id===supId);
-  if (!s) return;
-  let gMin, gMax;
-  if (s.pct_min != null && s.pct_max != null) {
-    gMin = s.pct_min / 100 * peso * 1000;
-    gMax = s.pct_max / 100 * peso * 1000;
-  } else {
-    gMin = s.g_min_fixo || 0;
-    gMax = s.g_max_fixo || gMin;
-  }
-  const gMed = (gMin + gMax) / 2;
-  const custoDia = gMed / 1000 * qtd * s.preco_kg;
-  const custoMes = custoDia * 30;
-  prev.style.display = 'block';
-  prev.innerHTML = `
-    <b>Estimativa:</b><br>
-    Consumo/animal/dia: ${gMin.toFixed(0)}–${gMax.toFixed(0)} g (méd. ${gMed.toFixed(0)} g)<br>
-    Total kg/dia (${qtd} animais): ${(gMed/1000*qtd).toFixed(2)} kg<br>
-    Custo/dia: ${fmtMoeda(custoDia)} &nbsp;|&nbsp; Custo/mês: ${fmtMoeda(custoMes)}`;
-}
-
-async function salvarPlano(e) {
-  e.preventDefault();
-  const body = {
-    lote_id:      parseInt(document.getElementById('plano-lote').value),
-    suplemento_id:parseInt(document.getElementById('plano-sup').value),
-    qtd_animais:  parseInt(document.getElementById('plano-qtd').value),
-    peso_medio_kg:parseFloat(document.getElementById('plano-peso').value),
-    data_inicio:  document.getElementById('plano-ini').value,
-    data_fim:     document.getElementById('plano-fim').value || null,
-    obs:          document.getElementById('plano-obs').value || null,
-  };
-  const r = await fetch('/nutricao/planos', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if (r.ok) {
-    showToast('Plano criado!','sucesso');
-    fecharModalPlano();
-    const p = await fetch('/nutricao/planos').then(r=>r.json());
-    _planos = p;
-    _preencherSelects();
-    renderizarPlanos();
-    carregarKpis();
-  } else {
-    const d = await r.json();
-    showToast(d.detail||'Erro ao salvar plano','erro');
-  }
-}
-
-async function excluirPlano(id) {
-  confirmarExclusao(`/nutricao/planos/${id}`, ()=>{
-    fetch('/nutricao/planos').then(r=>r.json()).then(p=>{ _planos=p; renderizarPlanos(); carregarKpis(); });
-  });
-}
-
-// ── Modais – Lançamento ───────────────────────────────────────────────────────
-
-function abrirModalLancamento() {
-  document.getElementById('form-lancamento').reset();
-  document.getElementById('lanc-data').value = new Date().toISOString().slice(0,10);
-  document.getElementById('modal-lancamento').style.display = 'flex';
-}
-function fecharModalLancamento() { document.getElementById('modal-lancamento').style.display = 'none'; }
-
-function preencherLancPlano() {
+async function salvarLancamento() {
   const pid = parseInt(document.getElementById('lanc-plano').value);
-  const p   = _planos.find(x=>x.id===pid);
-  if (!p) return;
-  const planej = p.consumo_med_g ? (p.consumo_med_g/1000*p.qtd_animais).toFixed(3) : '';
-  document.getElementById('lanc-planej').value = planej;
-}
-
-async function salvarLancamento(e) {
-  e.preventDefault();
-  const planId = parseInt(document.getElementById('lanc-plano').value);
-  const plan = _planos.find(x=>x.id===planId);
+  if (!pid) { showToast('Selecione um plano','erro'); return; }
+  const data = document.getElementById('lanc-data').value;
+  const qtd  = parseFloat(document.getElementById('lanc-qtd').value);
+  if (!data || !qtd) { showToast('Preencha data e quantidade','erro'); return; }
   const body = {
-    plano_id:        planId,
-    lote_id:         plan ? plan.lote_id : 0,
-    suplemento_id:   plan ? plan.suplemento_id : 0,
-    data:            document.getElementById('lanc-data').value,
-    qtd_fornecida_kg:parseFloat(document.getElementById('lanc-qtd').value),
-    qtd_planejada_kg:document.getElementById('lanc-planej').value ? parseFloat(document.getElementById('lanc-planej').value) : null,
+    plano_id:        pid,
+    data,
+    qtd_fornecida_kg: qtd,
     responsavel:     document.getElementById('lanc-resp').value || null,
-    obs:             document.getElementById('lanc-obs').value || null,
+    obs:             document.getElementById('lanc-obs').value  || null,
   };
   const r = await fetch('/nutricao/lancamentos', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if (r.ok) {
-    showToast('Lançamento registrado!','sucesso');
-    fecharModalLancamento();
+    const resp = await r.json();
+    showToast(`Lançamento registrado! Diferença: ${resp.diferenca_kg >= 0 ? '+' : ''}${resp.diferenca_kg} kg`, 'sucesso');
+    document.getElementById('lanc-qtd').value  = '';
+    document.getElementById('lanc-resp').value = '';
+    document.getElementById('lanc-obs').value  = '';
+    document.getElementById('lanc-preview').style.display = 'none';
+    await carregarPlanos();
+    carregarLancHoje();
     carregarLancamentos();
-    carregarEstoque();
     carregarKpis();
   } else {
     const d = await r.json();
@@ -760,51 +752,324 @@ async function salvarLancamento(e) {
 }
 
 async function excluirLancamento(id) {
-  confirmarExclusao(`/nutricao/lancamentos/${id}`, ()=>{
-    carregarLancamentos(); carregarEstoque(); carregarKpis();
-  });
+  confirmarExclusao(`/nutricao/lancamentos/${id}`, ()=>{ carregarLancamentos(); carregarLancHoje(); carregarEstoque(); carregarKpis(); });
 }
 
-// ── Modais – Estoque ──────────────────────────────────────────────────────────
-
-function abrirModalMovimento() {
-  document.getElementById('form-movimento').reset();
-  document.getElementById('mov-data').value = new Date().toISOString().slice(0,10);
-  document.getElementById('modal-movimento').style.display = 'flex';
+/* ── ABA ESTOQUE ───────────────────────────────────────────────── */
+async function carregarEstoque() {
+  const rows = await fetch('/nutricao/estoque').then(r=>r.json()).catch(()=>[]);
+  const el = document.getElementById('grid-estoque');
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);">Nenhum suplemento ativo.</p>'; return; }
+  el.innerHTML = rows.map(s=>{
+    const sc = {'OK':'var(--good)','BAIXO':'var(--warn)','CRITICO':'var(--bad)','SEM_DADOS':'var(--muted)'}[s.situacao];
+    const bc = {'OK':'var(--border)','BAIXO':'var(--warn)','CRITICO':'var(--bad)','SEM_DADOS':'var(--border)'}[s.situacao];
+    return `
+    <div class="card ${s.situacao==='CRITICO'?'est-card-crit':''}" style="border-color:${bc};">
+      <div class="card-header">
+        <div>
+          <div class="card-title" style="font-size:13px;">${s.nome}</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">${s.tipo.replace(/_/g,' ')}</div>
+        </div>
+        <span class="badge ${s.situacao==='OK'?'badge-green':s.situacao==='BAIXO'?'badge-amber':'badge-red'}">${s.situacao.replace('_',' ')}</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size:26px;font-weight:700;color:var(--ink);line-height:1;">${s.saldo_kg} <span style="font-size:14px;font-weight:400;color:var(--muted);">kg</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+          Valor: ${fmtMoeda(s.valor_estoque)}<br>
+          Consumo médio: ${s.consumo_medio_dia_kg ?? '—'} kg/dia<br>
+          <span style="color:${sc};font-weight:600;">Duração: ${s.dias_restantes != null ? s.dias_restantes+' dias' : 'Sem consumo'}</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button class="btn btn-sm" onclick="verHistorico(${s.suplemento_id},'${s.nome}')">📜 Histórico</button>
+        <button class="btn btn-sm btn-primary" onclick="abrirEntradaPara(${s.suplemento_id})">+ Entrada</button>
+      </div>
+    </div>`;
+  }).join('');
 }
-function fecharModalMovimento() { document.getElementById('modal-movimento').style.display = 'none'; }
 
-async function salvarMovimento(e) {
-  e.preventDefault();
-  const body = {
-    suplemento_id: parseInt(document.getElementById('mov-sup').value),
-    data:          document.getElementById('mov-data').value,
-    tipo_mov:      document.getElementById('mov-tipo').value,
-    quantidade_kg: parseFloat(document.getElementById('mov-qtd').value),
-    preco_kg:      document.getElementById('mov-preco').value ? parseFloat(document.getElementById('mov-preco').value) : null,
-    fornecedor:    document.getElementById('mov-fornec').value || null,
-    nf:            document.getElementById('mov-nf').value || null,
-    obs:           document.getElementById('mov-obs').value || null,
-  };
-  const r = await fetch('/nutricao/estoque/movimento', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if (r.ok) {
-    showToast('Movimento registrado!','sucesso');
-    fecharModalMovimento();
-    carregarEstoque(); carregarKpis();
+async function carregarHistoricoGeral() {
+  const supId  = document.getElementById('filtro-sup-hist').value;
+  const tipo   = document.getElementById('filtro-tipo-mov').value;
+  const el     = document.getElementById('tabela-mov-wrap');
+  if (!supId) { el.innerHTML = '<p style="padding:14px;color:var(--muted);">Selecione um suplemento para ver o histórico</p>'; return; }
+  let url = `/nutricao/estoque/historico/${supId}`;
+  if (tipo) url += `?tipo_mov=${tipo}`;
+  const rows = await fetch(url).then(r=>r.json()).catch(()=>[]);
+  if (!rows.length) { el.innerHTML = '<p style="padding:14px;color:var(--muted);">Sem movimentos.</p>'; return; }
+  el.innerHTML = `<table class="table"><thead><tr>
+    <th>Data</th><th>Tipo</th><th>Qtd (kg)</th><th>Preço/kg</th><th>Valor</th><th>Saldo</th><th>Fornecedor</th><th>NF</th>
+  </tr></thead><tbody>${rows.map(r=>`<tr>
+    <td>${fmtData(r.data)}</td>
+    <td class="mov-${r.tipo_mov}">${r.tipo_mov}</td>
+    <td>${r.tipo_mov==='SAIDA'?'-':''}${r.quantidade_kg}</td>
+    <td>${r.preco_kg?fmtMoeda(r.preco_kg):'—'}</td>
+    <td>${r.valor_total?fmtMoeda(r.valor_total):'—'}</td>
+    <td style="font-weight:600;">${r.saldo_acumulado} kg</td>
+    <td>${r.fornecedor||'—'}</td>
+    <td>${r.nf||'—'}</td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+async function verHistorico(supId, nome) {
+  document.getElementById('filtro-sup-hist').value = supId;
+  carregarHistoricoGeral();
+  document.getElementById('tabela-mov-wrap').scrollIntoView({behavior:'smooth'});
+}
+
+/* ── ABA RELATÓRIOS ────────────────────────────────────────────── */
+async function carregarRelatorios() {
+  const loteId  = document.getElementById('rel-lote')?.value || '';
+  const periodo = parseInt(document.getElementById('rel-periodo')?.value || '30');
+  const [cm, caData, custoLote] = await Promise.all([
+    fetch('/nutricao/relatorios/custo-mensal').then(r=>r.json()).catch(()=>[]),
+    loteId ? fetch(`/nutricao/relatorio/custo-lote?lote_id=${loteId}&periodo_dias=${periodo}`).then(r=>r.json()).catch(()=>null) : null,
+    loteId ? fetch(`/nutricao/lancamentos?lote_id=${loteId}&data_ini=${_diasAtras(periodo)}&data_fim=${_hoje()}`).then(r=>r.json()).catch(()=>[]) : [],
+  ]);
+
+  // Gráfico planejado vs real (barras)
+  const ctx1 = document.getElementById('graf-plvsr');
+  if (ctx1) {
+    if (_grafPlvsr) _grafPlvsr.destroy();
+    // Construir dados a partir de lançamentos
+    const byDate = {};
+    if (Array.isArray(custoLote)) {
+      custoLote.forEach(l => {
+        byDate[l.data] = byDate[l.data] || {plan:0,real:0};
+        byDate[l.data].plan += l.qtd_planejada_kg||0;
+        byDate[l.data].real += l.qtd_fornecida_kg||0;
+      });
+    }
+    const labels = Object.keys(byDate).sort().slice(-30);
+    _grafPlvsr = new Chart(ctx1, {
+      type:'bar',
+      data:{
+        labels: labels.map(d => fmtData(d)),
+        datasets:[
+          {label:'Planejado (kg)',data:labels.map(d=>byDate[d].plan.toFixed(2)),backgroundColor:'rgba(99,102,241,.5)',borderRadius:3},
+          {label:'Real (kg)',data:labels.map(d=>byDate[d].real.toFixed(2)),backgroundColor:'rgba(34,197,94,.7)',borderRadius:3},
+        ]
+      },
+      options:{
+        responsive:true,
+        plugins:{legend:{position:'bottom',labels:{color:'var(--muted)',font:{size:11}}}},
+        scales:{
+          x:{ticks:{color:'var(--muted)',font:{size:10}},grid:{color:'var(--border)'}},
+          y:{ticks:{color:'var(--muted)'},grid:{color:'var(--border)'},beginAtZero:true}
+        }
+      }
+    });
+  }
+
+  // Gauge CA
+  if (caData && caData.ca != null) {
+    document.getElementById('ca-valor').textContent = caData.ca;
+    const caMap = {EXCELENTE:{c:'var(--good)',w:'30%'},BOM:{c:'oklch(0.78 0.10 250)',w:'55%'},REGULAR:{c:'var(--warn)',w:'75%'},RUIM:{c:'var(--bad)',w:'100%'}};
+    const cc = caMap[caData.ca_classificacao] || {c:'var(--muted)',w:'0%'};
+    document.getElementById('ca-fill').style.cssText = `width:${cc.w};background:${cc.c};`;
+    document.getElementById('ca-badge').innerHTML = `<span class="badge" style="background:${cc.c}20;color:${cc.c};border:1px solid ${cc.c};">${caData.ca_classificacao}</span>`;
+    if (caData.custo_arroba) {
+      document.getElementById('ca-ref').textContent = `Para ganhar 1 arroba, este lote consome ${caData.ca} kg de ração = ${fmtMoeda(caData.custo_arroba)}`;
+    }
   } else {
-    const d = await r.json();
-    showToast(d.detail||'Erro','erro');
+    document.getElementById('ca-valor').textContent = '—';
+    document.getElementById('ca-badge').innerHTML = '<span style="color:var(--muted);font-size:12px;">Registre pesagens para calcular CA</span>';
+  }
+
+  // Card custo detalhado
+  if (caData) {
+    document.getElementById('custo-detalhe').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Total consumido</div><div style="font-size:20px;font-weight:700;">${caData.total_consumido_kg} kg</div></div>
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Custo total</div><div style="font-size:20px;font-weight:700;">${fmtMoeda(caData.custo_total)}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Custo/cab/dia</div><div style="font-size:18px;font-weight:600;">${caData.custo_cab_dia ? fmtMoeda(caData.custo_cab_dia) : '—'}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Custo/arroba</div><div style="font-size:18px;font-weight:600;">${caData.custo_arroba ? fmtMoeda(caData.custo_arroba) : '—'}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Custo/kg ganho</div><div style="font-size:18px;font-weight:600;">${caData.custo_kg_ganho ? fmtMoeda(caData.custo_kg_ganho) : '—'}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Arrobas produzidas</div><div style="font-size:18px;font-weight:600;">${caData.arrobas_produzidas ?? '—'} @</div></div>
+      </div>
+      ${caData.por_suplemento?.length ? `<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Por suplemento</div>
+        ${caData.por_suplemento.map(s=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span>${s.nome}</span><span>${s.consumido_kg} kg · ${fmtMoeda(s.custo)}</span></div>`).join('')}
+      </div>` : ''}`;
+  }
+
+  // Gráfico custo mensal
+  const ctx2 = document.getElementById('graf-custo-mensal');
+  if (ctx2 && cm.length) {
+    if (_grafMensal) _grafMensal.destroy();
+    _grafMensal = new Chart(ctx2, {
+      type:'line',
+      data:{
+        labels: cm.map(m=>m.mes),
+        datasets:[{label:'Custo mensal R$',data:cm.map(m=>m.custo),
+          borderColor:'var(--accent)',backgroundColor:'oklch(0.78 0.13 80 / 0.15)',
+          fill:true,tension:.3,pointRadius:4,pointBackgroundColor:'var(--accent)'}]
+      },
+      options:{
+        responsive:true,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{ticks:{color:'var(--muted)',font:{size:10}},grid:{color:'var(--border)'}},
+          y:{ticks:{color:'var(--muted)',callback:v=>fmtMoeda(v).replace('R$ ','')},grid:{color:'var(--border)'},beginAtZero:true}
+        }
+      }
+    });
   }
 }
 
-// ── Modais – Suplemento ───────────────────────────────────────────────────────
+function _hoje() { return new Date().toISOString().slice(0,10); }
+function _diasAtras(n) { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); }
 
+/* ── ABA SUPLEMENTOS ───────────────────────────────────────────── */
+function renderizarSuplementos() {
+  const el = document.getElementById('tabela-suplementos');
+  if (!_sups.length) { el.innerHTML = '<p style="padding:14px;color:var(--muted);">Nenhum suplemento cadastrado.</p>'; return; }
+  el.innerHTML = `<table class="table"><thead><tr>
+    <th>Nome</th><th>Tipo</th><th>Fabricante</th><th>Preço/kg</th><th>Dosagem</th><th>Objetivo</th><th>Status</th><th></th>
+  </tr></thead><tbody>${_sups.map(s=>`<tr>
+    <td style="font-weight:600;">${s.nome}</td>
+    <td><span class="badge badge-accent" style="font-size:10px;">${s.tipo.replace(/_/g,' ')}</span></td>
+    <td>${s.fabricante||'—'}</td>
+    <td style="font-weight:700;color:var(--accent-ink);">${fmtMoeda(s.preco_kg)}</td>
+    <td style="font-size:11px;">${s.pct_min!=null?`${s.pct_min}–${s.pct_max} (frac.PV)`:s.g_min_fixo?`${s.g_min_fixo}–${s.g_max_fixo}g/dia`:'—'}</td>
+    <td style="font-size:11px;color:var(--muted);">${s.objetivo||'—'}</td>
+    <td><span class="badge ${s.ativo?'badge-green':'badge-gray'}">${s.ativo?'Ativo':'Inativo'}</span></td>
+    <td>
+      <button class="btn btn-sm" onclick="abrirModalSuplemento(${s.id})" title="Editar">✏️</button>
+      <button class="btn btn-sm btn-danger" onclick="excluirSuplemento(${s.id})" title="Excluir">🗑</button>
+    </td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+/* ── Modais – Plano ────────────────────────────────────────────── */
+function abrirModalPlano() {
+  document.getElementById('plano-lote').innerHTML  = '<option value="">Selecione...</option>' + _lotes.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('');
+  document.getElementById('plano-sup').innerHTML   = '<option value="">Selecione...</option>' + _sups.filter(s=>s.ativo).map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
+  document.getElementById('plano-ini').value        = _hoje();
+  document.getElementById('plano-preview').style.display = 'none';
+  document.getElementById('modal-plano').style.display   = 'flex';
+}
+function fecharModalPlano() { document.getElementById('modal-plano').style.display = 'none'; }
+
+function onPlanoLote() {
+  const lId = parseInt(document.getElementById('plano-lote').value);
+  const l   = _lotes.find(x=>x.id===lId);
+  if (!l) return;
+  if (l.qtd_animais) document.getElementById('plano-qtd').value = l.qtd_animais;
+  if (l.peso_medio_kg) document.getElementById('plano-peso').value = l.peso_medio_kg;
+  calcPreview();
+}
+
+function calcPreview() {
+  const supId = parseInt(document.getElementById('plano-sup').value);
+  const qtd   = parseFloat(document.getElementById('plano-qtd').value);
+  const peso  = parseFloat(document.getElementById('plano-peso').value);
+  const prev  = document.getElementById('plano-preview');
+  if (!supId || !qtd || !peso) { prev.style.display='none'; return; }
+  const s = _sups.find(x=>x.id===supId);
+  if (!s) return;
+  let gMin, gMax;
+  if (s.pct_min != null && s.pct_max != null) {
+    gMin = s.pct_min * peso * 1000;
+    gMax = s.pct_max * peso * 1000;
+  } else {
+    gMin = s.g_min_fixo || 0;
+    gMax = s.g_max_fixo || gMin;
+  }
+  const gMed = (gMin + gMax) / 2;
+  const custoDia = gMed / 1000 * qtd * s.preco_kg;
+  prev.style.display = 'block';
+  prev.innerHTML = `
+    <b>Estimativa calculada:</b><br>
+    Consumo/animal/dia: ${gMin.toFixed(0)} – ${gMax.toFixed(0)} g &nbsp;|&nbsp; <b>Médio: ${gMed.toFixed(0)} g/cab</b><br>
+    Total/lote/dia: ${(gMin/1000*qtd).toFixed(2)} – ${(gMax/1000*qtd).toFixed(2)} kg &nbsp;|&nbsp; <b>Médio: ${(gMed/1000*qtd).toFixed(2)} kg</b><br>
+    Custo estimado: <b>${fmtMoeda(custoDia)}/dia</b> &nbsp;·&nbsp; ${fmtMoeda(custoDia*30)}/mês`;
+}
+
+async function salvarPlano() {
+  const lId   = parseInt(document.getElementById('plano-lote').value);
+  const sId   = parseInt(document.getElementById('plano-sup').value);
+  const qtd   = parseInt(document.getElementById('plano-qtd').value);
+  const peso  = parseFloat(document.getElementById('plano-peso').value);
+  const ini   = document.getElementById('plano-ini').value;
+  if (!lId || !sId || !qtd || !peso || !ini) { showToast('Preencha todos os campos obrigatórios','erro'); return; }
+  const body  = { lote_id:lId, suplemento_id:sId, qtd_animais:qtd, peso_medio_kg:peso, data_inicio:ini, obs:document.getElementById('plano-obs').value||null };
+  const r = await fetch('/nutricao/planos', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (r.ok) {
+    showToast('Plano criado com sucesso!','sucesso');
+    fecharModalPlano();
+    await carregarPlanos();
+    carregarKpis();
+  } else {
+    const d = await r.json();
+    showToast(d.detail||'Erro ao salvar plano','erro');
+  }
+}
+
+async function encerrarPlano(pid) {
+  confirmarExclusao('#', async () => {});  // reutiliza apenas o padrão visual
+  // Override: encerrar em vez de excluir
+  const modal = document.getElementById('modalConfirm');
+  modal.style.display = 'flex';
+  document.getElementById('btnConfirmarExclusao').onclick = async () => {
+    document.getElementById('modalConfirm').style.display = 'none';
+    const r = await fetch(`/nutricao/planos/${pid}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'ENCERRADO'})});
+    if (r.ok) { showToast('Plano encerrado','sucesso'); await carregarPlanos(); carregarKpis(); }
+    else showToast('Erro ao encerrar plano','erro');
+  };
+}
+
+/* ── Modais – Estoque ──────────────────────────────────────────── */
+function abrirModalEntrada() {
+  document.getElementById('ent-sup').innerHTML = '<option value="">Selecione...</option>' + _sups.map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
+  document.getElementById('ent-data').value = _hoje();
+  document.getElementById('ent-valor').value = '';
+  document.getElementById('modal-entrada').style.display = 'flex';
+}
+function abrirEntradaPara(supId) { abrirModalEntrada(); document.getElementById('ent-sup').value = supId; }
+function fecharModalEntrada() { document.getElementById('modal-entrada').style.display = 'none'; }
+
+function calcValorEntrada() {
+  const qtd   = parseFloat(document.getElementById('ent-qtd').value) || 0;
+  const preco = parseFloat(document.getElementById('ent-preco').value) || 0;
+  document.getElementById('ent-valor').value = qtd && preco ? fmtMoeda(qtd * preco) : '';
+}
+
+async function salvarEntrada() {
+  const body = {
+    suplemento_id: parseInt(document.getElementById('ent-sup').value),
+    data:          document.getElementById('ent-data').value,
+    quantidade_kg: parseFloat(document.getElementById('ent-qtd').value),
+    preco_kg:      parseFloat(document.getElementById('ent-preco').value),
+    fornecedor:    document.getElementById('ent-fornec').value || null,
+    nf:            document.getElementById('ent-nf').value    || null,
+    obs:           document.getElementById('ent-obs').value   || null,
+  };
+  if (!body.suplemento_id || !body.quantidade_kg || !body.preco_kg) { showToast('Preencha suplemento, quantidade e preço','erro'); return; }
+  const r = await fetch('/nutricao/estoque/entrada', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (r.ok) {
+    showToast('Entrada registrada!','sucesso');
+    fecharModalEntrada();
+    // Atualizar suplementos (preço muda)
+    const ks = await fetch('/nutricao/suplementos').then(r=>r.json()).catch(()=>[]);
+    _sups = Array.isArray(ks) ? ks : [];
+    carregarEstoque();
+    carregarKpis();
+  } else {
+    const d = await r.json();
+    showToast(d.detail||'Erro ao registrar entrada','erro');
+  }
+}
+
+/* ── Modais – Suplemento ───────────────────────────────────────── */
 function abrirModalSuplemento(id) {
-  document.getElementById('form-suplemento').reset();
   document.getElementById('sup-id').value = '';
   document.getElementById('sup-modal-titulo').textContent = '🧪 Novo Suplemento';
+  ['sup-nome','sup-fab','sup-preco','sup-obj','sup-pct-min','sup-pct-max','sup-g-min','sup-g-max','sup-obs','sim-peso','sim-qtd'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  document.getElementById('sim-result').innerHTML = '';
   if (id) {
-    const s = _suplementos.find(x=>x.id===id);
+    const s = _sups.find(x=>x.id===id);
     if (!s) return;
     document.getElementById('sup-modal-titulo').textContent = '🧪 Editar Suplemento';
     document.getElementById('sup-id').value    = s.id;
@@ -818,26 +1083,63 @@ function abrirModalSuplemento(id) {
     document.getElementById('sup-g-min').value   = s.g_min_fixo||'';
     document.getElementById('sup-g-max').value   = s.g_max_fixo||'';
     document.getElementById('sup-obs').value   = s.obs||'';
+    onSupTipo();
+  } else {
+    onSupTipo();
   }
-  document.getElementById('modal-suplemento').style.display = 'flex';
+  document.getElementById('modal-sup').style.display = 'flex';
 }
-function editarSuplemento(id) { abrirModalSuplemento(id); }
-function fecharModalSuplemento() { document.getElementById('modal-suplemento').style.display = 'none'; }
+function fecharModalSuplemento() { document.getElementById('modal-sup').style.display = 'none'; }
 
-async function salvarSuplemento(e) {
-  e.preventDefault();
+function onSupTipo() {
+  const tipo = document.getElementById('sup-tipo').value;
+  const usePct = tipo !== 'SAL_MINERAL';
+  document.getElementById('dosagem-pct').style.display = usePct ? 'grid' : 'none';
+  document.getElementById('dosagem-g').style.display   = !usePct ? 'grid' : 'none';
+  simularSup();
+}
+
+function simularSup() {
+  const tipo  = document.getElementById('sup-tipo').value;
+  const preco = parseFloat(document.getElementById('sup-preco').value) || 0;
+  const peso  = parseFloat(document.getElementById('sim-peso').value) || 0;
+  const qtd   = parseFloat(document.getElementById('sim-qtd').value) || 0;
+  const el    = document.getElementById('sim-result');
+  if (!peso || !qtd || !preco) { el.innerHTML = '<span style="color:var(--muted);">Preencha peso médio, qtd animais e preço para simular.</span>'; return; }
+  let gMin, gMax;
+  if (tipo !== 'SAL_MINERAL') {
+    const pMin = parseFloat(document.getElementById('sup-pct-min').value) || 0;
+    const pMax = parseFloat(document.getElementById('sup-pct-max').value) || pMin;
+    gMin = pMin * peso * 1000;
+    gMax = pMax * peso * 1000;
+  } else {
+    gMin = parseFloat(document.getElementById('sup-g-min').value) || 0;
+    gMax = parseFloat(document.getElementById('sup-g-max').value) || gMin;
+  }
+  const gMed = (gMin + gMax) / 2;
+  const cDia = gMed / 1000 * qtd * preco;
+  el.innerHTML = `
+    <b>Consumo/cab:</b> ${gMin.toFixed(0)} – ${gMax.toFixed(0)} g &nbsp;|&nbsp; <b>médio ${gMed.toFixed(0)} g</b><br>
+    <b>Total/lote/dia:</b> ${(gMed/1000*qtd).toFixed(2)} kg<br>
+    <b>Custo/dia:</b> ${fmtMoeda(cDia)} &nbsp;|&nbsp; <b>Custo/mês:</b> ${fmtMoeda(cDia*30)}`;
+}
+
+async function salvarSuplemento() {
   const id   = document.getElementById('sup-id').value;
+  const tipo = document.getElementById('sup-tipo').value;
+  const usePct = tipo !== 'SAL_MINERAL';
   const body = {
     nome:       document.getElementById('sup-nome').value,
-    tipo:       document.getElementById('sup-tipo').value,
-    fabricante: document.getElementById('sup-fab').value||null,
+    tipo,
+    fabricante: document.getElementById('sup-fab').value  || null,
     preco_kg:   parseFloat(document.getElementById('sup-preco').value),
-    objetivo:   document.getElementById('sup-obj').value||null,
-    pct_min:    document.getElementById('sup-pct-min').value ? parseFloat(document.getElementById('sup-pct-min').value) : null,
-    pct_max:    document.getElementById('sup-pct-max').value ? parseFloat(document.getElementById('sup-pct-max').value) : null,
-    g_min_fixo: document.getElementById('sup-g-min').value ? parseFloat(document.getElementById('sup-g-min').value) : null,
-    g_max_fixo: document.getElementById('sup-g-max').value ? parseFloat(document.getElementById('sup-g-max').value) : null,
-    obs:        document.getElementById('sup-obs').value||null,
+    objetivo:   document.getElementById('sup-obj').value  || null,
+    pct_min:    usePct && document.getElementById('sup-pct-min').value ? parseFloat(document.getElementById('sup-pct-min').value) : null,
+    pct_max:    usePct && document.getElementById('sup-pct-max').value ? parseFloat(document.getElementById('sup-pct-max').value) : null,
+    g_min_fixo: !usePct && document.getElementById('sup-g-min').value ? parseFloat(document.getElementById('sup-g-min').value) : null,
+    g_max_fixo: !usePct && document.getElementById('sup-g-max').value ? parseFloat(document.getElementById('sup-g-max').value) : null,
+    obs:        document.getElementById('sup-obs').value  || null,
+    ativo:      true,
   };
   const url    = id ? `/nutricao/suplementos/${id}` : '/nutricao/suplementos';
   const method = id ? 'PUT' : 'POST';
@@ -845,29 +1147,33 @@ async function salvarSuplemento(e) {
   if (r.ok) {
     showToast(id?'Suplemento atualizado!':'Suplemento criado!','sucesso');
     fecharModalSuplemento();
-    const ks = await fetch('/nutricao/suplementos').then(r=>r.json());
-    _suplementos = ks;
-    _preencherSelects();
-    renderizarSuplemetos();
+    const ks = await fetch('/nutricao/suplementos').then(r=>r.json()).catch(()=>[]);
+    _sups = Array.isArray(ks) ? ks : [];
+    _populateSelects();
+    renderizarSuplementos();
     carregarEstoque();
     carregarKpis();
   } else {
     const d = await r.json();
-    showToast(d.detail||'Erro','erro');
+    showToast(d.detail||'Erro ao salvar','erro');
   }
 }
 
 async function excluirSuplemento(id) {
   confirmarExclusao(`/nutricao/suplementos/${id}`, async ()=>{
-    const ks = await fetch('/nutricao/suplementos').then(r=>r.json());
-    _suplementos = ks;
-    _preencherSelects();
-    renderizarSuplemetos();
+    const ks = await fetch('/nutricao/suplementos').then(r=>r.json()).catch(()=>[]);
+    _sups = Array.isArray(ks) ? ks : [];
+    _populateSelects();
+    renderizarSuplementos();
     carregarEstoque();
-    carregarKpis();
   });
 }
 
-document.addEventListener('DOMContentLoaded', carregarTudo);
+document.addEventListener('DOMContentLoaded', () => {
+  nutInit();
+  document.getElementById('lanc-data').value = _hoje();
+  carregarLancHoje();
+});
+window.addEventListener('fazenda-contexto', nutInit);
 </script>
 {% endblock %}

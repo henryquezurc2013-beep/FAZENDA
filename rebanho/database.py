@@ -1,33 +1,35 @@
+import os
+import httpx
 from fastapi import Request
-from sqlalchemy import create_engine, event
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./rebanho.db"
+load_dotenv()
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-@event.listens_for(engine, "connect")
-def _configurar_sqlite(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=MEMORY")
-    cursor.execute("PRAGMA busy_timeout=5000")
-    cursor.close()
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
+# Forçar HTTP/1.1 no cliente postgrest para evitar RemoteProtocolError com HTTP/2
+try:
+    _old = supabase.postgrest.session
+    _headers = dict(_old.headers)
+    _base_url = str(_old.base_url)
+    _timeout = _old.timeout
+    _old.close()
+    supabase.postgrest.session = httpx.Client(
+        base_url=_base_url,
+        headers=_headers,
+        timeout=_timeout,
+        http2=False,
+    )
+except Exception:
+    pass
 
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    yield None
 
 
 def get_fazenda_id(request: Request) -> int:
@@ -40,48 +42,3 @@ def get_fazenda_id(request: Request) -> int:
         return int(fid)
     except (ValueError, TypeError):
         return 1
-
-
-def _migrate():
-    """Apply additive schema migrations for existing databases."""
-    migrations = [
-        # Legacy migrations
-        "ALTER TABLE animais ADD COLUMN valor_compra REAL",
-        "ALTER TABLE animais ADD COLUMN custo_kg REAL",
-        "ALTER TABLE animais ADD COLUMN custo_arroba REAL",
-        "ALTER TABLE piquetes ADD COLUMN coordenadas TEXT",
-        "ALTER TABLE piquetes ADD COLUMN cor_mapa TEXT DEFAULT '#2E7D32'",
-        "ALTER TABLE piquetes ADD COLUMN icone_mapa TEXT DEFAULT '🌿'",
-        # Multi-fazenda migrations
-        "ALTER TABLE animais ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE pesagens ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE sanidade ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE inseminacoes ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE plano_nutricional ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE lancamento_racao ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE estoque_suplemento ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE pastos ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE piquetes ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE manejo_pastagem ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE lotes ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE lote_animais ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE chuva ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-        "ALTER TABLE adubacao_pastagem ADD COLUMN fazenda_id INTEGER DEFAULT 1",
-    ]
-    with engine.connect() as conn:
-        for sql in migrations:
-            try:
-                conn.execute(__import__('sqlalchemy').text(sql))
-                conn.commit()
-            except Exception:
-                pass  # column already exists
-
-
-def create_tables():
-    from models import (  # noqa: F401
-        Animal, Pesagem, Sanidade, Inseminacao,
-        Compra, Venda, Despesa, Pessoa, Config,
-        Fazenda,
-    )
-    Base.metadata.create_all(bind=engine)
-    _migrate()

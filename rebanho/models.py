@@ -323,6 +323,118 @@ class LotePasto(Base):
     status         = Column(String, default="ATIVO")
 
 
+# ── Módulo de Confinamento ────────────────────────────────────────────
+
+class IngredienteDieta(Base):
+    __tablename__ = "ingredientes_dieta"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    nome         = Column(String, nullable=False, unique=True)
+    tipo         = Column(String, nullable=False)  # VOLUMOSO|CONCENTRADO|MINERAL|ADITIVO
+    pct_ms       = Column(Float, nullable=False)
+    energia_mcal = Column(Float)
+    proteina_pct = Column(Float)
+    preco_kg     = Column(Float, nullable=False)
+    unidade      = Column(String, default='kg')
+    ativo        = Column(Boolean, default=True)
+    obs          = Column(String)
+
+
+class DietaConfinamento(Base):
+    __tablename__ = "dietas_confinamento"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    nome         = Column(String, nullable=False, unique=True)
+    fase         = Column(String, nullable=False)  # ADAPTACAO|CRESCIMENTO|TERMINACAO|MANUTENCAO
+    duracao_dias = Column(Integer)
+    obs          = Column(String)
+    ativo        = Column(Boolean, default=True)
+
+
+class DietaIngrediente(Base):
+    __tablename__ = "dieta_ingredientes"
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    dieta_id       = Column(Integer, nullable=False)
+    ingrediente_id = Column(Integer, nullable=False)
+    kg_cab_dia     = Column(Float, nullable=False)
+    ordem          = Column(Integer, default=0)
+
+
+class LoteConfinamento(Base):
+    __tablename__ = "lotes_confinamento"
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    fazenda_id         = Column(Integer, default=1)
+    nome               = Column(String, nullable=False)
+    data_entrada       = Column(String, nullable=False)
+    data_saida_real    = Column(String)
+    qtd_animais        = Column(Integer, nullable=False)
+    peso_medio_entrada = Column(Float, nullable=False)
+    peso_alvo_saida    = Column(Float, nullable=False)
+    valor_compra_cab   = Column(Float, nullable=False)
+    frete_entrada      = Column(Float, default=0)
+    frete_saida        = Column(Float, default=0)
+    mao_obra_cab_dia   = Column(Float, default=0)
+    outros_custos      = Column(Float, default=0)
+    preco_arroba_venda = Column(Float)
+    rc_estimado_pct    = Column(Float, default=54.0)
+    rc_real_pct        = Column(Float)
+    status             = Column(String, default='ATIVO')
+    obs                = Column(String)
+
+
+class FaseConfinamento(Base):
+    __tablename__ = "fases_confinamento"
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    lote_conf_id     = Column(Integer, nullable=False)
+    dieta_id         = Column(Integer, nullable=False)
+    fase             = Column(String, nullable=False)
+    data_inicio      = Column(String, nullable=False)
+    data_fim         = Column(String)
+    duracao_prevista = Column(Integer)
+    status           = Column(String, default='ATIVA')
+    obs              = Column(String)
+
+
+class LancamentoConfinamento(Base):
+    __tablename__ = "lancamento_confinamento"
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    lote_conf_id     = Column(Integer, nullable=False)
+    fase_id          = Column(Integer, nullable=False)
+    data             = Column(String, nullable=False)
+    qtd_fornecida_kg = Column(Float, nullable=False)
+    qtd_planejada_kg = Column(Float)
+    ms_fornecida_kg  = Column(Float)
+    custo_real       = Column(Float)
+    responsavel      = Column(String)
+    obs              = Column(String)
+
+
+class PesagemConfinamento(Base):
+    __tablename__ = "pesagem_confinamento"
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    lote_conf_id  = Column(Integer, nullable=False)
+    data          = Column(String, nullable=False)
+    peso_medio_kg = Column(Float, nullable=False)
+    qtd_animais   = Column(Integer)
+    gmd_periodo   = Column(Float)
+    ca_periodo    = Column(Float)
+    cms_cab_dia   = Column(Float)
+    responsavel   = Column(String)
+    obs           = Column(String)
+
+
+class PesagemConfIndividual(Base):
+    __tablename__ = "pesagem_conf_individual"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    lote_conf_id = Column(Integer, nullable=False)
+    brinco       = Column(String, nullable=False)
+    data         = Column(String, nullable=False)
+    peso_kg      = Column(Float, nullable=False)
+    gmd_periodo  = Column(Float)
+    dias_periodo = Column(Integer)
+    responsavel  = Column(String)
+    obs          = Column(String)
+
+
 class Config(Base):
     __tablename__ = "config"
 
@@ -399,3 +511,27 @@ class EstoqueSuplemento(Base):
     nf            = Column(String)
     obs           = Column(String)
     fazenda_id    = Column(Integer, default=1)
+
+
+# ── Autenticação / Modo Campo ─────────────────────────────────────────
+
+class Usuario(Base):
+    __tablename__ = "usuarios"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    login      = Column(String, nullable=False, unique=True)
+    senha_hash = Column(String, nullable=False)
+    nome       = Column(String, nullable=False)
+    perfil     = Column(String, nullable=False, default='FUNCIONARIO')  # GESTOR|FUNCIONARIO
+    ativo      = Column(Boolean, default=True)
+    criado_em  = Column(String, default=now_str)
+
+
+class Sessao(Base):
+    __tablename__ = "sessoes"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    token      = Column(String, nullable=False, unique=True)
+    usuario_id = Column(Integer, nullable=False)
+    criado_em  = Column(String, default=now_str)
+    expira_em  = Column(String, nullable=False)

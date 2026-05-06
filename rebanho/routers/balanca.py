@@ -4,15 +4,12 @@ from datetime import date, datetime
 from typing import List
 
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, UploadFile, File
 
-from database import get_db
-from models import Animal, ImportacaoBalanca, Pesagem
+from database import supabase
 
 router = APIRouter()
 
-# ── Mapeamento tolerante de colunas ──────────────────────────────────
 _BRINCO_COLS  = {"animal id", "animal_id", "tag id", "tag_id", "brinco", "id", "animais"}
 _PESO_COLS    = {"weight", "peso", "kg", "weight kg", "weight(kg)", "peso kg"}
 _DATA_COLS    = {"date", "data", "fecha", "dt", "data pesagem", "data_pesagem"}
@@ -20,7 +17,7 @@ _DATE_FMTS    = ["%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d", "%d-%m-%Y",
                  "%d/%m/%y", "%m/%d/%y", "%Y/%m/%d"]
 
 
-def _detect_col(columns: list[str], candidates: set) -> str | None:
+def _detect_col(columns: list, candidates: set):
     for col in columns:
         if col.strip().lower() in candidates:
             return col
@@ -36,7 +33,6 @@ def _parse_date(valor) -> str | None:
             return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
-    # tenta datetime do pandas
     try:
         return pd.to_datetime(valor).strftime("%Y-%m-%d")
     except Exception:
@@ -71,22 +67,16 @@ def _ler_arquivo(conteudo: bytes, nome: str) -> pd.DataFrame:
     raise ValueError(f"Extensão não suportada: {ext}")
 
 
-def _calcular_ganho(brinco: str, peso_novo: float, data_nova: str, db: Session):
-    anterior = (
-        db.query(Pesagem)
-        .filter(Pesagem.brinco.ilike(brinco), Pesagem.data_pesagem < data_nova)
-        .order_by(Pesagem.data_pesagem.desc())
-        .first()
-    )
+def _calcular_ganho(brinco: str, peso_novo: float, data_nova: str):
+    rows = supabase.table("pesagens").select("peso,data_pesagem").ilike("brinco", brinco).lt("data_pesagem", data_nova).order("data_pesagem", desc=True).limit(1).execute().data
+    anterior = rows[0] if rows else None
     ganho_kg = ganho_pct = media_dia_kg = 0.0
     if anterior:
-        ganho_kg = round(peso_novo - anterior.peso, 2)
-        if anterior.peso:
-            ganho_pct = round((ganho_kg / anterior.peso) * 100, 1)
+        ganho_kg = round(peso_novo - anterior["peso"], 2)
+        if anterior["peso"]:
+            ganho_pct = round((ganho_kg / anterior["peso"]) * 100, 1)
         try:
-            d1 = date.fromisoformat(anterior.data_pesagem)
-            d2 = date.fromisoformat(data_nova)
-            dias = (d2 - d1).days
+            dias = (date.fromisoformat(data_nova) - date.fromisoformat(anterior["data_pesagem"])).days
             if dias > 0:
                 media_dia_kg = round(ganho_kg / dias, 1)
         except Exception:
@@ -94,18 +84,13 @@ def _calcular_ganho(brinco: str, peso_novo: float, data_nova: str, db: Session):
     return ganho_kg, ganho_pct, media_dia_kg
 
 
-# ── POST /balanca/importar ────────────────────────────────────────────
 @router.post("/importar")
-async def importar_balanca(arquivo: UploadFile = File(...), db: Session = Depends(get_db)):
+async def importar_balanca(arquivo: UploadFile = File(...)):
     nome = arquivo.filename or "arquivo"
-    ext  = nome.rsplit(".", 1)[-1].lower() if "." in nome else ""
-
+    ext = nome.rsplit(".", 1)[-1].lower() if "." in nome else ""
     if ext not in ("csv", "xls", "xlsx"):
-        raise HTTPException(status_code=400,
-            detail="Formato não suportado. Use CSV, XLS ou XLSX.")
-
+        raise HTTPException(status_code=400, detail="Formato não suportado. Use CSV, XLS ou XLSX.")
     conteudo = await arquivo.read()
-
     try:
         df = _ler_arquivo(conteudo, nome)
     except Exception as e:
@@ -115,10 +100,8 @@ async def importar_balanca(arquivo: UploadFile = File(...), db: Session = Depend
     col_brinco = _detect_col(colunas, _BRINCO_COLS)
     col_peso   = _detect_col(colunas, _PESO_COLS)
     col_data   = _detect_col(colunas, _DATA_COLS)
-
     if not col_brinco or not col_peso:
-        raise HTTPException(status_code=400,
-            detail="Colunas obrigatórias não encontradas. O arquivo deve ter colunas de Animal ID e Weight.")
+        raise HTTPException(status_code=400, detail="Colunas obrigatórias não encontradas.")
 
     hoje = date.today().isoformat()
     lista_ignorados: List[dict] = []
@@ -126,135 +109,80 @@ async def importar_balanca(arquivo: UploadFile = File(...), db: Session = Depend
     importados = 0
 
     for idx, row in df.iterrows():
-        num_linha = int(idx) + 2  # +2: cabeçalho + índice base 0
-
-        # brinco
+        num_linha = int(idx) + 2
         brinco_raw = str(row.get(col_brinco, "")).strip()
         if not brinco_raw or brinco_raw.lower() == "nan":
             lista_erros.append({"linha": num_linha, "motivo": "Brinco vazio"})
             continue
-
-        # peso
         peso = _parse_peso(row.get(col_peso))
         if peso is None:
-            lista_erros.append({
-                "linha": num_linha,
-                "motivo": f"Peso inválido: '{row.get(col_peso)}'"
-            })
+            lista_erros.append({"linha": num_linha, "motivo": f"Peso inválido: '{row.get(col_peso)}'"})
             continue
-
-        # data
         data_str = None
         if col_data:
             data_str = _parse_date(row.get(col_data))
         if not data_str:
             data_str = hoje
-
-        # verificar animal
-        animal = db.query(Animal).filter(Animal.brinco.ilike(brinco_raw)).first()
-        if not animal:
-            lista_ignorados.append({
-                "brinco": brinco_raw,
-                "motivo": "Brinco não encontrado no sistema"
-            })
+        animal_rows = supabase.table("animais").select("brinco,pasto").ilike("brinco", brinco_raw).limit(1).execute().data
+        if not animal_rows:
+            lista_ignorados.append({"brinco": brinco_raw, "motivo": "Brinco não encontrado no sistema"})
             continue
-
-        # verificar duplicata
-        existe = db.query(Pesagem).filter(
-            Pesagem.brinco.ilike(brinco_raw),
-            Pesagem.data_pesagem == data_str
-        ).first()
+        animal = animal_rows[0]
+        existe = supabase.table("pesagens").select("id").ilike("brinco", brinco_raw).eq("data_pesagem", data_str).limit(1).execute().data
         if existe:
-            lista_ignorados.append({
-                "brinco": brinco_raw,
-                "data": data_str,
-                "motivo": "Pesagem já importada para esta data"
-            })
+            lista_ignorados.append({"brinco": brinco_raw, "data": data_str, "motivo": "Pesagem já importada para esta data"})
             continue
-
-        # calcular ganho
-        ganho_kg, ganho_pct, media_dia_kg = _calcular_ganho(brinco_raw, peso, data_str, db)
-
+        ganho_kg, ganho_pct, media_dia_kg = _calcular_ganho(brinco_raw, peso, data_str)
         dt = date.fromisoformat(data_str)
-        pesagem = Pesagem(
-            brinco=animal.brinco,
-            data_pesagem=data_str,
-            peso=peso,
-            ganho_kg=ganho_kg,
-            ganho_pct=ganho_pct,
-            media_dia_kg=media_dia_kg,
-            mes=dt.month,
-            ano=dt.year,
-            pasto=animal.pasto,
-        )
-        db.add(pesagem)
-        animal.peso_atual = peso
-        db.add(animal)
+        supabase.table("pesagens").insert({
+            "brinco": animal["brinco"],
+            "data_pesagem": data_str,
+            "peso": peso,
+            "ganho_kg": ganho_kg,
+            "ganho_pct": ganho_pct,
+            "media_dia_kg": media_dia_kg,
+            "mes": dt.month,
+            "ano": dt.year,
+            "pasto": animal.get("pasto"),
+        }).execute()
+        supabase.table("animais").update({"peso_atual": peso}).ilike("brinco", brinco_raw).execute()
         importados += 1
 
-    db.flush()
-
-    total     = len(df)
-    n_ign     = len(lista_ignorados)
-    n_err     = len(lista_erros)
-    detalhes  = {"ignorados": lista_ignorados, "erros": lista_erros}
-
-    log = ImportacaoBalanca(
-        nome_arquivo    = nome,
-        data_importacao = datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        total_linhas    = total,
-        importados      = importados,
-        ignorados       = n_ign,
-        erros           = n_err,
-        detalhes        = json.dumps(detalhes, ensure_ascii=False),
-    )
-    db.add(log)
-    db.commit()
+    total = len(df)
+    n_ign = len(lista_ignorados)
+    n_err = len(lista_erros)
+    detalhes = {"ignorados": lista_ignorados, "erros": lista_erros}
+    supabase.table("importacoes_balanca").insert({
+        "nome_arquivo": nome,
+        "data_importacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_linhas": total,
+        "importados": importados,
+        "ignorados": n_ign,
+        "erros": n_err,
+        "detalhes": json.dumps(detalhes, ensure_ascii=False),
+    }).execute()
 
     partes = [f"{importados} pesagens importadas com sucesso."]
     if n_ign: partes.append(f"{n_ign} ignoradas.")
     if n_err: partes.append(f"{n_err} com erro.")
-
     return {
-        "sucesso":    importados > 0 or (n_err == 0 and n_ign == 0),
-        "importados": importados,
-        "ignorados":  n_ign,
-        "erros":      n_err,
-        "total":      total,
-        "mensagem":   " ".join(partes),
-        "detalhes":   detalhes,
+        "sucesso": importados > 0 or (n_err == 0 and n_ign == 0),
+        "importados": importados, "ignorados": n_ign, "erros": n_err,
+        "total": total, "mensagem": " ".join(partes), "detalhes": detalhes,
     }
 
 
-# ── GET /balanca/historico ────────────────────────────────────────────
 @router.get("/historico")
-def historico(db: Session = Depends(get_db)):
-    registros = (
-        db.query(ImportacaoBalanca)
-        .order_by(ImportacaoBalanca.data_importacao.desc())
-        .all()
-    )
-    return [
-        {
-            "id":              r.id,
-            "nome_arquivo":    r.nome_arquivo,
-            "data_importacao": r.data_importacao,
-            "total_linhas":    r.total_linhas,
-            "importados":      r.importados,
-            "ignorados":       r.ignorados,
-            "erros":           r.erros,
-        }
-        for r in registros
-    ]
+def historico():
+    return supabase.table("importacoes_balanca").select("id,nome_arquivo,data_importacao,total_linhas,importados,ignorados,erros").order("data_importacao", desc=True).execute().data
 
 
-# ── GET /balanca/historico/{id}/detalhes ─────────────────────────────
 @router.get("/historico/{id}/detalhes")
-def historico_detalhes(id: int, db: Session = Depends(get_db)):
-    registro = db.query(ImportacaoBalanca).filter(ImportacaoBalanca.id == id).first()
-    if not registro:
+def historico_detalhes(id: int):
+    rows = supabase.table("importacoes_balanca").select("detalhes").eq("id", id).limit(1).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Importação não encontrada")
     try:
-        return json.loads(registro.detalhes or "{}")
+        return json.loads(rows[0].get("detalhes") or "{}")
     except Exception:
         return {}
