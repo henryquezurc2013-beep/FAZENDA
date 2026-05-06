@@ -2,6 +2,9 @@ import os
 import sys
 import traceback
 
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
+
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _REBANHO = os.path.join(_BASE, "rebanho")
 
@@ -10,13 +13,13 @@ if _REBANHO not in sys.path:
 
 os.chdir(_REBANHO)
 
-try:
-    from main import app  # noqa: E402
-except Exception as _e:
-    _err = traceback.format_exc()
-    from fastapi import FastAPI
-    from fastapi.responses import PlainTextResponse
+app: FastAPI
 
+try:
+    from main import app as _real_app  # noqa: E402
+    app = _real_app
+except Exception:
+    _err = traceback.format_exc()
     app = FastAPI()
 
     @app.get("/{full_path:path}")
