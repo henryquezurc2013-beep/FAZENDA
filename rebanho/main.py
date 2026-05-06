@@ -32,10 +32,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_seed_nut()
-_seed_faz()
-_seed_conf()
-_seed_usuarios()
+for _seed in (_seed_nut, _seed_faz, _seed_conf, _seed_usuarios):
+    try:
+        _seed()
+    except Exception as _e:
+        print(f"[startup] seed {_seed.__name__} ignorado: {_e}")
 
 app.include_router(definicoes.router,    prefix="/definicoes",    tags=["Definições"])
 app.include_router(animais.router,       prefix="/animais",        tags=["Animais"])
