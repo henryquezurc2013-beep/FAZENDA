@@ -90,14 +90,14 @@ def exportar_animais(
 
 @router.get("/inseminacoes")
 def exportar_inseminacoes():
-    registros = supabase.table("inseminacoes").select("*").order("data_insem", desc=True).execute().data
+    registros = supabase.table("inseminacoes").select("*").order("data", desc=True).execute().data
     cabecalho = [
         "Brinco", "Data Inseminação", "Prenhez", "Qtd Crias",
         "Nasc. Crias", "Status", "Observação",
     ]
     rows = [
         [
-            r["brinco"], _fmt(r.get("data_insem")), r.get("prenhez") or "",
+            r["brinco"], _fmt(r.get("data")), r.get("prenhez") or "",
             r.get("qtd_crias") if r.get("qtd_crias") is not None else 0,
             _fmt(r.get("data_nasc_cria")), r.get("status") or "", r.get("obs") or "",
         ]
