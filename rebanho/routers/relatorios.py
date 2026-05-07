@@ -368,7 +368,7 @@ def financeiro(ano: int = Query(...)):
 
 @router.get("/despesas")
 def despesas_relatorio(ano: int = Query(...), status: Optional[str] = Query(None)):
-    q = supabase.table("despesas").select("data,categoria,valor").like("data", f"{ano}-%")
+    q = supabase.table("despesas").select("vencimento,tipo,valor").like("vencimento", f"{ano}-%")
     if status:
         q = q.ilike("status", status)
     registros = q.execute().data
@@ -376,11 +376,11 @@ def despesas_relatorio(ano: int = Query(...), status: Optional[str] = Query(None
     por_tipo: dict = {}
     for d in registros:
         try:
-            mes = int((d.get("data") or "")[:7].split("-")[1])
+            mes = int((d.get("vencimento") or "")[:7].split("-")[1])
             mensal[str(mes)] = round(mensal[str(mes)] + (d.get("valor") or 0), 2)
         except Exception:
             pass
-        cat = d.get("categoria")
+        cat = d.get("tipo")
         if cat:
             por_tipo[cat] = round(por_tipo.get(cat, 0) + (d.get("valor") or 0), 2)
     return {"mensal": mensal, "por_tipo": por_tipo}
