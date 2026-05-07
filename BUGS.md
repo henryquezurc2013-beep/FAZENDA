@@ -21,10 +21,13 @@ durante as próprias rodadas de fix.
 | 10 | `rebanho/seed.py`                                                      | **baixa**  | ✅ CORRIGIDO em `3614396`. Arquivo deletado junto com `models.py` (mesmo commit). Importava `SessionLocal`/`create_tables` que não existem mais em `database.py`, e inseria com Schema B (`data_pesagem`, `peso`, `data_insem`, `mm_chuva`). Os routers já têm seeds idiomáticos `seed_*()`. |
 | 11 | Vercel — Environment Variables                                         | **baixa**  | `SUPABASE_SECRET_KEY` ainda não foi adicionada na Vercel. Será necessária quando o código precisar bypassar RLS server-side (Fase 3, ao reativar RLS). Hoje o código só usa `SUPABASE_KEY` (publishable) e não precisa da secret.                                                       |
 | 12 | `rebanho/routers/relatorios.py:350-351,371`                            | **baixa**  | Três funções (`compras_relatorio`, `vendas_relatorio`, `despesas_relatorio`) usam `.like(coluna, f"{ano}-%")` contra coluna DATE. Funciona em runtime via cast implícito do PostgREST, mas semanticamente seria mais correto usar `.gte/.lte` com intervalo de DATE (ex.: `gte("vencimento", f"{ano}-01-01").lte("vencimento", f"{ano}-12-31")`). Refactor candidato para um commit dedicado cobrindo as 3 funções juntas — não misturar com outros fixes. |
+| 13 | Todo o app (`rebanho/routers/*.py`)                                    | **CRÍTICA** | **ENDPOINTS DE API SEM AUTENTICAÇÃO.** Todos os routers (`animais`, `balanca`, `financeiro`, `pesagem`, `pessoas`, `pastagem`, `nutricao`, `confinamento`, `inseminacao`, `sanidade`, `relatorios`, `exportacao`, `fazendas`, `definicoes`, `config`) aceitam GET/POST/PUT/DELETE sem checar cookie `cb_token` ou usuário logado. `get_usuario_atual` é invocado **apenas** em `main.py:173,188` (`/campo` e `/campo/dados`). Frontend bloqueia via tela de login mas a API por trás é pública — atacante com a URL pode criar/apagar/listar dados via `curl` direto. **Mitigação temporária:** URL não foi divulgada publicamente; ataque depende de descoberta do subdomínio (vercel.app é escaneado por bots, prazo de segurança presumido em dias-semanas, não meses). **Fix sugerido:** middleware FastAPI global em `main.py` exigindo `get_usuario_atual` em todas as rotas exceto `/login`, `/static`, `/auth/login`. **Critério temporal:** corrigir ANTES de cadastrar dados financeiros sensíveis em produção OU em até 7 dias do push do Commit C (UI de importação), o que vier primeiro. Descoberto durante revisão do commit `8c37ade`. |
 
 ---
 
 ## Próximos passos sugeridos (fora do escopo desta fase)
 
-Todos os bugs identificados na Fase 1 foram corrigidos. Débitos
-restantes (#11, #12) são novos e estão listados na tabela acima.
+Todos os bugs da Fase 1 foram corrigidos. Débitos restantes:
+**#11** (Vercel env), **#12** (refactor SQL), e **#13** — endpoints
+sem auth, severidade **CRÍTICA**, com prazo temporal definido na
+linha da tabela.
