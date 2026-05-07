@@ -1,8 +1,8 @@
 # Débitos técnicos — Controle Bovino
 
 Inconsistências e bugs encontrados durante a Fase 1 (análise de schema).
-Os 4 bugs de severidade **alta** foram corrigidos numa fase posterior
-(commits abaixo). Os de severidade média/baixa seguem em backlog.
+Os bugs de severidade **alta** (#1–#4) e parte dos **média/baixa**
+(#5, #6, #9, #10) já foram corrigidos. Os demais seguem em backlog.
 
 ---
 
@@ -12,17 +12,18 @@ Os 4 bugs de severidade **alta** foram corrigidos numa fase posterior
 | 2  | `rebanho/main.py:230` (em `campo_dados`)                               | **alta**   | ✅ CORRIGIDO em `7645e92`. Usava `gte("data_pesagem", limite30)`; coluna real é `data`. Endpoint `/campo/dados` retornava sempre `sem_pesagem_30d == total_ativos`.                                                                                                                       |
 | 3  | `rebanho/routers/fazendas.py:93,123`                                   | **alta**   | ✅ CORRIGIDO em `b5ddf03`. `pesagens.select("data_pesagem").order("data_pesagem", desc=True)` em :93 e leitura `ultima_pes["data_pesagem"]` em :123. `GET /fazendas/{id}/resumo` falhava por coluna inexistente.                                                                          |
 | 4  | `rebanho/main.py:202`                                                  | **alta**   | ✅ CORRIGIDO em `e8b504f`. Tabela errada: `supabase.table("planos_nutricionais")` (plural). Tabela canônica é `plano_nutricional` (singular). Endpoint `/campo/dados` retornava 0 planos sempre.                                                                                          |
-| 5  | `rebanho/routers/exportacao.py:93`                                     | **média**  | `inseminacoes.order("data_insem", desc=True)` — coluna real é `data`. Export CSV de inseminações falha.                                                                                                                                                                                  |
-| 6  | `rebanho/routers/relatorios.py:371`                                    | **média**  | `despesas.select("data,categoria,valor").like("data", f"{ano}-%")` — colunas reais são `vencimento` e `tipo`. Endpoint correspondente falha.                                                                                                                                            |
+| 5  | `rebanho/routers/exportacao.py:93`                                     | **média**  | ✅ CORRIGIDO em `6dc9ffc`. `order`/`get` usavam coluna inexistente `data_insem`; coluna real é `data`. Trocadas as duas refs (query `.order` e consumer `r.get`) em `/exportacao/inseminacoes`. Cabeçalho "Data Inseminação" do CSV mantido (label de saída, não nome de coluna).         |
+| 6  | `rebanho/routers/relatorios.py:371`                                    | **média**  | ✅ CORRIGIDO em `e854607`. `.select` usava `data,categoria,valor` e `.like` filtrava por `data`; colunas reais são `vencimento` (DATE) e `tipo`. Trocadas 3 refs em `despesas_relatorio` (`select`, consumer `d.get(vencimento)`, consumer `d.get(tipo)`). Padrão `.like("vencimento", f"{ano}-%")` mantido para consistência com `compras_relatorio` e `vendas_relatorio` (mesmo arquivo, L350-351). |
 | 7  | `rebanho/routers/pastagem.py:639,690`                                  | **baixa**  | `piquetes.semaforo` é `UPDATE`-ado mas o valor nunca é lido (semáforo é recalculado sob demanda em `semaforo_piquete()`). Coluna existe no DDL para não quebrar os UPDATEs, mas é morta — candidata a remoção.                                                                          |
 | 8  | `rebanho/routers/auth.py:35,58-60`                                     | **baixa**  | `sessoes.expira_em` é TEXT formatado em vez de TIMESTAMPTZ. Postgres compara timestamps melhor que strings; trocar exige `strptime` → `fromisoformat` no Python.                                                                                                                       |
-| 9  | `rebanho/models.py` (arquivo inteiro)                                  | **média**  | Importa `from database import Base` que não existe mais (`database.py` virou cliente Supabase puro). Se importado em runtime, quebra. Tem campos divergentes do schema real (`pasto` vs `pasto_atual`, `dias_descanso_alvo` vs `descanso_alvo_dias`, `mm_chuva` vs `mm`, `medicao_pasto` vs `medicao_pastagem`, etc.). Candidato a remoção. |
-| 10 | `rebanho/seed.py`                                                      | **baixa**  | Seed legado SQLAlchemy. Os routers já têm seeds idiomáticos (`seed_*()`). Arquivo é morto, candidato a remoção.                                                                                                                                                                          |
+| 9  | `rebanho/models.py` (arquivo inteiro)                                  | **média**  | ✅ CORRIGIDO em `3614396`. Arquivo deletado. Confirmado morto: `findstr` global mostrou que `seed.py` era o único import de `models.py` em todo o projeto, e `seed.py` também foi deletado no mesmo commit (Bug #10).                                                                    |
+| 10 | `rebanho/seed.py`                                                      | **baixa**  | ✅ CORRIGIDO em `3614396`. Arquivo deletado junto com `models.py` (mesmo commit). Importava `SessionLocal`/`create_tables` que não existem mais em `database.py`, e inseria com Schema B (`data_pesagem`, `peso`, `data_insem`, `mm_chuva`). Os routers já têm seeds idiomáticos `seed_*()`. |
+| 11 | Vercel — Environment Variables                                         | **baixa**  | `SUPABASE_SECRET_KEY` ainda não foi adicionada na Vercel. Será necessária quando o código precisar bypassar RLS server-side (Fase 3, ao reativar RLS). Hoje o código só usa `SUPABASE_KEY` (publishable) e não precisa da secret.                                                       |
+| 12 | `rebanho/routers/relatorios.py:350-351,371`                            | **baixa**  | Três funções (`compras_relatorio`, `vendas_relatorio`, `despesas_relatorio`) usam `.like(coluna, f"{ano}-%")` contra coluna DATE. Funciona em runtime via cast implícito do PostgREST, mas semanticamente seria mais correto usar `.gte/.lte` com intervalo de DATE (ex.: `gte("vencimento", f"{ano}-01-01").lte("vencimento", f"{ano}-12-31")`). Refactor candidato para um commit dedicado cobrindo as 3 funções juntas — não misturar com outros fixes. |
 
 ---
 
 ## Próximos passos sugeridos (fora do escopo desta fase)
 
-- **Colunas corretas** — corrigir nomes em `relatorios.py:371` (`vencimento`, `tipo`) e `exportacao.py:93` (`data`).
-- **Limpeza** — avaliar remoção de `piquetes.semaforo`, `models.py` e `seed.py` (todos com indícios fortes de código morto).
+- **Limpeza** — avaliar remoção de `piquetes.semaforo` (Bug #7, coluna escrita-only no banco).
 - **Tipo correto** — migrar `sessoes.expira_em` para TIMESTAMPTZ junto com ajuste em `auth.py:35`.
