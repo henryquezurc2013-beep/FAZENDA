@@ -108,6 +108,11 @@ async def page_animais(request: Request):
     return templates.TemplateResponse(request=request, name="animais.html", context=_ctx("animais"))
 
 
+@app.get("/animais-importar")
+async def page_animais_importar(request: Request):
+    return templates.TemplateResponse(request=request, name="animais-importar.html", context=_ctx("animais-importar"))
+
+
 @app.get("/pesagem-page")
 async def page_pesagem(request: Request):
     return templates.TemplateResponse(request=request, name="pesagem.html", context=_ctx("pesagem"))

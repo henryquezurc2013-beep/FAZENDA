@@ -147,6 +147,25 @@ def listar_animais(
     return [_to_out(a) for a in rows]
 
 
+@router.get("/importacoes")
+def listar_importacoes_animais():
+    """Histórico de importações em massa (carga via POST /animais/importar)."""
+    return supabase.table("importacoes_animais").select(
+        "id,nome_arquivo,total_linhas,importados,ignorados,criado_em,fazenda_id"
+    ).order("criado_em", desc=True).execute().data
+
+
+@router.get("/importacoes/{id}/detalhes")
+def detalhes_importacao_animais(id: int):
+    """Detalhes (lista de ignorados) de uma importação específica."""
+    rows = supabase.table("importacoes_animais").select("detalhes").eq("id", id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Importação não encontrada")
+    return rows[0].get("detalhes") or {}
+
+
+# NOTA: GETs de /importacoes precisam vir ANTES de /{brinco} senão FastAPI
+# casa o path dinâmico primeiro e retorna 404 "Animal não encontrado".
 @router.get("/{brinco}")
 def buscar_animal(brinco: str):
     rows = supabase.table("animais").select("*").ilike("brinco", brinco).limit(1).execute().data

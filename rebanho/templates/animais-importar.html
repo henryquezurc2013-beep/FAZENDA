@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% block title %}Importar Animais — Fazenda Ipanema{% endblock %}
+{% block page_title %}Importação — Cadastro de Animais{% endblock %}
+
+{% block content %}
+<style>
+  .drop-area {
+    border: 2px dashed #2E7D32; border-radius: 12px; padding: 36px 20px;
+    text-align: center; cursor: pointer; transition: all .2s;
+    background: #F9FFF9;
+  }
+  .drop-area.over { border-style: solid; background: #F1F8E9; }
+  .drop-area input[type=file] { display: none; }
+  .imp-aux-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .imp-aux-row label { font-size: 12px; color: #555; font-weight: 600; display: block; margin-bottom: 4px; }
+  .imp-aux-row input[type=text],
+  .imp-aux-row input[type=date] {
+    width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+    font-size: 13px; box-sizing: border-box;
+  }
+  .imp-checkbox-row { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; }
+</style>
+
+<!-- ── Seção 1: Instruções ─────────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">
+  <button onclick="toggleInstrucoes()" style="width:100%;text-align:left;padding:14px 20px;background:none;border:none;cursor:pointer;font-size:14px;font-weight:600;color:#1B5E20;display:flex;justify-content:space-between;align-items:center;">
+    <span>📋 Como preparar a planilha</span>
+    <span id="iconInstr">▼</span>
+  </button>
+  <div id="instrucoes" style="padding:0 20px 16px;border-top:1px solid #e5e7eb;">
+    <ol style="font-size:13px;color:#374151;line-height:1.9;margin:12px 0 0 16px;">
+      <li>A planilha precisa ter <strong>3 colunas</strong>: brinco, peso (kg) e valor (R$).</li>
+      <li>Os nomes das colunas podem variar — o sistema reconhece variações como <em>Brinco / ID / Tag</em> para o brinco, <em>Peso / Weight / Kg</em> para o peso e <em>Valor / Preço / Custo</em> para o valor.</li>
+      <li>Cada linha vira <strong>1 animal</strong> cadastrado com defaults: sexo MACHO, raça NELORE, tipo GARROTE, origem COMPRA, status ATIVO.</li>
+      <li>A <strong>data da compra</strong> e o <strong>fornecedor</strong> ficam abaixo do upload (defaults: data de hoje e "Importação").</li>
+      <li>Se "Gerar lançamento de compra agregado" estiver marcado, será criado <strong>1 lançamento em /financeiro/compras</strong> consolidando o gasto total.</li>
+    </ol>
+    <p style="font-size:12px;color:#6b7280;margin-top:10px;background:#f9fafb;padding:10px 14px;border-radius:6px;">
+      ℹ️ O sistema aceita arquivos <strong>.csv</strong>, <strong>.xls</strong> e <strong>.xlsx</strong>.
+      A <strong>data de nascimento</strong> é estimada como 240 dias antes da data da compra (≈ 8 meses de idade).
+    </p>
+  </div>
+</div>
+
+<!-- ── Seção 2: Upload + Campos auxiliares ─────────────────────────── -->
+<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <h2 style="font-size:14px;font-weight:600;color:#1B5E20;margin-bottom:16px;">📤 Upload de Arquivo</h2>
+
+  <div class="drop-area" id="dropArea" onclick="document.getElementById('inputArquivo').click()">
+    <input type="file" id="inputArquivo" accept=".csv,.xls,.xlsx" onchange="selecionarArquivo(this.files[0])" />
+    <div id="dropIcon" style="font-size:36px;margin-bottom:8px;">📁</div>
+    <div id="dropTexto" style="font-size:14px;color:#555;">
+      Arraste o arquivo aqui ou <span style="color:#1B5E20;font-weight:600;">clique para selecionar</span>
+    </div>
+    <div style="font-size:12px;color:#9ca3af;margin-top:6px;">Aceita: .csv, .xls, .xlsx</div>
+  </div>
+
+  <div id="arquivoSelecionado" style="display:none;margin-top:12px;padding:10px 14px;background:#F1F8E9;border-radius:8px;border:1px solid #C8E6C9;display:none;align-items:center;gap:10px;">
+    <span style="font-size:18px;">📄</span>
+    <span id="nomeArquivo" style="font-size:13px;font-weight:600;color:#1B5E20;"></span>
+    <button onclick="limparArquivo()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#6b7280;font-size:16px;">✕</button>
+  </div>
+
+  <!-- Campos auxiliares -->
+  <div class="imp-aux-row">
+    <div>
+      <label for="inpFornecedor">Fornecedor</label>
+      <input id="inpFornecedor" type="text" value="Importação" />
+    </div>
+    <div>
+      <label for="inpDataCompra">Data da compra</label>
+      <input id="inpDataCompra" type="date" />
+    </div>
+  </div>
+  <div class="imp-checkbox-row">
+    <input id="chkCompraAgregada" type="checkbox" checked />
+    <label for="chkCompraAgregada">Gerar lançamento de compra agregado</label>
+  </div>
+
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;">
+    <button id="btnImportar" onclick="importar()" disabled
+      style="background:#9ca3af;color:#fff;border:none;border-radius:8px;padding:10px 28px;cursor:not-allowed;font-size:15px;font-weight:600;transition:background .2s;">
+      💾 Importar Animais
+    </button>
+    <div id="spinnerImport" style="display:none;"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- ── Seção 3: Resultado ──────────────────────────────────────────── -->
+<div id="secaoResultado" style="display:none;margin-bottom:16px;">
+  <div id="cardResultado" style="border-radius:10px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <span id="resultIcon" style="font-size:28px;"></span>
+      <div>
+        <div id="resultMensagem" style="font-size:15px;font-weight:700;"></div>
+        <div id="resultSubtitulo" style="font-size:12px;color:#6b7280;margin-top:2px;"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numImportados" style="font-size:22px;font-weight:700;color:#1B5E20;"></div>
+        <div style="font-size:11px;color:#555;font-weight:600;">IMPORTADOS</div>
+      </div>
+      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numIgnorados" style="font-size:22px;font-weight:700;color:#E65100;"></div>
+        <div style="font-size:11px;color:#555;font-weight:600;">IGNORADOS</div>
+      </div>
+      <div id="boxCompra" style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;display:none;">
+        <div id="numCompraId" style="font-size:18px;font-weight:700;color:#0d47a1;"></div>
+        <div style="font-size:11px;color:#555;font-weight:600;">LANÇAMENTO</div>
+      </div>
+    </div>
+
+    <div id="tabelaIgnorados" style="display:none;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:600;color:#E65100;margin-bottom:6px;">⚠️ Linhas ignoradas:</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:rgba(0,0,0,.05);">
+          <th style="padding:5px 10px;text-align:left;">Linha</th>
+          <th style="padding:5px 10px;text-align:left;">Brinco</th>
+          <th style="padding:5px 10px;text-align:left;">Motivo</th>
+        </tr></thead>
+        <tbody id="tbodyIgnorados"></tbody>
+      </table>
+    </div>
+
+    <button onclick="novaImportacao()" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:13px;margin-top:4px;">
+      ↩ Importar outro arquivo
+    </button>
+  </div>
+</div>
+
+<!-- ── Seção 4: Histórico ──────────────────────────────────────────── -->
+<div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">
+  <div style="padding:14px 20px;border-bottom:1px solid #e5e7eb;">
+    <h2 style="font-size:14px;font-weight:600;color:#1B5E20;">📋 Importações anteriores</h2>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#F1F8E9;color:#33691e;">
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Data</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Arquivo</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Importados</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Ignorados</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Total</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Detalhes</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyHistorico"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal detalhes -->
+<div id="modalDetalhes" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:620px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;">
+      <h3 style="font-size:14px;font-weight:600;color:#1B5E20;">Detalhes da Importação</h3>
+      <button onclick="document.getElementById('modalDetalhes').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <pre id="jsonDetalhes" style="padding:16px 20px;font-size:12px;color:#374151;white-space:pre-wrap;word-break:break-word;line-height:1.6;"></pre>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let arquivoAtual = null;
+
+// ── Defaults dos campos auxiliares ───────────────────────────────────
+document.getElementById('inpDataCompra').value = new Date().toISOString().slice(0, 10);
+
+// ── Instruções colapsável ────────────────────────────────────────────
+function toggleInstrucoes() {
+  const el = document.getElementById('instrucoes');
+  const ic = document.getElementById('iconInstr');
+  const vis = el.style.display !== 'none';
+  el.style.display = vis ? 'none' : 'block';
+  ic.textContent   = vis ? '▶' : '▼';
+}
+
+// ── Drag-and-drop ────────────────────────────────────────────────────
+const dropArea = document.getElementById('dropArea');
+
+dropArea.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropArea.classList.add('over');
+});
+dropArea.addEventListener('dragleave', () => dropArea.classList.remove('over'));
+dropArea.addEventListener('drop', e => {
+  e.preventDefault();
+  dropArea.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) selecionarArquivo(f);
+});
+
+function selecionarArquivo(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['csv','xls','xlsx'].includes(ext)) {
+    showToast('Formato não suportado. Use CSV, XLS ou XLSX.', 'erro');
+    return;
+  }
+  arquivoAtual = file;
+  document.getElementById('nomeArquivo').textContent = file.name;
+  document.getElementById('arquivoSelecionado').style.display = 'flex';
+  document.getElementById('dropIcon').textContent = '✅';
+  document.getElementById('dropTexto').innerHTML = `<strong>${file.name}</strong> selecionado`;
+  const btn = document.getElementById('btnImportar');
+  btn.disabled = false;
+  btn.style.background = '#1B5E20';
+  btn.style.cursor = 'pointer';
+}
+
+function limparArquivo() {
+  arquivoAtual = null;
+  document.getElementById('inputArquivo').value = '';
+  document.getElementById('arquivoSelecionado').style.display = 'none';
+  document.getElementById('dropIcon').textContent = '📁';
+  document.getElementById('dropTexto').innerHTML = 'Arraste o arquivo aqui ou <span style="color:#1B5E20;font-weight:600;">clique para selecionar</span>';
+  const btn = document.getElementById('btnImportar');
+  btn.disabled = true;
+  btn.style.background = '#9ca3af';
+  btn.style.cursor = 'not-allowed';
+}
+
+// ── Importar ─────────────────────────────────────────────────────────
+async function importar() {
+  if (!arquivoAtual) return;
+
+  document.getElementById('spinnerImport').style.display = 'block';
+  document.getElementById('btnImportar').disabled = true;
+
+  const form = new FormData();
+  form.append('arquivo', arquivoAtual);
+  form.append('fornecedor',           document.getElementById('inpFornecedor').value || 'Importação');
+  form.append('data_compra',          document.getElementById('inpDataCompra').value || '');
+  form.append('gerar_compra_agregada', document.getElementById('chkCompraAgregada').checked ? 'true' : 'false');
+
+  try {
+    const r = await fetch('/animais/importar', { method: 'POST', body: form });
+    const d = await r.json();
+
+    document.getElementById('spinnerImport').style.display = 'none';
+
+    if (!r.ok) {
+      showToast(d.detail || 'Erro na importação.', 'erro');
+      document.getElementById('btnImportar').disabled = false;
+      return;
+    }
+
+    renderResultado(d);
+    await carregarHistorico();
+    const msg = `${d.importados} animais importados${d.ignorados > 0 ? ', ' + d.ignorados + ' ignorados' : ''}.`;
+    showToast(msg, d.importados > 0 ? 'sucesso' : 'erro');
+
+  } catch(e) {
+    document.getElementById('spinnerImport').style.display = 'none';
+    showToast('Erro de conexão com o servidor.', 'erro');
+    document.getElementById('btnImportar').disabled = false;
+  }
+}
+
+function renderResultado(d) {
+  const card = document.getElementById('cardResultado');
+  const sucesso = d.importados > 0;
+  card.style.background = sucesso ? '#F1F8E9' : '#fff1f2';
+  card.style.border = `1px solid ${sucesso ? '#C8E6C9' : '#fca5a5'}`;
+
+  document.getElementById('resultIcon').textContent     = sucesso ? '✅' : '⚠️';
+  document.getElementById('resultMensagem').textContent =
+    sucesso ? `${d.importados} animais importados` : 'Nenhum animal importado';
+  document.getElementById('resultSubtitulo').textContent = `Processado em ${new Date().toLocaleString('pt-BR')}`;
+  document.getElementById('numImportados').textContent  = d.importados;
+  document.getElementById('numIgnorados').textContent   = d.ignorados;
+
+  if (d.compra_id) {
+    document.getElementById('numCompraId').textContent = '#' + d.compra_id;
+    document.getElementById('boxCompra').style.display = 'block';
+  } else {
+    document.getElementById('boxCompra').style.display = 'none';
+  }
+
+  const igns = d.lista_ignorados || [];
+  if (igns.length > 0) {
+    const tbody = document.getElementById('tbodyIgnorados');
+    tbody.innerHTML = igns.map(g => `
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:4px 10px;">${g.linha != null ? g.linha : '—'}</td>
+        <td style="padding:4px 10px;font-weight:600;color:#1B5E20;">${g.brinco || '—'}</td>
+        <td style="padding:4px 10px;color:#E65100;">${g.motivo}</td>
+      </tr>`).join('');
+    document.getElementById('tabelaIgnorados').style.display = 'block';
+  } else {
+    document.getElementById('tabelaIgnorados').style.display = 'none';
+  }
+
+  document.getElementById('secaoResultado').style.display = 'block';
+}
+
+function novaImportacao() {
+  limparArquivo();
+  document.getElementById('secaoResultado').style.display = 'none';
+  document.getElementById('tabelaIgnorados').style.display = 'none';
+  document.getElementById('btnImportar').disabled = true;
+  document.getElementById('btnImportar').style.background = '#9ca3af';
+}
+
+// ── Histórico ─────────────────────────────────────────────────────────
+async function carregarHistorico() {
+  let lista = [];
+  try {
+    const r = await fetch('/animais/importacoes');
+    if (r.ok) lista = await r.json();
+  } catch (e) {
+    // Tabela importacoes_animais pode ainda não existir no banco — ignora.
+  }
+  const tbody = document.getElementById('tbodyHistorico');
+  if (!lista || !lista.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:18px;color:#9ca3af;">Nenhuma importação realizada.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map((r, i) => `
+    <tr style="background:${i%2===0?'#fff':'#fafafa'};border-bottom:1px solid #f3f4f6;">
+      <td style="padding:8px 12px;">${(r.criado_em || '').slice(0,16).replace('T',' ')}</td>
+      <td style="padding:8px 12px;font-weight:500;color:#1B5E20;">${r.nome_arquivo}</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:600;color:#166534;">${r.importados}</td>
+      <td style="padding:8px 12px;text-align:center;color:#E65100;">${r.ignorados}</td>
+      <td style="padding:8px 12px;text-align:center;">${r.total_linhas}</td>
+      <td style="padding:8px 12px;text-align:center;">
+        <button onclick="verDetalhes(${r.id})"
+          style="background:#e5e7eb;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px;">
+          🔍 Ver
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function verDetalhes(id) {
+  const d = await fetch(`/animais/importacoes/${id}/detalhes`).then(r => r.json());
+  document.getElementById('jsonDetalhes').textContent = JSON.stringify(d, null, 2);
+  document.getElementById('modalDetalhes').style.display = 'flex';
+}
+
+document.addEventListener('DOMContentLoaded', carregarHistorico);
+window.addEventListener('fazenda-contexto', carregarHistorico);
+</script>
+{% endblock %}
