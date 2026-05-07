@@ -636,6 +636,11 @@ def registrar_entrada(body: dict):
             "piquete_id": piquete_id, "data_entrada": data_entrada, "status": "ATIVO"
         }).eq("id", lote_id).execute()
 
+    # DEPRECATED: piquetes.semaforo e codigo morto. O semaforo
+    # real e recalculado sob demanda em semaforo_piquete().
+    # Coluna mantida no DDL e UPDATEs preservados para nao quebrar
+    # historico, mas serao removidos junto com a coluna na Fase 3.
+    # Ver bug #7 do BUGS.md.
     supabase.table("piquetes").update({"semaforo": "OCUPADO"}).eq("id", piquete_id).execute()
     return {"id": manejo["id"], "dias_descanso": dias_descanso, "previsao_saida": previsao}
 
@@ -687,6 +692,7 @@ def registrar_saida(body: dict):
     if lote_id:
         supabase.table("lotes").update({"data_saida": data_saida, "status": "INATIVO"}).eq("id", lote_id).eq("piquete_id", manejo["piquete_id"]).execute()
 
+    # DEPRECATED: ver comentario no UPDATE acima (bug #7).
     supabase.table("piquetes").update({"semaforo": "SEM_DADOS"}).eq("id", manejo["piquete_id"]).execute()
 
     return {
