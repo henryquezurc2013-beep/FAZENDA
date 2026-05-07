@@ -112,3 +112,22 @@ CREATE TABLE IF NOT EXISTS inseminacoes (
 CREATE INDEX IF NOT EXISTS idx_inseminacoes_brinco  ON inseminacoes (lower(brinco_femea));
 CREATE INDEX IF NOT EXISTS idx_inseminacoes_data    ON inseminacoes (data DESC);
 CREATE INDEX IF NOT EXISTS idx_inseminacoes_fazenda ON inseminacoes (fazenda_id);
+
+
+-- 5. IMPORTACOES_ANIMAIS ──────────────────────────────────────
+--  Histórico de importações em massa via POST /animais/importar.
+--  Espelha estrutura de importacoes_balanca; detalhes em JSONB
+--  (lista de linhas ignoradas com motivo).
+CREATE TABLE IF NOT EXISTS importacoes_animais (
+    id            BIGSERIAL    PRIMARY KEY,
+    fazenda_id    BIGINT       NOT NULL DEFAULT 1,
+    nome_arquivo  TEXT         NOT NULL,
+    total_linhas  INT          NOT NULL DEFAULT 0,
+    importados    INT          NOT NULL DEFAULT 0,
+    ignorados     INT          NOT NULL DEFAULT 0,
+    detalhes      JSONB,                          -- { "ignorados": [{brinco, motivo}, ...] }
+    criado_em     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_imp_animais_data    ON importacoes_animais (criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_imp_animais_fazenda ON importacoes_animais (fazenda_id);
