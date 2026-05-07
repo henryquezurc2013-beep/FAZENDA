@@ -1,8 +1,9 @@
 # Débitos técnicos — Controle Bovino
 
 Inconsistências e bugs encontrados durante a Fase 1 (análise de schema).
-Os bugs de severidade **alta** (#1–#4) e parte dos **média/baixa**
-(#5, #6, #9, #10) já foram corrigidos. Os demais seguem em backlog.
+Os bugs de severidade **alta** (#1–#4) e **média/baixa** (#5–#10) já
+foram corrigidos. Os débitos restantes (#11, #12) são novos, surgidos
+durante as próprias rodadas de fix.
 
 ---
 
@@ -14,8 +15,8 @@ Os bugs de severidade **alta** (#1–#4) e parte dos **média/baixa**
 | 4  | `rebanho/main.py:202`                                                  | **alta**   | ✅ CORRIGIDO em `e8b504f`. Tabela errada: `supabase.table("planos_nutricionais")` (plural). Tabela canônica é `plano_nutricional` (singular). Endpoint `/campo/dados` retornava 0 planos sempre.                                                                                          |
 | 5  | `rebanho/routers/exportacao.py:93`                                     | **média**  | ✅ CORRIGIDO em `6dc9ffc`. `order`/`get` usavam coluna inexistente `data_insem`; coluna real é `data`. Trocadas as duas refs (query `.order` e consumer `r.get`) em `/exportacao/inseminacoes`. Cabeçalho "Data Inseminação" do CSV mantido (label de saída, não nome de coluna).         |
 | 6  | `rebanho/routers/relatorios.py:371`                                    | **média**  | ✅ CORRIGIDO em `e854607`. `.select` usava `data,categoria,valor` e `.like` filtrava por `data`; colunas reais são `vencimento` (DATE) e `tipo`. Trocadas 3 refs em `despesas_relatorio` (`select`, consumer `d.get(vencimento)`, consumer `d.get(tipo)`). Padrão `.like("vencimento", f"{ano}-%")` mantido para consistência com `compras_relatorio` e `vendas_relatorio` (mesmo arquivo, L350-351). |
-| 7  | `rebanho/routers/pastagem.py:639,690`                                  | **baixa**  | `piquetes.semaforo` é `UPDATE`-ado mas o valor nunca é lido (semáforo é recalculado sob demanda em `semaforo_piquete()`). Coluna existe no DDL para não quebrar os UPDATEs, mas é morta — candidata a remoção.                                                                          |
-| 8  | `rebanho/routers/auth.py:35,58-60`                                     | **baixa**  | `sessoes.expira_em` é TEXT formatado em vez de TIMESTAMPTZ. Postgres compara timestamps melhor que strings; trocar exige `strptime` → `fromisoformat` no Python.                                                                                                                       |
+| 7  | `rebanho/routers/pastagem.py:639,690`                                  | **baixa**  | ✅ CORRIGIDO em `b726ca3` (Caminho C). Mantidos os 2 UPDATEs e a coluna no DDL — apenas marcados como deprecated com comentário inline. Remoção definitiva (DROP COLUMN + remover UPDATEs) será feita na Fase 3 junto com outras mudanças de schema.                                    |
+| 8  | `rebanho/routers/auth.py:35,58-60`                                     | **baixa**  | ✅ CORRIGIDO em `398d0ad`. `expira_em` migrado de TEXT para TIMESTAMPTZ. Mudanças em 4 arquivos: `sql/05_auth_tables.sql` (tipo da coluna + comentário invertido); `sql/migrations/2026_05_07_sessoes_expira_em_timestamptz.sql` (novo); `sql/README.md` (seção explicando migrations one-shot); `rebanho/routers/auth.py` (import `timezone`, `_expira()` usa `isoformat()` em UTC, `get_usuario_atual()` usa `fromisoformat` e `datetime.now(utc)`). Migration executada manualmente no Supabase (TRUNCATE TABLE sessoes + ALTER COLUMN). Sessões ATIVAS truncadas — todos os usuários precisaram relogar. |
 | 9  | `rebanho/models.py` (arquivo inteiro)                                  | **média**  | ✅ CORRIGIDO em `3614396`. Arquivo deletado. Confirmado morto: `findstr` global mostrou que `seed.py` era o único import de `models.py` em todo o projeto, e `seed.py` também foi deletado no mesmo commit (Bug #10).                                                                    |
 | 10 | `rebanho/seed.py`                                                      | **baixa**  | ✅ CORRIGIDO em `3614396`. Arquivo deletado junto com `models.py` (mesmo commit). Importava `SessionLocal`/`create_tables` que não existem mais em `database.py`, e inseria com Schema B (`data_pesagem`, `peso`, `data_insem`, `mm_chuva`). Os routers já têm seeds idiomáticos `seed_*()`. |
 | 11 | Vercel — Environment Variables                                         | **baixa**  | `SUPABASE_SECRET_KEY` ainda não foi adicionada na Vercel. Será necessária quando o código precisar bypassar RLS server-side (Fase 3, ao reativar RLS). Hoje o código só usa `SUPABASE_KEY` (publishable) e não precisa da secret.                                                       |
@@ -25,5 +26,5 @@ Os bugs de severidade **alta** (#1–#4) e parte dos **média/baixa**
 
 ## Próximos passos sugeridos (fora do escopo desta fase)
 
-- **Limpeza** — avaliar remoção de `piquetes.semaforo` (Bug #7, coluna escrita-only no banco).
-- **Tipo correto** — migrar `sessoes.expira_em` para TIMESTAMPTZ junto com ajuste em `auth.py:35`.
+Todos os bugs identificados na Fase 1 foram corrigidos. Débitos
+restantes (#11, #12) são novos e estão listados na tabela acima.
