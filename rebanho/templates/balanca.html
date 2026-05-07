@@ -28,7 +28,12 @@
     </ol>
     <p style="font-size:12px;color:#6b7280;margin-top:10px;background:#f9fafb;padding:10px 14px;border-radius:6px;">
       ℹ️ O sistema aceita arquivos <strong>.csv</strong>, <strong>.xls</strong> e <strong>.xlsx</strong> exportados pela S3.
-      A coluna <strong>Animal ID</strong> deve corresponder ao brinco cadastrado no sistema.
+      Reconhece colunas com nomes <strong>IDV / Animal ID / Brinco / Tag</strong> para o brinco.
+    </p>
+    <p style="font-size:12px;color:#6b7280;margin-top:8px;background:#f9fafb;padding:10px 14px;border-radius:6px;">
+      💡 Animais cujo brinco não estiver cadastrado serão <strong>criados automaticamente</strong> com os
+      defaults definidos abaixo. Para desligar esse comportamento, desmarque a caixa
+      "Cadastrar animais novos automaticamente".
     </p>
   </div>
 </div>
@@ -50,6 +55,69 @@
     <span style="font-size:18px;">📄</span>
     <span id="nomeArquivo" style="font-size:13px;font-weight:600;color:#1B5E20;"></span>
     <button onclick="limparArquivo()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#6b7280;font-size:16px;">✕</button>
+  </div>
+
+  <!-- ── Auto-cadastro de animais novos ────────────────────────────── -->
+  <div style="margin-top:18px;padding:14px 16px;background:rgba(0,0,0,.04);border-radius:8px;border:1px solid #e5e7eb;">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;font-weight:600;cursor:pointer;">
+      <input type="checkbox" id="cadastrarNovos" checked onchange="toggleDefaultsNovos()" />
+      Cadastrar animais novos automaticamente
+    </label>
+
+    <div id="defaultsNovos" style="margin-top:14px;">
+      <div style="font-size:11px;font-weight:700;color:#1B5E20;letter-spacing:.04em;margin-bottom:10px;">
+        DEFAULTS PARA ANIMAIS NOVOS
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:12px;color:#555;font-weight:600;display:block;margin-bottom:4px;">Sexo</label>
+          <select id="sexoPadrao" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+            <option value="MACHO" selected>Macho</option>
+            <option value="FEMEA">Fêmea</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#555;font-weight:600;display:block;margin-bottom:4px;">Raça</label>
+          <input id="racaPadrao" type="text" value="NELORE"
+            style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:#555;font-weight:600;display:block;margin-bottom:4px;">Tipo</label>
+          <select id="tipoPadrao" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+            <option value="BEZERRO">Bezerro</option>
+            <option value="GARROTE" selected>Garrote</option>
+            <option value="BOI">Boi</option>
+            <option value="VACA">Vaca</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#555;font-weight:600;display:block;margin-bottom:4px;">Origem</label>
+          <select id="origemPadrao" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+            <option value="COMPRA" selected>Compra</option>
+            <option value="NASCIMENTO">Nascimento</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+        <div>
+          <label style="font-size:12px;color:#555;font-weight:600;display:block;margin-bottom:4px;">Fornecedor (lançamento financeiro)</label>
+          <input id="fornecedor" type="text" value="Importação Balança"
+            style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:#555;font-weight:600;display:block;margin-bottom:4px;">Valor médio por animal (R$)</label>
+          <input id="valorMedio" type="number" step="0.01" placeholder="Opcional"
+            style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;" />
+        </div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px;color:#374151;cursor:pointer;">
+        <input type="checkbox" id="gerarCompraAgregada" checked />
+        Gerar lançamento de compra agregado (só se valor médio for informado)
+      </label>
+    </div>
   </div>
 
   <div style="margin-top:14px;display:flex;align-items:center;gap:14px;">
@@ -76,6 +144,10 @@
       <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
         <div id="numImportados" style="font-size:22px;font-weight:700;color:var(--good);"></div>
         <div style="font-size:11px;color:var(--muted);font-weight:600;">IMPORTADOS</div>
+      </div>
+      <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numCadastrados" style="font-size:22px;font-weight:700;color:var(--accent-ink);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">CADASTRADOS</div>
       </div>
       <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
         <div id="numIgnorados" style="font-size:22px;font-weight:700;color:var(--warn);"></div>
@@ -160,6 +232,13 @@
 <script>
 let arquivoAtual = null;
 
+// ── Toggle do bloco de defaults para animais novos ──────────────────
+function toggleDefaultsNovos() {
+  const ck = document.getElementById('cadastrarNovos');
+  const bloco = document.getElementById('defaultsNovos');
+  bloco.style.display = ck.checked ? 'block' : 'none';
+}
+
 // ── Instruções colapsável ────────────────────────────────────────────
 function toggleInstrucoes() {
   const el = document.getElementById('instrucoes');
@@ -223,6 +302,14 @@ async function importar() {
 
   const form = new FormData();
   form.append('arquivo', arquivoAtual);
+  form.append('cadastrar_novos',       document.getElementById('cadastrarNovos').checked ? 'true' : 'false');
+  form.append('sexo_padrao',           document.getElementById('sexoPadrao').value);
+  form.append('raca_padrao',           document.getElementById('racaPadrao').value || 'NELORE');
+  form.append('tipo_padrao',           document.getElementById('tipoPadrao').value);
+  form.append('origem_padrao',         document.getElementById('origemPadrao').value);
+  form.append('fornecedor',            document.getElementById('fornecedor').value || 'Importação Balança');
+  form.append('valor_medio',           document.getElementById('valorMedio').value || '');
+  form.append('gerar_compra_agregada', document.getElementById('gerarCompraAgregada').checked ? 'true' : 'false');
 
   try {
     const r = await fetch('/balanca/importar', { method: 'POST', body: form });
@@ -257,6 +344,7 @@ function renderResultado(d) {
   document.getElementById('resultMensagem').textContent = d.mensagem;
   document.getElementById('resultSubtitulo').textContent = `Arquivo processado em ${new Date().toLocaleString('pt-BR')}`;
   document.getElementById('numImportados').textContent  = d.importados;
+  document.getElementById('numCadastrados').textContent = d.novos_cadastrados ?? 0;
   document.getElementById('numIgnorados').textContent   = d.ignorados;
   document.getElementById('numErros').textContent       = d.erros;
   document.getElementById('numTotal').textContent       = d.total;
