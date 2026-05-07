@@ -1,6 +1,6 @@
 import hashlib
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
@@ -21,7 +21,7 @@ def _novo_token() -> str:
 
 
 def _expira() -> str:
-    return (datetime.now() + timedelta(hours=_TTL_HORAS)).strftime("%Y-%m-%d %H:%M:%S")
+    return (datetime.now(timezone.utc) + timedelta(hours=_TTL_HORAS)).isoformat()
 
 
 def get_usuario_atual(request: Request, db=None):
@@ -32,7 +32,7 @@ def get_usuario_atual(request: Request, db=None):
     if not rows:
         return None
     sessao = rows[0]
-    if datetime.strptime(sessao["expira_em"], "%Y-%m-%d %H:%M:%S") < datetime.now():
+    if datetime.fromisoformat(sessao["expira_em"]) < datetime.now(timezone.utc):
         supabase.table("sessoes").delete().eq("token", token).execute()
         return None
     u_rows = supabase.table("usuarios").select("*").eq("id", sessao["usuario_id"]).eq("ativo", True).limit(1).execute().data

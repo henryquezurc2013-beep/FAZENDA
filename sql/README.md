@@ -57,6 +57,17 @@ Se alguma tabela aparecer como `MISSING`:
 - Verifique se o arquivo correspondente foi executado.
 - Confirme que a key no `.env` é a `service_role` (a `anon` não enxerga tabelas sem RLS configurado).
 
+## Migrations (`sql/migrations/`)
+
+A pasta `migrations/` contém scripts **one-shot** para evoluir bancos
+**já existentes** (ALTER TABLE, mudanças de tipo, backfills). Eles **não**
+fazem parte da sequência de criação acima — bancos novos são criados
+pelos `0X_*_tables.sql` já com o schema final.
+
+Cada migration deve ser executada **uma única vez** no SQL Editor do
+Supabase, em cada ambiente que precise dela. O nome do arquivo segue
+`YYYY_MM_DD_<descricao>.sql` para ordenação cronológica.
+
 ## Sobre RLS e seeds
 
 - **RLS (Row Level Security)** *não* faz parte desses DDLs. Vai numa fase separada — depende de decisão sobre adoção de Supabase Auth ou modelo alternativo (auth atual é custom, ver `05_auth_tables.sql`).
