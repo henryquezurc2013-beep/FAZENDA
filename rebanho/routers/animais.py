@@ -1,6 +1,10 @@
-from fastapi import APIRouter, HTTPException, Query, Request
-from typing import Optional, List
-from datetime import date
+import io
+import json
+from datetime import date, timedelta
+from typing import List, Optional
+
+import pandas as pd
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from database import supabase, get_fazenda_id
 
@@ -16,6 +20,26 @@ _ALLOWED_FIELDS = {
     "origem", "valor_compra", "pasto_atual", "peso_atual", "status", "data_morte",
     "motivo_morte", "custo_kg", "custo_arroba", "obs", "fazenda_id",
 }
+
+
+# ── Importação em massa (POST /animais/importar) ──────────────────────────
+# Heurísticas amplas (case-insensitive, com/sem acento) para detectar colunas
+# do CSV/XLS de entrada. Mapeiam para 3 campos obrigatórios: brinco, peso, valor.
+_BRINCO_COLS_IMP = {"brinco", "id", "tag", "animal", "animal id", "ear tag"}
+_PESO_COLS_IMP   = {"peso", "peso entrada", "peso_kg", "weight", "kg"}
+_VALOR_COLS_IMP  = {"valor", "preco", "preço", "custo", "valor unit", "preco unit"}
+
+# Defaults aplicados a todos os animais da importação (carga inicial assume
+# rebanho homogêneo — gado de corte macho nelore garrote comprado).
+_DEFAULTS_IMP = {
+    "sexo":   "MACHO",
+    "raca":   "NELORE",
+    "tipo":   "GARROTE",
+    "origem": "COMPRA",
+    "status": "ATIVO",
+}
+# Estimativa de idade na compra: 8 meses → data_nascimento = data_compra - 240 dias.
+_DATA_NASCIMENTO_OFFSET_DIAS = 240
 
 
 def _calc_idade(data_nascimento: str):
@@ -144,6 +168,194 @@ def criar_animal(request: Request, body: dict):
     _calcular_custos(data)
     result = supabase.table("animais").insert(data).execute().data[0]
     return _to_out(result)
+
+
+# ── Importação em massa ──────────────────────────────────────────────────
+
+def _ler_arquivo_animais(conteudo: bytes, nome: str) -> pd.DataFrame:
+    """Lê CSV/XLS/XLSX como string (espelha balanca._ler_arquivo)."""
+    ext = nome.rsplit(".", 1)[-1].lower()
+    if ext == "csv":
+        for sep in [",", ";"]:
+            try:
+                df = pd.read_csv(io.BytesIO(conteudo), sep=sep, dtype=str)
+                if len(df.columns) > 1:
+                    return df
+            except Exception:
+                continue
+        return pd.read_csv(io.BytesIO(conteudo), dtype=str)
+    elif ext == "xlsx":
+        return pd.read_excel(io.BytesIO(conteudo), engine="openpyxl", dtype=str)
+    elif ext == "xls":
+        return pd.read_excel(io.BytesIO(conteudo), engine="xlrd", dtype=str)
+    raise ValueError(f"Extensão não suportada: {ext}")
+
+
+def _detectar_coluna(df: pd.DataFrame, candidatos: set) -> Optional[str]:
+    """Encontra a primeira coluna do DF cujo nome (lower+strip) bate com algum candidato."""
+    for col in df.columns:
+        if str(col).strip().lower() in candidatos:
+            return col
+    return None
+
+
+def _parse_numero(valor) -> Optional[float]:
+    """Parsa peso/valor com tolerância (R$, kg, vírgula decimal). None se inválido."""
+    if pd.isna(valor):
+        return None
+    s = str(valor).strip().upper()
+    s = s.replace("KG", "").replace("R$", "").replace(",", ".").strip()
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+@router.post("/importar")
+async def importar_animais(
+    request: Request,
+    arquivo: UploadFile = File(...),
+    gerar_compra_agregada: bool = Form(True),
+    fornecedor: str = Form("Importação"),
+    data_compra: Optional[str] = Form(None),
+):
+    nome = arquivo.filename or "arquivo"
+    ext = nome.rsplit(".", 1)[-1].lower() if "." in nome else ""
+    if ext not in ("csv", "xls", "xlsx"):
+        raise HTTPException(status_code=400, detail="Formato não suportado. Use CSV, XLS ou XLSX.")
+    conteudo = await arquivo.read()
+    try:
+        df = _ler_arquivo_animais(conteudo, nome)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Erro ao ler arquivo: {e}")
+
+    col_brinco = _detectar_coluna(df, _BRINCO_COLS_IMP)
+    col_peso   = _detectar_coluna(df, _PESO_COLS_IMP)
+    col_valor  = _detectar_coluna(df, _VALOR_COLS_IMP)
+    if not col_brinco or not col_peso or not col_valor:
+        raise HTTPException(
+            status_code=400,
+            detail="Colunas obrigatórias não encontradas. A planilha precisa ter colunas para brinco, peso e valor."
+        )
+
+    # Parse data_compra (default = hoje); data_nascimento = compra - 240 dias.
+    if data_compra:
+        try:
+            dt_compra = date.fromisoformat(data_compra)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="data_compra inválida, use YYYY-MM-DD.")
+    else:
+        dt_compra = date.today()
+    data_compra_iso = dt_compra.isoformat()
+    data_nascimento_iso = (dt_compra - timedelta(days=_DATA_NASCIMENTO_OFFSET_DIAS)).isoformat()
+
+    fid = get_fazenda_id(request)
+    fazenda_id_final = fid if fid > 0 else 1
+
+    lista_ignorados: List[dict] = []
+    importados = 0
+    soma_valores = 0.0
+
+    for idx, row in df.iterrows():
+        num_linha = int(idx) + 2
+        brinco_raw = str(row.get(col_brinco, "")).strip()
+        if not brinco_raw or brinco_raw.lower() == "nan":
+            lista_ignorados.append({"linha": num_linha, "motivo": "Brinco vazio"})
+            continue
+        peso = _parse_numero(row.get(col_peso))
+        if peso is None or peso <= 0:
+            lista_ignorados.append({
+                "linha": num_linha, "brinco": brinco_raw,
+                "motivo": f"Peso inválido: '{row.get(col_peso)}'"
+            })
+            continue
+        valor = _parse_numero(row.get(col_valor))
+        if valor is None or valor <= 0:
+            lista_ignorados.append({
+                "linha": num_linha, "brinco": brinco_raw,
+                "motivo": f"Valor inválido: '{row.get(col_valor)}'"
+            })
+            continue
+
+        # Brinco já existe? (mesmo padrão do POST "" individual)
+        existing = supabase.table("animais").select("id").ilike("brinco", brinco_raw).limit(1).execute().data
+        if existing:
+            lista_ignorados.append({
+                "linha": num_linha, "brinco": brinco_raw,
+                "motivo": "Brinco já cadastrado"
+            })
+            continue
+
+        custo_kg = round(valor / peso, 2)
+        custo_arroba = round(valor / (peso / 15), 2)
+
+        animal_data = {
+            "brinco":          brinco_raw,
+            "sexo":            _DEFAULTS_IMP["sexo"],
+            "raca":            _DEFAULTS_IMP["raca"],
+            "tipo":            _DEFAULTS_IMP["tipo"],
+            "origem":          _DEFAULTS_IMP["origem"],
+            "status":          _DEFAULTS_IMP["status"],
+            "fazenda_id":      fazenda_id_final,
+            "peso_atual":      peso,
+            "valor_compra":    valor,
+            "custo_kg":        custo_kg,
+            "custo_arroba":    custo_arroba,
+            "data_nascimento": data_nascimento_iso,
+            "data_compra":     data_compra_iso,
+        }
+        try:
+            supabase.table("animais").insert(animal_data).execute()
+            importados += 1
+            soma_valores += valor
+        except Exception as e:
+            lista_ignorados.append({
+                "linha": num_linha, "brinco": brinco_raw,
+                "motivo": f"Erro ao inserir: {str(e)[:120]}"
+            })
+
+    # Lançamento de compra agregado (consolida o gasto da importação inteira)
+    compra_id = None
+    if gerar_compra_agregada and importados > 0:
+        valor_unit_medio = round(soma_valores / importados, 2)
+        try:
+            row_compra = supabase.table("compras").insert({
+                "fornecedor":  fornecedor,
+                "data":        data_compra_iso,
+                "descricao":   f"Importação de {importados} animais (carga em massa)",
+                "valor_unit":  valor_unit_medio,
+                "quantidade":  importados,
+                "valor_total": round(soma_valores, 2),
+                "mes":         dt_compra.month,
+                "ano":         dt_compra.year,
+            }).execute().data[0]
+            compra_id = row_compra["id"]
+        except Exception as e:
+            print(f"[importar_animais] aviso: falhou ao gravar lançamento de compra: {e}")
+
+    # Log da importação. try/except defensivo: se a tabela importacoes_animais
+    # ainda não foi criada no Supabase do ambiente, a importação real não falha.
+    importacao_id = None
+    try:
+        row_imp = supabase.table("importacoes_animais").insert({
+            "fazenda_id":   fazenda_id_final,
+            "nome_arquivo": nome,
+            "total_linhas": int(len(df)),
+            "importados":   importados,
+            "ignorados":    len(lista_ignorados),
+            "detalhes":     {"ignorados": lista_ignorados},
+        }).execute().data[0]
+        importacao_id = row_imp["id"]
+    except Exception as e:
+        print(f"[importar_animais] aviso: falhou ao gravar log em importacoes_animais: {e}")
+
+    return {
+        "importados":      importados,
+        "ignorados":       len(lista_ignorados),
+        "lista_ignorados": lista_ignorados,
+        "compra_id":       compra_id,
+        "importacao_id":   importacao_id,
+    }
 
 
 @router.put("/{brinco}")
