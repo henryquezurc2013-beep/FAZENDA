@@ -10,7 +10,9 @@ from database import supabase
 
 router = APIRouter()
 
-_BRINCO_COLS  = {"animal id", "animal_id", "tag id", "tag_id", "brinco", "id", "animais"}
+_BRINCO_COLS  = {"animal id", "animal_id", "tag id", "tag_id",
+                 "brinco", "id", "idv", "eid", "vid", "ear tag",
+                 "tag", "animais"}
 _PESO_COLS    = {"weight", "peso", "kg", "weight kg", "weight(kg)", "peso kg"}
 _DATA_COLS    = {"date", "data", "fecha", "dt", "data pesagem", "data_pesagem"}
 _DATE_FMTS    = ["%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d", "%d-%m-%Y",
