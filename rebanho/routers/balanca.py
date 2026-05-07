@@ -132,6 +132,14 @@ async def importar_balanca(arquivo: UploadFile = File(...)):
         if existe:
             lista_ignorados.append({"brinco": brinco_raw, "data": data_str, "motivo": "Pesagem já importada para esta data"})
             continue
+        fazenda_id = animal.get("fazenda_id")
+        if not fazenda_id:
+            lista_ignorados.append({
+                "brinco": brinco_raw,
+                "data": data_str,
+                "motivo": "Animal sem fazenda_id cadastrada"
+            })
+            continue
         ganho_kg, gmd, dias_periodo = _calcular_ganho(brinco_raw, peso, data_str)
         supabase.table("pesagens").insert({
             "brinco": animal["brinco"],
@@ -141,7 +149,7 @@ async def importar_balanca(arquivo: UploadFile = File(...)):
             "gmd": gmd,
             "dias_periodo": dias_periodo,
             "pasto": animal.get("pasto_atual"),
-            "fazenda_id": animal.get("fazenda_id") or 1,
+            "fazenda_id": fazenda_id,
         }).execute()
         supabase.table("animais").update({"peso_atual": peso}).ilike("brinco", brinco_raw).execute()
         importados += 1
