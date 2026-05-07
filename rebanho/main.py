@@ -199,7 +199,7 @@ async def campo_dados(request: Request):
         for p in piquetes
     ]
 
-    planos = supabase.table("planos_nutricionais").select("*").eq("fazenda_id", fid).eq("status", "ATIVO").execute().data
+    planos = supabase.table("plano_nutricional").select("*").eq("fazenda_id", fid).eq("status", "ATIVO").execute().data
     planos_hoje = []
     for pl in planos:
         if pl.get("data_inicio") and pl["data_inicio"] <= hoje_iso and (not pl.get("data_fim") or pl["data_fim"] >= hoje_iso):
