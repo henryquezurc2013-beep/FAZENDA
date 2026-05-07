@@ -90,7 +90,7 @@ def resumo_fazenda(fid: int):
     despesas_rows = supabase.table("despesas").select("valor").ilike("vencimento", f"{mes_str}%").eq("status", "PENDENTE").execute().data
     despesa = sum(d["valor"] or 0 for d in despesas_rows)
 
-    ultima_pes_rows = supabase.table("pesagens").select("data_pesagem").eq("fazenda_id", fid).order("data_pesagem", desc=True).limit(1).execute().data
+    ultima_pes_rows = supabase.table("pesagens").select("data").eq("fazenda_id", fid).order("data", desc=True).limit(1).execute().data
     ultima_pes = ultima_pes_rows[0] if ultima_pes_rows else None
 
     piquetes = supabase.table("piquetes").select("id,status").eq("fazenda_id", fid).execute().data
@@ -120,7 +120,7 @@ def resumo_fazenda(fid: int):
         "financeiro": {"receita_mes": round(float(receita), 2),
                        "despesa_mes": round(float(despesa), 2),
                        "saldo_mes": round(float(receita) - float(despesa), 2)},
-        "ultima_pesagem": ultima_pes["data_pesagem"] if ultima_pes else None,
+        "ultima_pesagem": ultima_pes["data"] if ultima_pes else None,
         "confinamento": {
             "lotes_ativos": len(lotes_conf),
             "animais_confinados": animais_conf,
