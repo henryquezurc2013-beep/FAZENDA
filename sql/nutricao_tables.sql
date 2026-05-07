@@ -1,5 +1,6 @@
 -- ============================================================
 --  Módulo de Nutrição — DDL Supabase
+--  Pré-requisito: 04_pastagem_tables.sql executado (lotes, lote_animais).
 --  Execute no SQL Editor do Supabase (dashboard.supabase.com)
 -- ============================================================
 
@@ -106,16 +107,8 @@ CREATE INDEX IF NOT EXISTS idx_est_sup_sup     ON estoque_suplemento(suplemento_
 CREATE INDEX IF NOT EXISTS idx_est_sup_data    ON estoque_suplemento(data DESC);
 
 
--- 5. TABELA AUXILIAR: lote_animais (se ainda não existir) ─────
---    Relaciona brincos ao lote para cálculo de CA
-CREATE TABLE IF NOT EXISTS lote_animais (
-    id         BIGSERIAL PRIMARY KEY,
-    lote_id    BIGINT NOT NULL REFERENCES lotes(id) ON DELETE CASCADE,
-    brinco     TEXT   NOT NULL,
-    status     TEXT   NOT NULL DEFAULT 'ATIVO',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (lote_id, brinco)
-);
-
-CREATE INDEX IF NOT EXISTS idx_lote_animais_lote   ON lote_animais(lote_id);
-CREATE INDEX IF NOT EXISTS idx_lote_animais_brinco ON lote_animais(brinco);
+-- §5 (lote_animais) movido para 04_pastagem_tables.sql ───────
+--    A definição completa (com data_entrada, data_saida, fazenda_id e
+--    UNIQUE parcial) vive agora em 04_pastagem_tables.sql §4. Este
+--    arquivo apenas referencia a tabela via FK em plano_nutricional e
+--    lancamento_racao acima.
