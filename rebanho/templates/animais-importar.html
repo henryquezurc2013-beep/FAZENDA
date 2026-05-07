@@ -88,34 +88,34 @@
 
 <!-- ── Seção 3: Resultado ──────────────────────────────────────────── -->
 <div id="secaoResultado" style="display:none;margin-bottom:16px;">
-  <div id="cardResultado" style="border-radius:10px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <div id="cardResultado" style="border-radius:10px;padding:20px 24px;box-shadow:var(--shadow-sm);color:var(--ink);">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
       <span id="resultIcon" style="font-size:28px;"></span>
       <div>
         <div id="resultMensagem" style="font-size:15px;font-weight:700;"></div>
-        <div id="resultSubtitulo" style="font-size:12px;color:#6b7280;margin-top:2px;"></div>
+        <div id="resultSubtitulo" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
       </div>
     </div>
 
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
-      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
-        <div id="numImportados" style="font-size:22px;font-weight:700;color:#1B5E20;"></div>
-        <div style="font-size:11px;color:#555;font-weight:600;">IMPORTADOS</div>
+      <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numImportados" style="font-size:22px;font-weight:700;color:var(--good);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">IMPORTADOS</div>
       </div>
-      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
-        <div id="numIgnorados" style="font-size:22px;font-weight:700;color:#E65100;"></div>
-        <div style="font-size:11px;color:#555;font-weight:600;">IGNORADOS</div>
+      <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numIgnorados" style="font-size:22px;font-weight:700;color:var(--warn);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">IGNORADOS</div>
       </div>
-      <div id="boxCompra" style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;display:none;">
-        <div id="numCompraId" style="font-size:18px;font-weight:700;color:#0d47a1;"></div>
-        <div style="font-size:11px;color:#555;font-weight:600;">LANÇAMENTO</div>
+      <div id="boxCompra" style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;display:none;">
+        <div id="numCompraId" style="font-size:18px;font-weight:700;color:var(--accent-ink);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">LANÇAMENTO</div>
       </div>
     </div>
 
     <div id="tabelaIgnorados" style="display:none;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:600;color:#E65100;margin-bottom:6px;">⚠️ Linhas ignoradas:</div>
+      <div style="font-size:12px;font-weight:600;color:var(--warn);margin-bottom:6px;">⚠️ Linhas ignoradas:</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:rgba(0,0,0,.05);">
+        <thead><tr style="background:rgba(255,255,255,.06);">
           <th style="padding:5px 10px;text-align:left;">Linha</th>
           <th style="padding:5px 10px;text-align:left;">Brinco</th>
           <th style="padding:5px 10px;text-align:left;">Motivo</th>
@@ -266,8 +266,8 @@ async function importar() {
 function renderResultado(d) {
   const card = document.getElementById('cardResultado');
   const sucesso = d.importados > 0;
-  card.style.background = sucesso ? '#F1F8E9' : '#fff1f2';
-  card.style.border = `1px solid ${sucesso ? '#C8E6C9' : '#fca5a5'}`;
+  card.style.background = sucesso ? 'var(--good-soft)' : 'var(--bad-soft)';
+  card.style.border = `1px solid ${sucesso ? 'var(--good)' : 'var(--bad)'}`;
 
   document.getElementById('resultIcon').textContent     = sucesso ? '✅' : '⚠️';
   document.getElementById('resultMensagem').textContent =
@@ -287,10 +287,10 @@ function renderResultado(d) {
   if (igns.length > 0) {
     const tbody = document.getElementById('tbodyIgnorados');
     tbody.innerHTML = igns.map(g => `
-      <tr style="border-bottom:1px solid #f3f4f6;">
+      <tr style="border-bottom:1px solid var(--border);">
         <td style="padding:4px 10px;">${g.linha != null ? g.linha : '—'}</td>
-        <td style="padding:4px 10px;font-weight:600;color:#1B5E20;">${g.brinco || '—'}</td>
-        <td style="padding:4px 10px;color:#E65100;">${g.motivo}</td>
+        <td style="padding:4px 10px;font-weight:600;color:var(--good);">${g.brinco || '—'}</td>
+        <td style="padding:4px 10px;color:var(--warn);">${g.motivo}</td>
       </tr>`).join('');
     document.getElementById('tabelaIgnorados').style.display = 'block';
   } else {

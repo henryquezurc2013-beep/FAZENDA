@@ -63,38 +63,38 @@
 
 <!-- ── Seção 3: Resultado ──────────────────────────────────────────── -->
 <div id="secaoResultado" style="display:none;margin-bottom:16px;">
-  <div id="cardResultado" style="border-radius:10px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <div id="cardResultado" style="border-radius:10px;padding:20px 24px;box-shadow:var(--shadow-sm);color:var(--ink);">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
       <span id="resultIcon" style="font-size:28px;"></span>
       <div>
         <div id="resultMensagem" style="font-size:15px;font-weight:700;"></div>
-        <div id="resultSubtitulo" style="font-size:12px;color:#6b7280;margin-top:2px;"></div>
+        <div id="resultSubtitulo" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
       </div>
     </div>
 
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
-      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
-        <div id="numImportados" style="font-size:22px;font-weight:700;color:#1B5E20;"></div>
-        <div style="font-size:11px;color:#555;font-weight:600;">IMPORTADOS</div>
+      <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numImportados" style="font-size:22px;font-weight:700;color:var(--good);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">IMPORTADOS</div>
       </div>
-      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
-        <div id="numIgnorados" style="font-size:22px;font-weight:700;color:#E65100;"></div>
-        <div style="font-size:11px;color:#555;font-weight:600;">IGNORADOS</div>
+      <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numIgnorados" style="font-size:22px;font-weight:700;color:var(--warn);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">IGNORADOS</div>
       </div>
-      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
-        <div id="numErros" style="font-size:22px;font-weight:700;color:#dc2626;"></div>
-        <div style="font-size:11px;color:#555;font-weight:600;">ERROS</div>
+      <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numErros" style="font-size:22px;font-weight:700;color:var(--bad);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">ERROS</div>
       </div>
-      <div style="background:rgba(255,255,255,.7);border-radius:8px;padding:10px 18px;text-align:center;">
-        <div id="numTotal" style="font-size:22px;font-weight:700;color:#374151;"></div>
-        <div style="font-size:11px;color:#555;font-weight:600;">TOTAL</div>
+      <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:10px 18px;text-align:center;">
+        <div id="numTotal" style="font-size:22px;font-weight:700;color:var(--ink-2);"></div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;">TOTAL</div>
       </div>
     </div>
 
     <div id="tabelaIgnorados" style="display:none;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:600;color:#E65100;margin-bottom:6px;">⚠️ Registros ignorados:</div>
+      <div style="font-size:12px;font-weight:600;color:var(--warn);margin-bottom:6px;">⚠️ Registros ignorados:</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:rgba(0,0,0,.05);">
+        <thead><tr style="background:rgba(255,255,255,.06);">
           <th style="padding:5px 10px;text-align:left;">Brinco</th>
           <th style="padding:5px 10px;text-align:left;">Data</th>
           <th style="padding:5px 10px;text-align:left;">Motivo</th>
@@ -104,9 +104,9 @@
     </div>
 
     <div id="tabelaErros" style="display:none;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:600;color:#dc2626;margin-bottom:6px;">❌ Linhas com erro:</div>
+      <div style="font-size:12px;font-weight:600;color:var(--bad);margin-bottom:6px;">❌ Linhas com erro:</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:rgba(0,0,0,.05);">
+        <thead><tr style="background:rgba(255,255,255,.06);">
           <th style="padding:5px 10px;text-align:left;">Linha</th>
           <th style="padding:5px 10px;text-align:left;">Motivo</th>
         </tr></thead>
@@ -250,8 +250,8 @@ async function importar() {
 function renderResultado(d) {
   const card = document.getElementById('cardResultado');
   const sucesso = d.importados > 0;
-  card.style.background = sucesso ? '#F1F8E9' : (d.erros === d.total ? '#fff1f2' : '#FFF8E1');
-  card.style.border = `1px solid ${sucesso ? '#C8E6C9' : '#fca5a5'}`;
+  card.style.background = sucesso ? 'var(--good-soft)' : (d.erros === d.total ? 'var(--bad-soft)' : 'var(--warn-soft)');
+  card.style.border = `1px solid ${sucesso ? 'var(--good)' : (d.erros === d.total ? 'var(--bad)' : 'var(--warn)')}`;
 
   document.getElementById('resultIcon').textContent     = sucesso ? '✅' : '⚠️';
   document.getElementById('resultMensagem').textContent = d.mensagem;
@@ -266,10 +266,10 @@ function renderResultado(d) {
   if (igns.length > 0) {
     const tbody = document.getElementById('tbodyIgnorados');
     tbody.innerHTML = igns.map(g => `
-      <tr style="border-bottom:1px solid #f3f4f6;">
-        <td style="padding:4px 10px;font-weight:600;color:#1B5E20;">${g.brinco}</td>
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:4px 10px;font-weight:600;color:var(--good);">${g.brinco}</td>
         <td style="padding:4px 10px;">${g.data ? fmtData(g.data) : '—'}</td>
-        <td style="padding:4px 10px;color:#E65100;">${g.motivo}</td>
+        <td style="padding:4px 10px;color:var(--warn);">${g.motivo}</td>
       </tr>`).join('');
     document.getElementById('tabelaIgnorados').style.display = 'block';
   }
@@ -279,9 +279,9 @@ function renderResultado(d) {
   if (errs.length > 0) {
     const tbody = document.getElementById('tbodyErros');
     tbody.innerHTML = errs.map(e => `
-      <tr style="border-bottom:1px solid #f3f4f6;">
+      <tr style="border-bottom:1px solid var(--border);">
         <td style="padding:4px 10px;">Linha ${e.linha}</td>
-        <td style="padding:4px 10px;color:#dc2626;">${e.motivo}</td>
+        <td style="padding:4px 10px;color:var(--bad);">${e.motivo}</td>
       </tr>`).join('');
     document.getElementById('tabelaErros').style.display = 'block';
   }
