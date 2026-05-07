@@ -1,10 +1,10 @@
 import io
 import json
-from datetime import date, datetime
-from typing import List
+from datetime import date, datetime, timedelta
+from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from database import supabase
 
@@ -87,7 +87,17 @@ def _calcular_ganho(brinco: str, peso_novo: float, data_nova: str):
 
 
 @router.post("/importar")
-async def importar_balanca(arquivo: UploadFile = File(...)):
+async def importar_balanca(
+    arquivo: UploadFile = File(...),
+    cadastrar_novos: bool = Form(True),
+    sexo_padrao: str = Form("MACHO"),
+    raca_padrao: str = Form("NELORE"),
+    tipo_padrao: str = Form("GARROTE"),
+    origem_padrao: str = Form("COMPRA"),
+    fornecedor: str = Form("Importação Balança"),
+    valor_medio: str = Form(""),
+    gerar_compra_agregada: bool = Form(True),
+):
     nome = arquivo.filename or "arquivo"
     ext = nome.rsplit(".", 1)[-1].lower() if "." in nome else ""
     if ext not in ("csv", "xls", "xlsx"):
@@ -105,10 +115,25 @@ async def importar_balanca(arquivo: UploadFile = File(...)):
     if not col_brinco or not col_peso:
         raise HTTPException(status_code=400, detail="Colunas obrigatórias não encontradas.")
 
+    # valor_medio chega como string (form HTML); parseia tolerante (vírgula/ponto).
+    # Vazio, zero ou negativo → ignora (animais ficam sem valor_compra e nenhum
+    # lançamento agregado é criado).
+    valor_medio_float: Optional[float] = None
+    if valor_medio:
+        try:
+            v = float(str(valor_medio).replace(",", "."))
+            if v > 0:
+                valor_medio_float = v
+        except ValueError:
+            pass
+
     hoje = date.today().isoformat()
-    lista_ignorados: List[dict] = []
-    lista_erros:     List[dict] = []
+    lista_ignorados:   List[dict] = []
+    lista_erros:       List[dict] = []
+    lista_cadastrados: List[dict] = []
     importados = 0
+    novos_cadastrados = 0
+    data_primeira_pesagem: Optional[str] = None  # data do lote → vira data de /compras
 
     for idx, row in df.iterrows():
         num_linha = int(idx) + 2
@@ -125,10 +150,48 @@ async def importar_balanca(arquivo: UploadFile = File(...)):
             data_str = _parse_date(row.get(col_data))
         if not data_str:
             data_str = hoje
+        if data_primeira_pesagem is None:
+            data_primeira_pesagem = data_str
+
         animal_rows = supabase.table("animais").select("brinco,pasto_atual,fazenda_id").ilike("brinco", brinco_raw).limit(1).execute().data
+
+        # Brinco novo? Comportamento depende de cadastrar_novos.
         if not animal_rows:
-            lista_ignorados.append({"brinco": brinco_raw, "motivo": "Brinco não encontrado no sistema"})
-            continue
+            if not cadastrar_novos:
+                lista_ignorados.append({"brinco": brinco_raw, "motivo": "Brinco não encontrado no sistema"})
+                continue
+            # Auto-cadastra animal novo com defaults da UI.
+            try:
+                dt_compra = date.fromisoformat(data_str)
+                data_nascimento = (dt_compra - timedelta(days=240)).isoformat()
+                novo_animal = {
+                    "brinco":          brinco_raw,
+                    "sexo":            sexo_padrao,
+                    "raca":            raca_padrao,
+                    "tipo":            tipo_padrao,
+                    "origem":          origem_padrao,
+                    "status":          "ATIVO",
+                    "fazenda_id":      1,
+                    "data_compra":     data_str,
+                    "data_nascimento": data_nascimento,
+                    "peso_atual":      peso,
+                }
+                if valor_medio_float and peso > 0:
+                    novo_animal["valor_compra"] = valor_medio_float
+                    novo_animal["custo_kg"]     = round(valor_medio_float / peso, 2)
+                    novo_animal["custo_arroba"] = round(valor_medio_float / (peso / 15), 2)
+                supabase.table("animais").insert(novo_animal).execute()
+                novos_cadastrados += 1
+                lista_cadastrados.append({"brinco": brinco_raw, "data": data_str, "peso": peso})
+                # Substitui animal_rows pra cair no fluxo normal de pesagem abaixo.
+                animal_rows = [{"brinco": brinco_raw, "pasto_atual": None, "fazenda_id": 1}]
+            except Exception as e:
+                lista_erros.append({
+                    "linha": num_linha, "brinco": brinco_raw,
+                    "motivo": f"Falha ao cadastrar animal novo: {str(e)[:120]}"
+                })
+                continue
+
         animal = animal_rows[0]
         existe = supabase.table("pesagens").select("id").ilike("brinco", brinco_raw).eq("data", data_str).limit(1).execute().data
         if existe:
@@ -156,10 +219,35 @@ async def importar_balanca(arquivo: UploadFile = File(...)):
         supabase.table("animais").update({"peso_atual": peso}).ilike("brinco", brinco_raw).execute()
         importados += 1
 
+    # Lançamento agregado em /compras: só cria se houve cadastro de animais novos
+    # E o valor_medio foi informado (não inventa valor de compra).
+    compra_id = None
+    if gerar_compra_agregada and novos_cadastrados > 0 and valor_medio_float and data_primeira_pesagem:
+        try:
+            dt_compra = date.fromisoformat(data_primeira_pesagem)
+            valor_total = round(novos_cadastrados * valor_medio_float, 2)
+            row_compra = supabase.table("compras").insert({
+                "fornecedor":  fornecedor,
+                "data":        data_primeira_pesagem,
+                "descricao":   f"Importação balança — {novos_cadastrados} animais novos cadastrados",
+                "valor_unit":  valor_medio_float,
+                "quantidade":  novos_cadastrados,
+                "valor_total": valor_total,
+                "mes":         dt_compra.month,
+                "ano":         dt_compra.year,
+            }).execute().data[0]
+            compra_id = row_compra["id"]
+        except Exception as e:
+            print(f"[importar_balanca] aviso: falhou ao gravar lancamento de compra: {e}")
+
     total = len(df)
     n_ign = len(lista_ignorados)
     n_err = len(lista_erros)
-    detalhes = {"ignorados": lista_ignorados, "erros": lista_erros}
+    detalhes = {
+        "ignorados":   lista_ignorados,
+        "erros":       lista_erros,
+        "cadastrados": lista_cadastrados,
+    }
     supabase.table("importacoes_balanca").insert({
         "nome_arquivo": nome,
         "data_importacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -171,12 +259,22 @@ async def importar_balanca(arquivo: UploadFile = File(...)):
     }).execute()
 
     partes = [f"{importados} pesagens importadas com sucesso."]
-    if n_ign: partes.append(f"{n_ign} ignoradas.")
-    if n_err: partes.append(f"{n_err} com erro.")
+    if novos_cadastrados:
+        partes.append(f"{novos_cadastrados} animais novos cadastrados.")
+    if n_ign:
+        partes.append(f"{n_ign} ignoradas.")
+    if n_err:
+        partes.append(f"{n_err} com erro.")
     return {
-        "sucesso": importados > 0 or (n_err == 0 and n_ign == 0),
-        "importados": importados, "ignorados": n_ign, "erros": n_err,
-        "total": total, "mensagem": " ".join(partes), "detalhes": detalhes,
+        "sucesso":           importados > 0 or (n_err == 0 and n_ign == 0),
+        "importados":        importados,
+        "novos_cadastrados": novos_cadastrados,
+        "ignorados":         n_ign,
+        "erros":             n_err,
+        "total":             total,
+        "compra_id":         compra_id,
+        "mensagem":          " ".join(partes),
+        "detalhes":          detalhes,
     }
 
 
