@@ -68,20 +68,20 @@ def _ler_arquivo(conteudo: bytes, nome: str) -> pd.DataFrame:
 
 
 def _calcular_ganho(brinco: str, peso_novo: float, data_nova: str):
-    rows = supabase.table("pesagens").select("peso,data_pesagem").ilike("brinco", brinco).lt("data_pesagem", data_nova).order("data_pesagem", desc=True).limit(1).execute().data
+    rows = supabase.table("pesagens").select("peso_kg,data").ilike("brinco", brinco).lt("data", data_nova).order("data", desc=True).limit(1).execute().data
     anterior = rows[0] if rows else None
-    ganho_kg = ganho_pct = media_dia_kg = 0.0
+    ganho_kg = 0.0
+    gmd = 0.0
+    dias_periodo = 0
     if anterior:
-        ganho_kg = round(peso_novo - anterior["peso"], 2)
-        if anterior["peso"]:
-            ganho_pct = round((ganho_kg / anterior["peso"]) * 100, 1)
+        ganho_kg = round(peso_novo - anterior["peso_kg"], 2)
         try:
-            dias = (date.fromisoformat(data_nova) - date.fromisoformat(anterior["data_pesagem"])).days
-            if dias > 0:
-                media_dia_kg = round(ganho_kg / dias, 1)
+            dias_periodo = (date.fromisoformat(data_nova) - date.fromisoformat(anterior["data"])).days
+            if dias_periodo > 0:
+                gmd = round(ganho_kg / dias_periodo, 3)
         except Exception:
             pass
-    return ganho_kg, ganho_pct, media_dia_kg
+    return ganho_kg, gmd, dias_periodo
 
 
 @router.post("/importar")
@@ -123,27 +123,25 @@ async def importar_balanca(arquivo: UploadFile = File(...)):
             data_str = _parse_date(row.get(col_data))
         if not data_str:
             data_str = hoje
-        animal_rows = supabase.table("animais").select("brinco,pasto").ilike("brinco", brinco_raw).limit(1).execute().data
+        animal_rows = supabase.table("animais").select("brinco,pasto_atual,fazenda_id").ilike("brinco", brinco_raw).limit(1).execute().data
         if not animal_rows:
             lista_ignorados.append({"brinco": brinco_raw, "motivo": "Brinco não encontrado no sistema"})
             continue
         animal = animal_rows[0]
-        existe = supabase.table("pesagens").select("id").ilike("brinco", brinco_raw).eq("data_pesagem", data_str).limit(1).execute().data
+        existe = supabase.table("pesagens").select("id").ilike("brinco", brinco_raw).eq("data", data_str).limit(1).execute().data
         if existe:
             lista_ignorados.append({"brinco": brinco_raw, "data": data_str, "motivo": "Pesagem já importada para esta data"})
             continue
-        ganho_kg, ganho_pct, media_dia_kg = _calcular_ganho(brinco_raw, peso, data_str)
-        dt = date.fromisoformat(data_str)
+        ganho_kg, gmd, dias_periodo = _calcular_ganho(brinco_raw, peso, data_str)
         supabase.table("pesagens").insert({
             "brinco": animal["brinco"],
-            "data_pesagem": data_str,
-            "peso": peso,
+            "data": data_str,
+            "peso_kg": peso,
             "ganho_kg": ganho_kg,
-            "ganho_pct": ganho_pct,
-            "media_dia_kg": media_dia_kg,
-            "mes": dt.month,
-            "ano": dt.year,
-            "pasto": animal.get("pasto"),
+            "gmd": gmd,
+            "dias_periodo": dias_periodo,
+            "pasto": animal.get("pasto_atual"),
+            "fazenda_id": animal.get("fazenda_id") or 1,
         }).execute()
         supabase.table("animais").update({"peso_atual": peso}).ilike("brinco", brinco_raw).execute()
         importados += 1
