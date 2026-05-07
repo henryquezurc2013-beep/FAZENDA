@@ -227,7 +227,7 @@ async def campo_dados(request: Request):
         })
 
     limite30 = (hoje - timedelta(days=30)).isoformat()
-    pesagens_rows = supabase.table("pesagens").select("brinco").gte("data_pesagem", limite30).execute().data
+    pesagens_rows = supabase.table("pesagens").select("brinco").gte("data", limite30).execute().data
     brincos_pesados = {p["brinco"] for p in pesagens_rows}
     ativos_rows = supabase.table("animais").select("brinco").eq("status", "ATIVO").eq("fazenda_id", fid).execute().data
     sem_pesagem = sum(1 for a in ativos_rows if a["brinco"] not in brincos_pesados)
