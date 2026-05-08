@@ -354,9 +354,45 @@
     </div>
   </div>
 
-  <!-- Sub-section: Medicar (placeholder — conteúdo no commit 5) -->
+  <!-- Sub-section: Medicar (sanidade) -->
   <div class="c-subsection" id="sub-medicar">
-    <div class="c-empty"><span class="c-empty-icon">💉</span>Em breve</div>
+    <div class="c-card">
+      <div class="c-form-title">💉 Registrar Medicação</div>
+      <div class="c-field">
+        <label>Brinco do Animal *</label>
+        <input type="text" id="sanBrinco" placeholder="ex: BOV-001" autocapitalize="characters"/>
+      </div>
+      <div class="c-field">
+        <label>Classificação *</label>
+        <select id="sanClass"><option value="">— selecione —</option></select>
+      </div>
+      <div class="c-field">
+        <label>Medicamento / Produto *</label>
+        <input type="text" id="sanMed" list="sanMedList" placeholder="Nome do produto"/>
+        <datalist id="sanMedList"></datalist>
+      </div>
+      <div class="c-field">
+        <label>Quantidade</label>
+        <input type="number" id="sanQtd" step="0.1" min="0" placeholder="ex: 10"/>
+      </div>
+      <div class="c-field">
+        <label>Unidade</label>
+        <input type="text" id="sanUnidade" placeholder="ml, dose, comprimido..."/>
+      </div>
+      <div class="c-field">
+        <label>Data *</label>
+        <input type="date" id="sanData"/>
+      </div>
+      <div class="c-field">
+        <label>Responsável</label>
+        <input type="text" id="sanResp" placeholder="Campo"/>
+      </div>
+      <div class="c-field">
+        <label>Observação</label>
+        <textarea id="sanObs" placeholder="opcional..."></textarea>
+      </div>
+      <button class="btn-primary" onclick="registrarSanidade()">💾 Salvar</button>
+    </div>
   </div>
 
   <!-- Sub-section: Morte (placeholder — conteúdo no commit 6) -->
@@ -426,6 +462,9 @@ async function carregarDados() {
 
     // Pasto: lista de piquetes pra dropdown do form de medição.
     await carregarPiquetes();
+
+    // Animais: definições para os forms de sanidade (e morte, no futuro).
+    await carregarDefinicoesSanidade();
   } catch(e) {
     toast('Erro ao carregar dados', true);
   }
@@ -693,6 +732,74 @@ async function registrarPesagem() {
     document.getElementById('pesObs').value = '';
     dadosCache = null; carregarDados();
   } catch { toast('Erro ao registrar', true); }
+}
+
+// ── ANIMAIS / Sanidade (sub-tab Medicar) ──────────────────────────────
+async function carregarDefinicoesSanidade() {
+  try {
+    const defs = await fetch('/definicoes')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+    if (!defs) return;
+    const sel = document.getElementById('sanClass');
+    if (sel) {
+      sel.innerHTML = '<option value="">— selecione —</option>';
+      (defs.classificacoes_sanidade || []).forEach(c => {
+        sel.innerHTML += `<option value="${c}">${c}</option>`;
+      });
+    }
+    const dl = document.getElementById('sanMedList');
+    if (dl) {
+      dl.innerHTML = (defs.medicamentos || []).map(m => `<option value="${m}">`).join('');
+    }
+  } catch {} // silencioso — dropdown vazio é aceitável
+  document.getElementById('sanData').value = new Date().toISOString().slice(0,10);
+}
+
+async function registrarSanidade() {
+  const brinco = document.getElementById('sanBrinco').value.trim().toUpperCase();
+  const classificacao = document.getElementById('sanClass').value;
+  const medicamento = document.getElementById('sanMed').value.trim();
+  const quantidade = document.getElementById('sanQtd').value;
+  const unidade = document.getElementById('sanUnidade').value.trim();
+  const data = document.getElementById('sanData').value;
+  const resp = document.getElementById('sanResp').value.trim();
+  const obs = document.getElementById('sanObs').value.trim();
+  if (!brinco) { toast('Informe o brinco', true); return; }
+  if (!classificacao) { toast('Selecione a classificação', true); return; }
+  if (!medicamento) { toast('Informe o medicamento', true); return; }
+  if (!data) { toast('Informe a data', true); return; }
+  try {
+    const r = await fetch('/sanidade', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        brinco,
+        data,
+        classificacao,
+        medicamento,
+        quantidade:  quantidade !== '' ? parseFloat(quantidade) : null,
+        unidade:     unidade || null,
+        responsavel: resp || 'Campo',
+        obs:         obs || null,
+        status:      'APLICADO',
+      })
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      toast(e.detail || 'Erro ao salvar', true);
+      return;
+    }
+    toast('✓ Medicação registrada!', false);
+    // Mantém brinco — vaqueiro pode lançar várias medicações no mesmo animal.
+    document.getElementById('sanMed').value = '';
+    document.getElementById('sanQtd').value = '';
+    document.getElementById('sanUnidade').value = '';
+    document.getElementById('sanObs').value = '';
+    dadosCache = null; carregarDados();
+  } catch {
+    toast('Erro de conexão', true);
+  }
 }
 
 // ── Inicialização ─────────────────────────────────────────────────────
