@@ -486,22 +486,35 @@ async function registrarConfinamento() {
   const resp = document.getElementById('confResp').value.trim();
   if (!loteId || isNaN(qtd) || qtd <= 0 || !data) { toast('Preencha todos os campos', true); return; }
   try {
-    const r = await fetch('/confinamento/lotes/'+loteId+'/lancamentos', {
+    // Resolver fase_id real: backend nao filtra por status, entao pegamos
+    // todas as fases do lote e filtramos no JS pela ATIVA.
+    const fases = await fetch('/confinamento/lotes/'+loteId+'/fases')
+      .then(rr => rr.ok ? rr.json() : [])
+      .catch(() => []);
+    const ativa = (fases || []).find(f => f.status === 'ATIVA');
+    if (!ativa) { toast('Lote sem fase ativa', true); return; }
+    const r = await fetch('/confinamento/lancamentos', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         lote_conf_id: parseInt(loteId),
-        fase_id: 1,
-        data, qtd_fornecida_kg: qtd, responsavel: resp || 'Campo'
+        fase_id: ativa.id,
+        data, qtd_fornecida_kg: qtd,
+        responsavel: resp || 'Campo'
       })
     });
-    if (!r.ok) throw new Error();
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      toast(e.detail || 'Erro ao registrar', true);
+      return;
+    }
     toast('✓ Fornecimento registrado!', false);
     document.getElementById('confQtd').value = '';
     document.getElementById('confResp').value = '';
-    dadosCache = null;
-    carregarDados();
-  } catch { toast('Erro ao registrar', true); }
+    dadosCache = null; carregarDados();
+  } catch {
+    toast('Erro de conexão', true);
+  }
 }
 
 // ── Registrar pesagem ─────────────────────────────────────────────────
