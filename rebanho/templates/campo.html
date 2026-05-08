@@ -315,9 +315,19 @@ async function carregarDados() {
     if (r.status === 401) { location.href = '/login'; return; }
     dadosCache = await r.json();
     renderPasto(dadosCache.pastagem || []);
-    renderRacao(dadosCache.nutricao || []);
     renderConf(dadosCache.confinamento || []);
     renderPesagemResumo(dadosCache.pesagem || {});
+
+    // Ração: fonte separada pra ter plano_id no select (POST /nutricao/lancamentos
+    // exige plano_id; o /campo/dados não retorna o id).
+    const planos = await fetch('/nutricao/planos?status=ATIVO')
+      .then(rr => rr.ok ? rr.json() : [])
+      .catch(() => []);
+    const hoje = new Date().toISOString().slice(0,10);
+    const vigentes = planos.filter(p =>
+      p.data_inicio && p.data_inicio <= hoje && (!p.data_fim || p.data_fim >= hoje)
+    );
+    renderRacao(vigentes);
   } catch(e) {
     toast('Erro ao carregar dados', true);
   }
@@ -361,12 +371,14 @@ function renderRacao(lista) {
     el.innerHTML = '<div class="c-empty"><span class="c-empty-icon">🌾</span>Nenhum plano ativo hoje</div>';
   } else {
     let html = '<div class="c-card"><div class="c-card-title">🌾 Planos de Hoje</div>';
-    lista.forEach((p, i) => {
-      const qtdKg = p.consumo_med_g && p.qtd_animais ? ((p.consumo_med_g * p.qtd_animais) / 1000).toFixed(1) : '—';
+    lista.forEach(p => {
+      const qtdKg = p.consumo_med_lote_dia_kg != null
+        ? Number(p.consumo_med_lote_dia_kg).toFixed(1)
+        : (p.consumo_med_g && p.qtd_animais ? ((p.consumo_med_g * p.qtd_animais) / 1000).toFixed(1) : '—');
       html += `<div class="c-row">
         <div>
-          <div style="font-size:13px;font-weight:600;">${p.lote}</div>
-          <div class="c-row-label">${p.suplemento} · ${p.qtd_animais} animais</div>
+          <div style="font-size:13px;font-weight:600;">${p.lote_nome}</div>
+          <div class="c-row-label">${p.suplemento_nome} · ${p.qtd_animais} animais</div>
         </div>
         <div style="text-align:right;">
           <div style="font-size:13px;font-weight:700;color:var(--verde-dark);">${qtdKg} kg</div>
@@ -377,11 +389,11 @@ function renderRacao(lista) {
     html += '</div>';
     el.innerHTML = html;
   }
-  // Popular select do formulário
+  // Popular select do formulário (value = plano_id real)
   const sel = document.getElementById('racaoPlanoSel');
   sel.innerHTML = '<option value="">— selecione —</option>';
-  lista.forEach((p, i) => {
-    sel.innerHTML += `<option value="${i}">${p.lote} — ${p.suplemento}</option>`;
+  lista.forEach(p => {
+    sel.innerHTML += `<option value="${p.id}">${p.lote_nome} — ${p.suplemento_nome}</option>`;
   });
   // Setar data de hoje
   document.getElementById('racaoData').value = new Date().toISOString().slice(0,10);
@@ -435,17 +447,35 @@ function renderPesagemResumo(info) {
 
 // ── Registrar ração ───────────────────────────────────────────────────
 async function registrarRacao() {
-  const idx = parseInt(document.getElementById('racaoPlanoSel').value);
+  const planoId = parseInt(document.getElementById('racaoPlanoSel').value);
   const qtd = parseFloat(document.getElementById('racaoQtd').value);
   const data = document.getElementById('racaoData').value;
   const obs = document.getElementById('racaoObs').value;
-  if (isNaN(idx) || !data || isNaN(qtd) || qtd <= 0) { toast('Preencha todos os campos', true); return; }
-  const plano = dadosPlanos[idx];
-  if (!plano) { toast('Selecione um plano', true); return; }
-  // Buscar plano_id e lote_id via API não disponível no campo, usar form de pesagem direto
-  toast('Lançamento registrado! (via módulo completo)', false);
-  document.getElementById('racaoQtd').value = '';
-  document.getElementById('racaoObs').value = '';
+  if (!planoId || !data || isNaN(qtd) || qtd <= 0) { toast('Preencha todos os campos', true); return; }
+  try {
+    const r = await fetch('/nutricao/lancamentos', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        plano_id: planoId,
+        data,
+        qtd_fornecida_kg: qtd,
+        responsavel: 'Campo',
+        obs: obs.trim() || null,
+      })
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      toast(e.detail || 'Erro ao salvar', true);
+      return;
+    }
+    toast('✓ Lançamento registrado!', false);
+    document.getElementById('racaoQtd').value = '';
+    document.getElementById('racaoObs').value = '';
+    dadosCache = null; carregarDados();
+  } catch {
+    toast('Erro de conexão', true);
+  }
 }
 
 // ── Registrar fornecimento confinamento ───────────────────────────────
