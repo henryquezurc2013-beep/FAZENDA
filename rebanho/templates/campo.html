@@ -170,6 +170,37 @@
     #sec-animais .c-field select,
     #sec-animais .c-field textarea { font-size: 16px; padding: 12px 14px; }
     #sec-animais .btn-primary { padding: 14px; font-size: 16px; }
+
+    /* Modal customizado (Morte e similares) */
+    .c-modal {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 999;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .c-modal-card {
+      background: #fff; border-radius: 12px;
+      padding: 24px;
+      max-width: 90%; width: 420px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.3);
+    }
+    .c-modal-title {
+      font-size: 18px; font-weight: 700;
+      color: var(--danger); margin-bottom: 14px;
+    }
+    .c-modal-body {
+      font-size: 15px; color: var(--text);
+      line-height: 1.5; margin-bottom: 20px;
+    }
+    .c-modal-actions { display: flex; gap: 10px; }
+    .c-modal-actions button {
+      flex: 1; padding: 14px; min-height: 44px;
+      font-size: 16px; font-weight: 700;
+      border: none; border-radius: 8px; cursor: pointer;
+    }
+    #morModalCancelar { background: #e5e7eb; color: var(--text); }
+    #morModalConfirmar { background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; }
   </style>
 </head>
 <body>
@@ -395,9 +426,26 @@
     </div>
   </div>
 
-  <!-- Sub-section: Morte (placeholder — conteúdo no commit 6) -->
+  <!-- Sub-section: Morte (registro de morte) -->
   <div class="c-subsection" id="sub-morte">
-    <div class="c-empty"><span class="c-empty-icon">⚠️</span>Em breve</div>
+    <div class="c-card" style="border-left:4px solid var(--danger);">
+      <div class="c-form-title" style="color:var(--danger);">⚠️ Registrar Morte</div>
+      <div class="c-field">
+        <label>Brinco do Animal *</label>
+        <input type="text" id="morBrinco" placeholder="ex: BOV-001" autocapitalize="characters"/>
+      </div>
+      <div class="c-field">
+        <label>Data da Morte *</label>
+        <input type="date" id="morData"/>
+      </div>
+      <div class="c-field">
+        <label>Motivo *</label>
+        <select id="morMotivo"><option value="">— selecione —</option></select>
+      </div>
+      <button class="btn-primary"
+              style="background:linear-gradient(135deg,#dc2626,#991b1b);"
+              onclick="registrarMorte()">⚠️ Registrar Morte</button>
+    </div>
   </div>
 </section>
 
@@ -463,8 +511,8 @@ async function carregarDados() {
     // Pasto: lista de piquetes pra dropdown do form de medição.
     await carregarPiquetes();
 
-    // Animais: definições para os forms de sanidade (e morte, no futuro).
-    await carregarDefinicoesSanidade();
+    // Animais: definições para os forms de sanidade e morte.
+    await carregarDefinicoesAnimais();
   } catch(e) {
     toast('Erro ao carregar dados', true);
   }
@@ -734,13 +782,14 @@ async function registrarPesagem() {
   } catch { toast('Erro ao registrar', true); }
 }
 
-// ── ANIMAIS / Sanidade (sub-tab Medicar) ──────────────────────────────
-async function carregarDefinicoesSanidade() {
+// ── ANIMAIS / Definições (Sanidade + Morte) ───────────────────────────
+async function carregarDefinicoesAnimais() {
   try {
     const defs = await fetch('/definicoes')
       .then(r => r.ok ? r.json() : null)
       .catch(() => null);
     if (!defs) return;
+    // Sanidade — sub-tab Medicar
     const sel = document.getElementById('sanClass');
     if (sel) {
       sel.innerHTML = '<option value="">— selecione —</option>';
@@ -752,8 +801,20 @@ async function carregarDefinicoesSanidade() {
     if (dl) {
       dl.innerHTML = (defs.medicamentos || []).map(m => `<option value="${m}">`).join('');
     }
+    // Morte — sub-tab Morte
+    const motSel = document.getElementById('morMotivo');
+    if (motSel) {
+      motSel.innerHTML = '<option value="">— selecione —</option>';
+      (defs.causas_morte || []).forEach(c => {
+        motSel.innerHTML += `<option value="${c}">${c}</option>`;
+      });
+    }
   } catch {} // silencioso — dropdown vazio é aceitável
-  document.getElementById('sanData').value = new Date().toISOString().slice(0,10);
+  // Datas default = hoje
+  const sd = document.getElementById('sanData');
+  if (sd) sd.value = new Date().toISOString().slice(0,10);
+  const md = document.getElementById('morData');
+  if (md) md.value = new Date().toISOString().slice(0,10);
 }
 
 async function registrarSanidade() {
@@ -802,8 +863,75 @@ async function registrarSanidade() {
   }
 }
 
+// ── ANIMAIS / Morte (sub-tab Morte) ───────────────────────────────────
+function registrarMorte() {
+  const brinco = document.getElementById('morBrinco').value.trim().toUpperCase();
+  const data = document.getElementById('morData').value;
+  const motivo = document.getElementById('morMotivo').value;
+  if (!brinco) { toast('Informe o brinco', true); return; }
+  if (!data) { toast('Informe a data da morte', true); return; }
+  if (!motivo) { toast('Selecione o motivo', true); return; }
+  // Preview no modal
+  document.getElementById('morModalBrinco').textContent = brinco;
+  document.getElementById('morModalData').textContent = data;
+  document.getElementById('morModalMotivo').textContent = motivo;
+  document.getElementById('morModal').style.display = 'flex';
+}
+
+function fecharMorModal() {
+  document.getElementById('morModal').style.display = 'none';
+}
+
+async function executarMorte() {
+  const brinco = document.getElementById('morBrinco').value.trim().toUpperCase();
+  const data = document.getElementById('morData').value;
+  const motivo = document.getElementById('morMotivo').value;
+  fecharMorModal();
+  try {
+    const r = await fetch('/animais/' + encodeURIComponent(brinco), {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        status: 'MORTO',
+        data_morte: data,
+        motivo_morte: motivo,
+      })
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      toast(e.detail || 'Erro ao registrar morte', true);
+      return;
+    }
+    toast('✓ Morte registrada', false);
+    document.getElementById('morBrinco').value = '';
+    document.getElementById('morMotivo').value = '';
+    document.getElementById('morData').value = new Date().toISOString().slice(0,10);
+    dadosCache = null; carregarDados();
+  } catch {
+    toast('Erro de conexão', true);
+  }
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────
 carregarDados();
 </script>
+
+<!-- Modal de confirmação de morte -->
+<div id="morModal" class="c-modal" style="display:none;">
+  <div class="c-modal-card">
+    <div class="c-modal-title">⚠️ Confirmar Morte</div>
+    <div class="c-modal-body">
+      Brinco <strong id="morModalBrinco"></strong> será marcado como
+      <strong>MORTO</strong> em <strong id="morModalData"></strong>,
+      motivo <strong id="morModalMotivo"></strong>.
+      <br><br>
+      <em>Esta ação NÃO É facilmente reversível.</em>
+    </div>
+    <div class="c-modal-actions">
+      <button id="morModalCancelar" onclick="fecharMorModal()">Cancelar</button>
+      <button id="morModalConfirmar" onclick="executarMorte()">Confirmar Morte</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
