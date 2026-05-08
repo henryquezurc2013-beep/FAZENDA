@@ -137,6 +137,12 @@
     .gestor-link-icon { font-size: 20px; }
     .gestor-link-text { font-size: 13px; font-weight: 600; }
     .gestor-link-sub { font-size: 11px; color: var(--sub); }
+
+    /* Tamanhos mobile-friendly (touch target ≥44px, font ≥16px no iOS) — aba Pasto */
+    #sec-pasto .c-field input,
+    #sec-pasto .c-field select,
+    #sec-pasto .c-field textarea { font-size: 16px; padding: 12px 14px; }
+    #sec-pasto .btn-primary { padding: 14px; font-size: 16px; }
   </style>
 </head>
 <body>
@@ -181,6 +187,40 @@
 <section class="c-section ativo" id="sec-pasto">
   <div id="pasto-content">
     <div class="c-loading"><span class="c-loading-spinner">⏳</span>Carregando pasto...</div>
+  </div>
+
+  <!-- Formulário de medição -->
+  <div class="c-card" style="margin-top:16px;">
+    <div class="c-form-title">📏 Medir Pasto</div>
+    <div class="c-field">
+      <label>Piquete *</label>
+      <select id="medPiqSel"><option value="">— selecione —</option></select>
+    </div>
+    <div class="c-field">
+      <label>Altura (cm) *</label>
+      <input type="number" id="medAltura" step="0.5" min="0" placeholder="ex: 28.5"/>
+    </div>
+    <div class="c-field">
+      <label>Cobertura (%)</label>
+      <input type="number" id="medCobertura" step="1" min="0" max="100" placeholder="ex: 85"/>
+    </div>
+    <div class="c-field">
+      <label>Falhas (%)</label>
+      <input type="number" id="medFalhas" step="1" min="0" max="100" placeholder="ex: 5"/>
+    </div>
+    <div class="c-field">
+      <label>Data</label>
+      <input type="date" id="medData"/>
+    </div>
+    <div class="c-field">
+      <label>Responsável</label>
+      <input type="text" id="medResp" placeholder="Campo"/>
+    </div>
+    <div class="c-field">
+      <label>Observação</label>
+      <textarea id="medObs" placeholder="opcional..."></textarea>
+    </div>
+    <button class="btn-primary" onclick="registrarMedicao()">💾 Salvar Medição</button>
   </div>
 </section>
 
@@ -328,6 +368,9 @@ async function carregarDados() {
       p.data_inicio && p.data_inicio <= hoje && (!p.data_fim || p.data_fim >= hoje)
     );
     renderRacao(vigentes);
+
+    // Pasto: lista de piquetes pra dropdown do form de medição.
+    await carregarPiquetes();
   } catch(e) {
     toast('Erro ao carregar dados', true);
   }
@@ -443,6 +486,60 @@ function renderPesagemResumo(info) {
   <a href="/pesagem-page" class="gestor-link"><span class="gestor-link-icon">⚖️</span><div><div class="gestor-link-text">Pesagem em lote</div><div class="gestor-link-sub">Módulo completo de pesagem</div></div></a>`;
   // Setar data de hoje no form
   document.getElementById('pesData').value = new Date().toISOString().slice(0,10);
+}
+
+// ── PASTO (medição) ───────────────────────────────────────────────────
+async function carregarPiquetes() {
+  const lista = await fetch('/pastagem/piquetes')
+    .then(r => r.ok ? r.json() : [])
+    .catch(() => []);
+  const sel = document.getElementById('medPiqSel');
+  sel.innerHTML = '<option value="">— selecione —</option>';
+  lista.forEach(p => {
+    sel.innerHTML += `<option value="${p.id}">${p.nome}</option>`;
+  });
+  document.getElementById('medData').value = new Date().toISOString().slice(0,10);
+}
+
+async function registrarMedicao() {
+  const piquete_id = parseInt(document.getElementById('medPiqSel').value);
+  const altura_cm  = parseFloat(document.getElementById('medAltura').value);
+  const cobertura  = document.getElementById('medCobertura').value;
+  const falhas     = document.getElementById('medFalhas').value;
+  const data       = document.getElementById('medData').value;
+  const resp       = document.getElementById('medResp').value.trim();
+  const obs        = document.getElementById('medObs').value.trim();
+  if (!piquete_id || isNaN(altura_cm) || altura_cm < 0) {
+    toast('Selecione piquete e informe altura', true); return;
+  }
+  if (!data) { toast('Informe a data', true); return; }
+  try {
+    const r = await fetch('/pastagem/medicoes', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        piquete_id, altura_cm,
+        cobertura_pct: cobertura !== '' ? parseFloat(cobertura) : null,
+        falhas_pct:    falhas    !== '' ? parseFloat(falhas)    : null,
+        data,
+        responsavel:   resp || 'Campo',
+        obs:           obs  || null,
+      })
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      toast(e.detail || 'Erro ao salvar', true);
+      return;
+    }
+    toast('✓ Medição salva!', false);
+    document.getElementById('medAltura').value = '';
+    document.getElementById('medCobertura').value = '';
+    document.getElementById('medFalhas').value = '';
+    document.getElementById('medObs').value = '';
+    dadosCache = null; carregarDados();
+  } catch {
+    toast('Erro de conexão', true);
+  }
 }
 
 // ── Registrar ração ───────────────────────────────────────────────────
