@@ -14,7 +14,7 @@ from routers import (
     definicoes, exportacao, fazendas, inseminacao, nutricao,
     pastagem, pessoas, pesagem, relatorios, sanidade,
 )
-from routers.auth import router as auth_router, seed_usuarios as _seed_usuarios
+from routers.auth import router as auth_router, seed_usuarios as _seed_usuarios, get_usuario_atual
 from routers.financeiro import router_compras, router_despesas, router_vendas
 from routers.nutricao import seed_nutricao as _seed_nut
 from routers.fazendas import seed_fazendas as _seed_faz
@@ -29,6 +29,63 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Auth: middleware global (bug #13 do BUGS.md) ─────────────────────
+# Rotas públicas: passam direto. Match = path exato OU path.startswith(p + "/").
+#
+# ATENÇÃO: /docs, /redoc e /openapi.json estão públicos para
+# desenvolvimento. Antes de subir pra produção, remover essas 3
+# entradas da lista — elas expõem o schema completo da API.
+# Ver BUGS.md item #16.
+_ROTAS_PUBLICAS = (
+    "/login",
+    "/static",
+    "/favicon.ico",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/auth/login",
+    "/auth/logout",
+    "/auth/me",
+)
+
+# Prefixos de API REST: classificam requests sem Accept JSON explícito
+# (ex.: fetch() default Accept = */*) como API → 401 JSON em vez de
+# 302 redirect. Páginas HTML autenticadas (/dashboard, /*-page, /campo)
+# não estão aqui — caem no caminho HTML.
+_API_PREFIXES = (
+    "/definicoes", "/animais", "/pesagens", "/sanidade", "/inseminacoes",
+    "/compras", "/vendas", "/despesas", "/pessoas", "/relatorios",
+    "/exportar", "/balanca", "/pastagem", "/config", "/nutricao",
+    "/fazendas", "/confinamento", "/campo/dados",
+)
+
+
+def _is_match(path: str, prefixes) -> bool:
+    return any(path == p or path.startswith(p + "/") for p in prefixes)
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    # CORS pré-flight: nunca exigir auth.
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    path = request.url.path
+    if _is_match(path, _ROTAS_PUBLICAS):
+        return await call_next(request)
+
+    if get_usuario_atual(request) is not None:
+        return await call_next(request)
+
+    # Não autenticado: API → 401 JSON; browser → 302 /login.
+    accept = request.headers.get("accept", "")
+    quer_json = "application/json" in accept or _is_match(path, _API_PREFIXES)
+    if quer_json:
+        return JSONResponse(status_code=401, content={"detail": "Não autenticado"})
+    return RedirectResponse(url="/login", status_code=302)
+
 
 for _seed in (_seed_nut, _seed_faz, _seed_conf, _seed_usuarios):
     try:
