@@ -143,6 +143,33 @@
     #sec-pasto .c-field select,
     #sec-pasto .c-field textarea { font-size: 16px; padding: 12px 14px; }
     #sec-pasto .btn-primary { padding: 14px; font-size: 16px; }
+
+    /* Sub-tabs (dentro da aba Animais) */
+    .c-subtabs {
+      display: flex; gap: 6px;
+      background: rgba(0,0,0,.04);
+      padding: 4px; margin-bottom: 14px;
+      border-radius: 10px;
+    }
+    .c-subtab {
+      flex: 1; min-height: 44px; padding: 12px 8px;
+      border: none; background: transparent; border-radius: 8px;
+      font-size: 13px; font-weight: 600; color: var(--sub);
+      cursor: pointer; white-space: nowrap;
+      transition: background .15s, color .15s;
+    }
+    .c-subtab.ativo {
+      background: var(--card); color: var(--verde-dark);
+      box-shadow: 0 1px 2px rgba(0,0,0,.1);
+    }
+    .c-subsection { display: none; }
+    .c-subsection.ativo { display: block; }
+
+    /* Tamanhos mobile-friendly — aba Animais (mesmo padrão do #sec-pasto) */
+    #sec-animais .c-field input,
+    #sec-animais .c-field select,
+    #sec-animais .c-field textarea { font-size: 16px; padding: 12px 14px; }
+    #sec-animais .btn-primary { padding: 14px; font-size: 16px; }
   </style>
 </head>
 <body>
@@ -175,8 +202,8 @@
   <button class="c-tab" id="tab-conf" onclick="mudarTab('conf')">
     <span class="c-tab-icon">🏗️</span>Confinamento
   </button>
-  <button class="c-tab" id="tab-pesagem" onclick="mudarTab('pesagem')">
-    <span class="c-tab-icon">⚖️</span>Pesagem
+  <button class="c-tab" id="tab-animais" onclick="mudarTab('animais')">
+    <span class="c-tab-icon">🐂</span>Animais
   </button>
 </nav>
 
@@ -286,40 +313,61 @@
   </div>
 </section>
 
-<!-- ── PESAGEM ── -->
-<section class="c-section" id="sec-pesagem">
-  <div class="c-card">
-    <div class="c-form-title">⚖️ Registrar Pesagem</div>
-    <div class="c-field">
-      <label>Brinco do Animal</label>
-      <input type="text" id="pesBrinco" placeholder="ex: BOV-001" autocapitalize="characters"/>
-    </div>
-    <div class="c-field">
-      <label>Peso (kg)</label>
-      <input type="number" id="pesPeso" step="0.1" min="1" placeholder="ex: 420.5"/>
-    </div>
-    <div class="c-field">
-      <label>Data</label>
-      <input type="date" id="pesData"/>
-    </div>
-    <div class="c-field">
-      <label>Responsável</label>
-      <input type="text" id="pesResp" placeholder="Nome"/>
-    </div>
-    <div class="c-field">
-      <label>Observação</label>
-      <textarea id="pesObs" placeholder="opcional..."></textarea>
-    </div>
-    <button class="btn-primary" onclick="registrarPesagem()">💾 Salvar Pesagem</button>
+<!-- ── ANIMAIS (sub-tabs Pesar / Medicar / Morte) ── -->
+<section class="c-section" id="sec-animais">
+  <!-- Sub-tabs -->
+  <div class="c-subtabs">
+    <button class="c-subtab ativo" id="subtab-pesar"   onclick="mudarSubTab('pesar')">⚖️ Pesar</button>
+    <button class="c-subtab"       id="subtab-medicar" onclick="mudarSubTab('medicar')">💉 Medicar</button>
+    <button class="c-subtab"       id="subtab-morte"   onclick="mudarSubTab('morte')">⚠️ Morte</button>
   </div>
 
-  <div id="pesagem-recente">
-    <div class="c-loading"><span class="c-loading-spinner">⏳</span>Carregando...</div>
+  <!-- Sub-section: Pesar (form intacto, IDs preservados) -->
+  <div class="c-subsection ativo" id="sub-pesar">
+    <div class="c-card">
+      <div class="c-form-title">⚖️ Registrar Pesagem</div>
+      <div class="c-field">
+        <label>Brinco do Animal</label>
+        <input type="text" id="pesBrinco" placeholder="ex: BOV-001" autocapitalize="characters"/>
+      </div>
+      <div class="c-field">
+        <label>Peso (kg)</label>
+        <input type="number" id="pesPeso" step="0.1" min="1" placeholder="ex: 420.5"/>
+      </div>
+      <div class="c-field">
+        <label>Data</label>
+        <input type="date" id="pesData"/>
+      </div>
+      <div class="c-field">
+        <label>Responsável</label>
+        <input type="text" id="pesResp" placeholder="Nome"/>
+      </div>
+      <div class="c-field">
+        <label>Observação</label>
+        <textarea id="pesObs" placeholder="opcional..."></textarea>
+      </div>
+      <button class="btn-primary" onclick="registrarPesagem()">💾 Salvar Pesagem</button>
+    </div>
+
+    <div id="pesagem-recente">
+      <div class="c-loading"><span class="c-loading-spinner">⏳</span>Carregando...</div>
+    </div>
+  </div>
+
+  <!-- Sub-section: Medicar (placeholder — conteúdo no commit 5) -->
+  <div class="c-subsection" id="sub-medicar">
+    <div class="c-empty"><span class="c-empty-icon">💉</span>Em breve</div>
+  </div>
+
+  <!-- Sub-section: Morte (placeholder — conteúdo no commit 6) -->
+  <div class="c-subsection" id="sub-morte">
+    <div class="c-empty"><span class="c-empty-icon">⚠️</span>Em breve</div>
   </div>
 </section>
 
 <script>
-const TAB_ORDER = ['pasto','racao','conf','pesagem'];
+const TAB_ORDER = ['pasto','racao','conf','animais'];
+const SUB_TAB_ORDER = ['pesar','medicar','morte'];
 let dadosCache = null;
 let dadosPlanos = [];
 let dadosConf = [];
@@ -331,6 +379,13 @@ function mudarTab(tab) {
     document.getElementById('sec-'+t).classList.toggle('ativo', t === tab);
   });
   if (!dadosCache) carregarDados();
+}
+
+function mudarSubTab(sub) {
+  SUB_TAB_ORDER.forEach(s => {
+    document.getElementById('subtab-'+s).classList.toggle('ativo', s === sub);
+    document.getElementById('sub-'+s).classList.toggle('ativo', s === sub);
+  });
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────
