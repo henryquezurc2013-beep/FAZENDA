@@ -201,6 +201,53 @@
     }
     #morModalCancelar { background: #e5e7eb; color: var(--text); }
     #morModalConfirmar { background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; }
+
+    /* Overlay de busca (full-screen branco) */
+    .c-search-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #fff;
+      z-index: 999;
+      display: flex; flex-direction: column;
+      padding: 16px;
+    }
+    .c-search-overlay header {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .c-search-overlay input {
+      flex: 1; padding: 12px 14px;
+      font-size: 16px; min-height: 44px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      outline: none;
+    }
+    .c-search-overlay input:focus { border-color: var(--verde); }
+    .c-search-overlay #busFechar {
+      padding: 12px 16px; min-height: 44px;
+      background: #e5e7eb; color: var(--text);
+      border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+    }
+    .c-search-overlay #busResultado { flex: 1; overflow-y: auto; }
+
+    /* Card de resultado de busca */
+    .c-result-card {
+      background: var(--card);
+      border-left: 4px solid var(--border);
+      border-radius: 10px;
+      padding: 14px; margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .c-result-card.ativo { border-left-color: var(--verde); }
+    .c-result-card.morto { border-left-color: var(--danger); }
+    .c-result-brinco { font-size: 18px; font-weight: 700; color: var(--text); }
+    .c-result-meta { font-size: 13px; color: var(--sub); margin: 6px 0 4px; }
+    .c-result-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .c-result-actions button {
+      flex: 1; padding: 10px 6px; min-height: 44px;
+      font-size: 13px; font-weight: 600;
+      border: none; border-radius: 6px; cursor: pointer;
+      background: var(--bg); color: var(--text);
+    }
   </style>
 </head>
 <body>
@@ -218,6 +265,7 @@
     {% if usuario_perfil == 'GESTOR' %}
     <a href="/dashboard" style="color:#fff;font-size:12px;text-decoration:none;opacity:.85;">🖥 Gestor</a>
     {% endif %}
+    <button class="btn-logout" onclick="abrirBuscar()" title="Buscar animal" style="font-size:14px;">🔍</button>
     <button class="btn-logout" onclick="sair()">Sair</button>
   </div>
 </div>
@@ -912,9 +960,104 @@ async function executarMorte() {
   }
 }
 
+// ── Busca de animais (botão 🔍 da topbar) ─────────────────────────────
+let _buscaTimer = null;
+
+function abrirBuscar() {
+  const inp = document.getElementById('busInput');
+  inp.value = '';
+  document.getElementById('busResultado').innerHTML =
+    '<div class="c-empty"><span class="c-empty-icon">🔍</span>Digite pra buscar</div>';
+  document.getElementById('busModal').style.display = 'flex';
+  setTimeout(() => inp.focus(), 50);
+}
+
+function fecharBuscar() {
+  document.getElementById('busModal').style.display = 'none';
+  if (_buscaTimer) { clearTimeout(_buscaTimer); _buscaTimer = null; }
+}
+
+function onBusInput() {
+  if (_buscaTimer) clearTimeout(_buscaTimer);
+  _buscaTimer = setTimeout(executarBuscar, 500);
+}
+
+function onBusKey(e) {
+  if (e.key === 'Enter') {
+    if (_buscaTimer) { clearTimeout(_buscaTimer); _buscaTimer = null; }
+    executarBuscar();
+  }
+}
+
+async function executarBuscar() {
+  const q = document.getElementById('busInput').value.trim();
+  const el = document.getElementById('busResultado');
+  if (!q) {
+    el.innerHTML = '<div class="c-empty"><span class="c-empty-icon">🔍</span>Digite pra buscar</div>';
+    return;
+  }
+  el.innerHTML = '<div class="c-empty"><span class="c-empty-icon">⏳</span>Buscando...</div>';
+  try {
+    const r = await fetch('/animais?brinco=' + encodeURIComponent(q));
+    if (!r.ok) { toast('Erro ao buscar', true); return; }
+    const lista = await r.json();
+    if (!lista || !lista.length) {
+      el.innerHTML = '<div class="c-empty"><span class="c-empty-icon">🔍</span>Nenhum animal encontrado</div>';
+      return;
+    }
+    el.innerHTML = lista.map(a => {
+      const status = (a.status || 'INDEF').toUpperCase();
+      const klass = status === 'ATIVO' ? 'ativo' : (status === 'MORTO' ? 'morto' : '');
+      const meta = [a.sexo, a.raca, a.tipo, status].filter(Boolean).join(' · ');
+      const corpoParts = [];
+      if (a.peso_atual) corpoParts.push(Number(a.peso_atual).toFixed(1) + ' kg');
+      if (a.pasto_atual) corpoParts.push('Pasto: ' + a.pasto_atual);
+      const corpo = corpoParts.length
+        ? `<div class="c-row-label" style="font-size:12px;">${corpoParts.join(' · ')}</div>`
+        : '';
+      const b = (a.brinco || '').replace(/'/g, "\\'");
+      return `<div class="c-result-card ${klass}">
+        <div class="c-result-brinco">${a.brinco}</div>
+        <div class="c-result-meta">${meta}</div>
+        ${corpo}
+        <div class="c-result-actions">
+          <button onclick="selecionarAnimal('${b}', 'pesar')">⚖️ Pesar</button>
+          <button onclick="selecionarAnimal('${b}', 'medicar')">💉 Medicar</button>
+          <button onclick="selecionarAnimal('${b}', 'morte')">⚠️ Morte</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    toast('Erro de conexão', true);
+  }
+}
+
+function selecionarAnimal(brinco, acao) {
+  fecharBuscar();
+  mudarTab('animais');
+  mudarSubTab(acao);
+  const inputMap = { pesar: 'pesBrinco', medicar: 'sanBrinco', morte: 'morBrinco' };
+  const inp = document.getElementById(inputMap[acao]);
+  if (inp) { inp.value = brinco; inp.focus(); }
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────
 carregarDados();
 </script>
+
+<!-- Overlay de busca de animais -->
+<div id="busModal" class="c-search-overlay" style="display:none;">
+  <header>
+    <input type="text" id="busInput"
+           placeholder="Buscar por brinco (ex: BOV)"
+           autocapitalize="characters"
+           oninput="onBusInput()" onkeydown="onBusKey(event)"/>
+    <button id="busFechar" onclick="fecharBuscar()">Fechar</button>
+  </header>
+  <div id="busResultado">
+    <div class="c-empty"><span class="c-empty-icon">🔍</span>Digite pra buscar</div>
+  </div>
+</div>
 
 <!-- Modal de confirmação de morte -->
 <div id="morModal" class="c-modal" style="display:none;">
