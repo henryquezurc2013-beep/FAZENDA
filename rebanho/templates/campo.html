@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#1b4d2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Campo"/>
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png"/>
   <title>Modo Campo — Controle Bovino</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -304,6 +311,7 @@
     {% if usuario_perfil == 'GESTOR' %}
     <a href="/dashboard" style="color:#fff;font-size:12px;text-decoration:none;opacity:.85;">🖥 Gestor</a>
     {% endif %}
+    <button class="btn-logout" id="btnInstalarPWA" onclick="instalarPWA()" style="display:none;" title="Instalar app">📲</button>
     <button class="btn-logout" onclick="abrirBuscar()" title="Buscar animal" style="font-size:14px;">🔍</button>
     <button class="btn-logout" onclick="sair()">Sair</button>
   </div>
@@ -519,6 +527,34 @@
 </section>
 
 <script>
+// PWA — captura prompt de instalação
+let _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredPrompt = e;
+  const btn = document.getElementById('btnInstalarPWA');
+  if (btn) btn.style.display = '';
+});
+window.addEventListener('appinstalled', () => {
+  _deferredPrompt = null;
+  const btn = document.getElementById('btnInstalarPWA');
+  if (btn) btn.style.display = 'none';
+  toast('App instalado!');
+});
+
+async function instalarPWA() {
+  if (!_deferredPrompt) {
+    toast('Instalação não disponível neste navegador', true);
+    return;
+  }
+  _deferredPrompt.prompt();
+  const choice = await _deferredPrompt.userChoice;
+  _deferredPrompt = null;
+  if (choice.outcome === 'accepted') {
+    document.getElementById('btnInstalarPWA').style.display = 'none';
+  }
+}
+
 const TAB_ORDER = ['pasto','racao','conf','animais'];
 const SUB_TAB_ORDER = ['pesar','medicar','morte'];
 let dadosCache = null;
