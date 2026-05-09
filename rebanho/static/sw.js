@@ -2,8 +2,9 @@
 // Estratégia: cache-first pra shell estático, network-first pra HTML.
 // NÃO faz cache de POST/PUT/PATCH/DELETE — fila offline é Frente C.
 
-const CACHE_VERSION = 'campo-v1';
+const CACHE_VERSION = 'campo-v2';
 const SHELL = [
+  '/campo',
   '/static/manifest.json',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
