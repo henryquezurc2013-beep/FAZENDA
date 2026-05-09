@@ -526,6 +526,37 @@
   </div>
 </section>
 
+<!-- ── SYNC ── -->
+<section class="c-section" id="sec-sync">
+  <div class="c-card" style="margin-bottom:12px;">
+    <div class="c-form-title">📡 Status</div>
+    <div id="syncStatus" style="font-size:14px;">Carregando...</div>
+  </div>
+
+  <div class="c-card" style="margin-bottom:12px;">
+    <div class="c-form-title">⏳ Pendentes</div>
+    <div id="syncPendentes">
+      <div class="c-empty"><span class="c-empty-icon">✓</span>Nenhum pendente</div>
+    </div>
+    <button class="btn-primary" id="btnSyncAgora" onclick="forcarSync()"
+            style="margin-top:8px;display:none;">
+      🔄 Sincronizar agora
+    </button>
+  </div>
+
+  <div class="c-card">
+    <div class="c-form-title">📋 Histórico do dia</div>
+    <div id="syncHistorico">
+      <div class="c-empty"><span class="c-empty-icon">📋</span>Sem registros hoje</div>
+    </div>
+    <button class="btn-logout" onclick="limparHistoricoSync()"
+            style="margin-top:8px;width:100%;color:var(--danger);
+                   border-color:var(--danger);background:#fff;">
+      🗑️ Limpar histórico
+    </button>
+  </div>
+</section>
+
 <script>
 // PWA — captura prompt de instalação
 let _deferredPrompt = null;
