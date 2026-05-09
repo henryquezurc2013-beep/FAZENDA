@@ -675,6 +675,190 @@ async function filaLimparHistorico() {
   return sincronizados.length;
 }
 
+// === Sync Engine ===
+const _ENDPOINTS_FILA = {
+  '/pastagem/medicoes': 'medicao_pasto',
+  '/nutricao/lancamentos': 'racao',
+  '/confinamento/lancamentos': 'confinamento',
+  '/pesagens/': 'pesagem',
+  '/sanidade': 'sanidade',
+};
+
+let _online = navigator.onLine;
+let _sincronizando = false;
+
+async function fetchComFila(url, options) {
+  const metodo = (options && options.method ? options.method : 'GET').toUpperCase();
+  const ehFilavel = metodo === 'POST' && _ENDPOINTS_FILA[url];
+
+  // Se é endpoint da fila E está offline: salva direto na fila
+  if (ehFilavel && !_online) {
+    const body = options.body ? JSON.parse(options.body) : {};
+    await filaAdd({
+      tipo: _ENDPOINTS_FILA[url],
+      metodo,
+      url,
+      body,
+    });
+    atualizarBadgeSync();
+    return {
+      ok: true,
+      status: 202,
+      _offline: true,
+      json: async () => ({ _offline: true, mensagem: 'Salvo localmente' }),
+    };
+  }
+
+  // Senão: tenta direto
+  try {
+    const resp = await fetch(url, options);
+    return resp;
+  } catch (err) {
+    // Falhou (offline detectado tarde): se filavel, salva
+    if (ehFilavel) {
+      _online = false;
+      const body = options.body ? JSON.parse(options.body) : {};
+      await filaAdd({ tipo: _ENDPOINTS_FILA[url], metodo, url, body });
+      atualizarBadgeSync();
+      return {
+        ok: true,
+        status: 202,
+        _offline: true,
+        json: async () => ({ _offline: true, mensagem: 'Salvo localmente' }),
+      };
+    }
+    throw err;
+  }
+}
+
+async function processarFila() {
+  if (_sincronizando) return;
+  _sincronizando = true;
+
+  try {
+    const pendentes = await filaList('pendente');
+    const errosRetry = (await filaList('erro')).filter(r => r.tentativas < 3);
+    const todos = [...pendentes, ...errosRetry];
+
+    for (const reg of todos) {
+      await filaUpdate(reg.id, { status: 'sincronizando' });
+
+      const tentativa = reg.tentativas + 1;
+      const delay = tentativa === 1 ? 0 : (tentativa === 2 ? 5000 : 30000);
+      if (delay > 0) await new Promise(r => setTimeout(r, delay));
+
+      try {
+        const resp = await fetch(reg.url, {
+          method: reg.metodo,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reg.body),
+        });
+
+        if (resp.ok) {
+          await filaUpdate(reg.id, {
+            status: 'sincronizado',
+            sincronizado_em: new Date().toISOString(),
+            tentativas: tentativa,
+            erro: null,
+          });
+        } else {
+          const txt = await resp.text();
+          if (tentativa >= 3) {
+            await filaUpdate(reg.id, {
+              status: 'erro',
+              tentativas: tentativa,
+              erro: `HTTP ${resp.status}: ${txt.slice(0, 200)}`,
+            });
+          } else {
+            await filaUpdate(reg.id, {
+              status: 'pendente',
+              tentativas: tentativa,
+              erro: `HTTP ${resp.status}`,
+            });
+          }
+        }
+      } catch (err) {
+        // Network failure
+        if (tentativa >= 3) {
+          await filaUpdate(reg.id, {
+            status: 'erro',
+            tentativas: tentativa,
+            erro: err.message,
+          });
+        } else {
+          await filaUpdate(reg.id, {
+            status: 'pendente',
+            tentativas: tentativa,
+            erro: err.message,
+          });
+        }
+        _online = false;
+        break;  // Para o loop se rede caiu
+      }
+    }
+
+    // Re-render aba sync se estiver aberta
+    if (typeof renderSync === 'function') renderSync();
+    atualizarBadgeSync();
+  } finally {
+    _sincronizando = false;
+  }
+}
+
+async function pingServidor() {
+  try {
+    const resp = await fetch('/auth/me', { method: 'GET' });
+    if (resp.ok) {
+      if (!_online) {
+        _online = true;
+        toast('🌐 Online — sincronizando...');
+        processarFila();
+      }
+    }
+  } catch (err) {
+    _online = false;
+  }
+}
+
+function iniciarSyncEngine() {
+  // Eventos do navegador
+  window.addEventListener('online', () => {
+    _online = true;
+    toast('🌐 Online — sincronizando...');
+    processarFila();
+  });
+  window.addEventListener('offline', () => {
+    _online = false;
+    toast('📴 Offline — registros vão pra fila');
+  });
+
+  // Ping periódico (só quando há fila)
+  setInterval(async () => {
+    const count = await filaCountPendente();
+    if (count > 0 && !_sincronizando) {
+      pingServidor();
+    }
+  }, 30000);
+
+  // Tentar sync ao carregar (caso volte online com fila)
+  if (_online) {
+    setTimeout(() => processarFila(), 2000);
+  }
+}
+
+async function atualizarBadgeSync() {
+  const count = await filaCountPendente();
+  const badge = document.getElementById('syncBadge');
+  if (badge) {
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
 const TAB_ORDER = ['pasto','racao','conf','animais'];
 const SUB_TAB_ORDER = ['pesar','medicar','morte'];
 let dadosCache = null;
@@ -881,7 +1065,7 @@ async function registrarMedicao() {
   }
   if (!data) { toast('Informe a data', true); return; }
   try {
-    const r = await fetch('/pastagem/medicoes', {
+    const r = await fetchComFila('/pastagem/medicoes', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -898,12 +1082,17 @@ async function registrarMedicao() {
       toast(e.detail || 'Erro ao salvar', true);
       return;
     }
-    toast('✓ Medição salva!', false);
+    const _resp = await r.json().catch(() => ({}));
+    if (_resp._offline) {
+      toast('💾 Salvo localmente — sincroniza depois');
+    } else {
+      toast('✓ Medição salva!', false);
+    }
     document.getElementById('medAltura').value = '';
     document.getElementById('medCobertura').value = '';
     document.getElementById('medFalhas').value = '';
     document.getElementById('medObs').value = '';
-    dadosCache = null; carregarDados();
+    if (!_resp._offline) { dadosCache = null; carregarDados(); }
   } catch {
     toast('Erro de conexão', true);
   }
@@ -917,7 +1106,7 @@ async function registrarRacao() {
   const obs = document.getElementById('racaoObs').value;
   if (!planoId || !data || isNaN(qtd) || qtd <= 0) { toast('Preencha todos os campos', true); return; }
   try {
-    const r = await fetch('/nutricao/lancamentos', {
+    const r = await fetchComFila('/nutricao/lancamentos', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -933,10 +1122,15 @@ async function registrarRacao() {
       toast(e.detail || 'Erro ao salvar', true);
       return;
     }
-    toast('✓ Lançamento registrado!', false);
+    const _resp = await r.json().catch(() => ({}));
+    if (_resp._offline) {
+      toast('💾 Salvo localmente — sincroniza depois');
+    } else {
+      toast('✓ Lançamento registrado!', false);
+    }
     document.getElementById('racaoQtd').value = '';
     document.getElementById('racaoObs').value = '';
-    dadosCache = null; carregarDados();
+    if (!_resp._offline) { dadosCache = null; carregarDados(); }
   } catch {
     toast('Erro de conexão', true);
   }
@@ -957,7 +1151,7 @@ async function registrarConfinamento() {
       .catch(() => []);
     const ativa = (fases || []).find(f => f.status === 'ATIVA');
     if (!ativa) { toast('Lote sem fase ativa', true); return; }
-    const r = await fetch('/confinamento/lancamentos', {
+    const r = await fetchComFila('/confinamento/lancamentos', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -972,10 +1166,15 @@ async function registrarConfinamento() {
       toast(e.detail || 'Erro ao registrar', true);
       return;
     }
-    toast('✓ Fornecimento registrado!', false);
+    const _resp = await r.json().catch(() => ({}));
+    if (_resp._offline) {
+      toast('💾 Salvo localmente — sincroniza depois');
+    } else {
+      toast('✓ Fornecimento registrado!', false);
+    }
     document.getElementById('confQtd').value = '';
     document.getElementById('confResp').value = '';
-    dadosCache = null; carregarDados();
+    if (!_resp._offline) { dadosCache = null; carregarDados(); }
   } catch {
     toast('Erro de conexão', true);
   }
@@ -990,20 +1189,25 @@ async function registrarPesagem() {
   const obs = document.getElementById('pesObs').value;
   if (!brinco || isNaN(peso) || peso <= 0 || !data) { toast('Preencha brinco, peso e data', true); return; }
   try {
-    const r = await fetch('/pesagens/', {
+    const r = await fetchComFila('/pesagens/', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({brinco, peso_kg: peso, data, responsavel: resp||'Campo', obs})
     });
     if (!r.ok) {
-      const err = await r.json();
+      const err = await r.json().catch(() => ({}));
       toast(err.detail||'Erro ao salvar', true); return;
     }
-    toast('✓ Pesagem registrada!', false);
+    const _resp = await r.json().catch(() => ({}));
+    if (_resp._offline) {
+      toast('💾 Salvo localmente — sincroniza depois');
+    } else {
+      toast('✓ Pesagem registrada!', false);
+    }
     document.getElementById('pesBrinco').value = '';
     document.getElementById('pesPeso').value = '';
     document.getElementById('pesObs').value = '';
-    dadosCache = null; carregarDados();
+    if (!_resp._offline) { dadosCache = null; carregarDados(); }
   } catch { toast('Erro ao registrar', true); }
 }
 
@@ -1056,7 +1260,7 @@ async function registrarSanidade() {
   if (!medicamento) { toast('Informe o medicamento', true); return; }
   if (!data) { toast('Informe a data', true); return; }
   try {
-    const r = await fetch('/sanidade', {
+    const r = await fetchComFila('/sanidade', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -1076,13 +1280,18 @@ async function registrarSanidade() {
       toast(e.detail || 'Erro ao salvar', true);
       return;
     }
-    toast('✓ Medicação registrada!', false);
+    const _resp = await r.json().catch(() => ({}));
+    if (_resp._offline) {
+      toast('💾 Salvo localmente — sincroniza depois');
+    } else {
+      toast('✓ Medicação registrada!', false);
+    }
     // Mantém brinco — vaqueiro pode lançar várias medicações no mesmo animal.
     document.getElementById('sanMed').value = '';
     document.getElementById('sanQtd').value = '';
     document.getElementById('sanUnidade').value = '';
     document.getElementById('sanObs').value = '';
-    dadosCache = null; carregarDados();
+    if (!_resp._offline) { dadosCache = null; carregarDados(); }
   } catch {
     toast('Erro de conexão', true);
   }
@@ -1219,6 +1428,8 @@ function selecionarAnimal(brinco, acao) {
 }
 
 // ── Inicialização ─────────────────────────────────────────────────────
+iniciarSyncEngine();
+atualizarBadgeSync();
 carregarDados();
 </script>
 
