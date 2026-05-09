@@ -20,7 +20,12 @@ from routers.nutricao import seed_nutricao as _seed_nut
 from routers.fazendas import seed_fazendas as _seed_faz
 from routers.confinamento import seed_confinamento as _seed_conf
 
-app = FastAPI(title="Controle de Rebanho Bovino")
+app = FastAPI(
+    title="Controle de Rebanho Bovino",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,17 +39,14 @@ app.add_middleware(
 # ── Auth: middleware global (bug #13 do BUGS.md) ─────────────────────
 # Rotas públicas: passam direto. Match = path exato OU path.startswith(p + "/").
 #
-# ATENÇÃO: /docs, /redoc e /openapi.json estão públicos para
-# desenvolvimento. Antes de subir pra produção, remover essas 3
-# entradas da lista — elas expõem o schema completo da API.
-# Ver BUGS.md item #16.
+# /docs, /redoc, /openapi.json — desabilitados em FastAPI() (docs_url=None,
+# redoc_url=None, openapi_url=None) e removidos desta lista. Defesa em
+# profundidade: schema da API não é mais exposto, nem mesmo por bypass
+# do middleware. Ver BUGS.md item #16.
 _ROTAS_PUBLICAS = (
     "/login",
     "/static",
     "/favicon.ico",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
     "/auth/login",
     "/auth/logout",
     "/auth/me",
