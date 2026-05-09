@@ -28,15 +28,20 @@ def get_usuario_atual(request: Request, db=None):
     token = request.cookies.get(_TOKEN_COOKIE) or request.headers.get("X-Auth-Token")
     if not token:
         return None
-    rows = supabase.table("sessoes").select("*").eq("token", token).limit(1).execute().data
+    # JOIN via PostgREST: 'usuarios(*)' depende da FK
+    # sessoes.usuario_id -> usuarios(id). Se a FK ou nome da tabela
+    # mudarem, o JOIN retorna None silenciosamente — ajustar aqui.
+    rows = supabase.table("sessoes").select("*,usuarios(*)").eq("token", token).limit(1).execute().data
     if not rows:
         return None
     sessao = rows[0]
     if datetime.fromisoformat(sessao["expira_em"]) < datetime.now(timezone.utc):
         supabase.table("sessoes").delete().eq("token", token).execute()
         return None
-    u_rows = supabase.table("usuarios").select("*").eq("id", sessao["usuario_id"]).eq("ativo", True).limit(1).execute().data
-    return u_rows[0] if u_rows else None
+    usuario = sessao.get("usuarios")
+    if not usuario or not usuario.get("ativo"):
+        return None
+    return usuario
 
 
 def require_gestor(request: Request, db=None):

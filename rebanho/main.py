@@ -78,7 +78,9 @@ async def auth_middleware(request: Request, call_next):
     if _is_match(path, _ROTAS_PUBLICAS):
         return await call_next(request)
 
-    if get_usuario_atual(request) is not None:
+    usuario = get_usuario_atual(request)
+    request.state.usuario_atual = usuario
+    if usuario is not None:
         return await call_next(request)
 
     # Não autenticado: API → 401 JSON; browser → 302 /login.
@@ -234,8 +236,7 @@ async def page_login(request: Request):
 
 @app.get("/campo")
 async def page_campo(request: Request):
-    from routers.auth import get_usuario_atual
-    u = get_usuario_atual(request)
+    u = getattr(request.state, "usuario_atual", None)
     if not u:
         return RedirectResponse(url="/login")
     ctx = _ctx("campo")
@@ -246,10 +247,9 @@ async def page_campo(request: Request):
 
 @app.get("/campo/dados")
 async def campo_dados(request: Request):
-    from routers.auth import get_usuario_atual
     from database import get_fazenda_id
 
-    u = get_usuario_atual(request)
+    u = getattr(request.state, "usuario_atual", None)
     if not u:
         raise StarletteHTTPException(status_code=401, detail="Não autenticado")
 
