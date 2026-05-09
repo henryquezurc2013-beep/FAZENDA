@@ -12,7 +12,7 @@ from database import supabase
 from routers import (
     animais, balanca, config as config_router, confinamento,
     definicoes, exportacao, fazendas, inseminacao, nutricao,
-    pastagem, pessoas, pesagem, relatorios, sanidade,
+    pastagem, pessoas, pesagem, relatorios, sanidade, usuarios,
 )
 from routers.auth import router as auth_router, seed_usuarios as _seed_usuarios, get_usuario_atual
 from routers.financeiro import router_compras, router_despesas, router_vendas
@@ -60,7 +60,7 @@ _API_PREFIXES = (
     "/definicoes", "/animais", "/pesagens", "/sanidade", "/inseminacoes",
     "/compras", "/vendas", "/despesas", "/pessoas", "/relatorios",
     "/exportar", "/balanca", "/pastagem", "/config", "/nutricao",
-    "/fazendas", "/confinamento", "/campo/dados",
+    "/fazendas", "/confinamento", "/usuarios", "/campo/dados",
 )
 
 
@@ -114,6 +114,7 @@ app.include_router(config_router.router, prefix="/config",         tags=["Config
 app.include_router(nutricao.router,      prefix="/nutricao",       tags=["Nutrição"])
 app.include_router(fazendas.router,      prefix="/fazendas",       tags=["Fazendas"])
 app.include_router(confinamento.router,  prefix="/confinamento",   tags=["Confinamento"])
+app.include_router(usuarios.router,      prefix="/usuarios",       tags=["Usuários"])
 app.include_router(auth_router,          prefix="/auth",           tags=["Auth"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
