@@ -9,7 +9,7 @@ from database import supabase
 router = APIRouter()
 
 _TOKEN_COOKIE = "cb_token"
-_TTL_HORAS = 12
+_TTL_HORAS = 24 * 30  # 30 dias — sessão longa pra vaqueiro em campo
 
 
 def _hash(senha: str) -> str:
