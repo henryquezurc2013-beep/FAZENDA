@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -47,6 +47,7 @@ _ROTAS_PUBLICAS = (
     "/login",
     "/static",
     "/favicon.ico",
+    "/sw.js",
     "/auth/login",
     "/auth/logout",
     "/auth/me",
@@ -118,6 +119,19 @@ app.include_router(usuarios.router,      prefix="/usuarios",       tags=["Usuár
 app.include_router(auth_router,          prefix="/auth",           tags=["Auth"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/sw.js")
+def service_worker():
+    """Serve SW da raiz pra que o escopo possa ser '/' (não '/static/')."""
+    response = FileResponse(
+        "static/sw.js",
+        media_type="application/javascript",
+    )
+    # Service Worker não pode ser cacheado pelo browser
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Service-Worker-Allowed"] = "/"
+    return response
 
 templates = Jinja2Templates(directory="templates")
 

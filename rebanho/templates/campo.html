@@ -555,6 +555,15 @@ async function instalarPWA() {
   }
 }
 
+// PWA — registra service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/campo/' })
+      .then((reg) => console.log('SW registrado, escopo:', reg.scope))
+      .catch((err) => console.error('SW falhou:', err));
+  });
+}
+
 const TAB_ORDER = ['pasto','racao','conf','animais'];
 const SUB_TAB_ORDER = ['pesar','medicar','morte'];
 let dadosCache = null;
