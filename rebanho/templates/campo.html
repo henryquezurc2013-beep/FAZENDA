@@ -859,7 +859,7 @@ async function atualizarBadgeSync() {
   }
 }
 
-const TAB_ORDER = ['pasto','racao','conf','animais'];
+const TAB_ORDER = ['pasto','racao','conf','animais','sync'];
 const SUB_TAB_ORDER = ['pesar','medicar','morte'];
 let dadosCache = null;
 let dadosPlanos = [];
@@ -872,6 +872,7 @@ function mudarTab(tab) {
     document.getElementById('sec-'+t).classList.toggle('ativo', t === tab);
   });
   if (!dadosCache) carregarDados();
+  if (tab === 'sync') renderSync();
 }
 
 function mudarSubTab(sub) {
@@ -1427,6 +1428,94 @@ function selecionarAnimal(brinco, acao) {
   if (inp) { inp.value = brinco; inp.focus(); }
 }
 
+// === Render aba Sync ===
+async function renderSync() {
+  // Status
+  const statusEl = document.getElementById('syncStatus');
+  if (!statusEl) return;
+
+  if (_online) {
+    statusEl.innerHTML = '<span style="color:var(--verde);font-weight:700;">🌐 Online</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--danger);font-weight:700;">📴 Offline</span>';
+  }
+
+  // Pendentes
+  const pendentes = (await filaList('pendente')).concat(await filaList('erro'));
+  const elPend = document.getElementById('syncPendentes');
+  const btnSync = document.getElementById('btnSyncAgora');
+
+  const tipoLabel = (tipo) => ({
+    medicao_pasto: '📏 Medição',
+    racao: '🌾 Ração',
+    confinamento: '🏗️ Confinamento',
+    pesagem: '⚖️ Pesagem',
+    sanidade: '💉 Sanidade',
+  })[tipo] || tipo;
+
+  if (pendentes.length === 0) {
+    elPend.innerHTML = '<div class="c-empty"><span class="c-empty-icon">✓</span>Nenhum pendente</div>';
+    if (btnSync) btnSync.style.display = 'none';
+  } else {
+    elPend.innerHTML = pendentes.map(r => {
+      const cor = r.status === 'erro' ? 'var(--danger)' : 'var(--sub)';
+      const icone = r.status === 'erro' ? '❌' : '⏳';
+      const erroMsg = r.erro
+        ? `<div style="font-size:11px;color:var(--danger);margin-top:4px;">${escapeHtml(r.erro)}</div>`
+        : '';
+      return `
+        <div style="border-left:3px solid ${cor};padding:8px 12px;margin-bottom:8px;background:#f9fafb;border-radius:4px;">
+          <div style="font-size:13px;font-weight:600;">${icone} ${tipoLabel(r.tipo)}</div>
+          <div style="font-size:11px;color:var(--sub);margin-top:2px;">
+            ${new Date(r.criado_em).toLocaleString('pt-BR')} · ${r.tentativas}/3 tentativas
+          </div>
+          ${erroMsg}
+        </div>
+      `;
+    }).join('');
+    if (btnSync) btnSync.style.display = '';
+  }
+
+  // Histórico do dia (sincronizados hoje)
+  const hojeISO = new Date().toISOString().slice(0, 10);
+  const sincronizados = (await filaList('sincronizado')).filter(r =>
+    r.sincronizado_em && r.sincronizado_em.slice(0, 10) === hojeISO
+  );
+  const elHist = document.getElementById('syncHistorico');
+
+  if (sincronizados.length === 0) {
+    elHist.innerHTML = '<div class="c-empty"><span class="c-empty-icon">📋</span>Sem registros hoje</div>';
+  } else {
+    elHist.innerHTML = sincronizados.map(r => `
+      <div style="border-left:3px solid var(--verde);padding:8px 12px;margin-bottom:6px;background:#f0fdf4;border-radius:4px;">
+        <div style="font-size:13px;font-weight:600;">✅ ${tipoLabel(r.tipo)}</div>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px;">
+          ${new Date(r.sincronizado_em).toLocaleTimeString('pt-BR')}
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+async function forcarSync() {
+  toast('🔄 Sincronizando...');
+  await processarFila();
+  renderSync();
+}
+
+async function limparHistoricoSync() {
+  if (!confirm('Limpar histórico de registros sincronizados?')) return;
+  const n = await filaLimparHistorico();
+  toast(`${n} registros removidos do histórico`);
+  renderSync();
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────
 iniciarSyncEngine();
 atualizarBadgeSync();
@@ -1450,6 +1539,21 @@ carregarDados();
   <button class="c-bot-btn" id="tab-animais" onclick="mudarTab('animais')">
     <span class="c-bot-icon">🐂</span>
     <span class="c-bot-label">Animais</span>
+  </button>
+  <button class="c-bot-btn" id="tab-sync" onclick="mudarTab('sync')">
+    <span class="c-bot-icon" style="position:relative;">
+      🔄
+      <span id="syncBadge" style="
+        position:absolute; top:-6px; right:-10px;
+        background:var(--danger); color:#fff;
+        font-size:10px; font-weight:700;
+        min-width:16px; height:16px; padding:0 4px;
+        border-radius:8px; display:none;
+        align-items:center; justify-content:center;
+        line-height:1;
+      "></span>
+    </span>
+    <span class="c-bot-label">Sync</span>
   </button>
 </nav>
 
