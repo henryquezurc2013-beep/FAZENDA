@@ -43,25 +43,8 @@
     }
     .btn-logout:hover { background: rgba(255,255,255,.25); }
 
-    /* ── Nav tabs ── */
-    .c-nav {
-      display: flex; border-bottom: 2px solid var(--border);
-      background: var(--card); position: sticky; top: 54px; z-index: 99;
-      overflow-x: auto; scrollbar-width: none;
-    }
-    .c-nav::-webkit-scrollbar { display: none; }
-    .c-tab {
-      flex: 1; min-width: 80px; padding: 12px 4px; text-align: center;
-      font-size: 12px; font-weight: 600; color: var(--sub);
-      border-bottom: 2.5px solid transparent; cursor: pointer;
-      white-space: nowrap; transition: color .15s, border-color .15s;
-      background: none; border-top: none; border-left: none; border-right: none;
-    }
-    .c-tab.ativo { color: var(--verde); border-bottom-color: var(--verde); }
-    .c-tab-icon { font-size: 18px; display: block; margin-bottom: 2px; }
-
     /* ── Sections ── */
-    .c-section { display: none; padding: 16px; padding-bottom: 80px; }
+    .c-section { display: none; padding: 16px; padding-bottom: 88px; }
     .c-section.ativo { display: block; }
 
     /* ── Cards ── */
@@ -135,6 +118,41 @@
       box-shadow: 0 4px 16px rgba(0,0,0,.3);
     }
     .c-toast.erro { background: var(--danger); }
+
+    /* ── Menu inferior fixo ── */
+    .c-bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      z-index: 200;
+      box-shadow: 0 -2px 10px rgba(0,0,0,.1);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .c-bot-btn {
+      flex: 1;
+      min-height: 56px;
+      padding: 8px 4px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: none;
+      border: none;
+      border-top: 2.5px solid transparent;
+      color: var(--sub);
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .c-bot-btn.ativo {
+      color: var(--verde);
+      border-top-color: var(--verde);
+    }
+    .c-bot-icon { font-size: 22px; line-height: 1; }
+    .c-bot-label { font-size: 11px; font-weight: 600; line-height: 1; }
 
     /* ── Desktop link ── */
     .gestor-link {
@@ -290,22 +308,6 @@
     <button class="btn-logout" onclick="sair()">Sair</button>
   </div>
 </div>
-
-<!-- ── Nav tabs ── -->
-<nav class="c-nav">
-  <button class="c-tab ativo" id="tab-pasto" onclick="mudarTab('pasto')">
-    <span class="c-tab-icon">🌿</span>Pasto
-  </button>
-  <button class="c-tab" id="tab-racao" onclick="mudarTab('racao')">
-    <span class="c-tab-icon">🌾</span>Ração
-  </button>
-  <button class="c-tab" id="tab-conf" onclick="mudarTab('conf')">
-    <span class="c-tab-icon">🏗️</span>Confinamento
-  </button>
-  <button class="c-tab" id="tab-animais" onclick="mudarTab('animais')">
-    <span class="c-tab-icon">🐂</span>Animais
-  </button>
-</nav>
 
 <!-- ── Toast ── -->
 <div class="c-toast" id="cToast"></div>
@@ -1063,6 +1065,26 @@ function selecionarAnimal(brinco, acao) {
 // ── Inicialização ─────────────────────────────────────────────────────
 carregarDados();
 </script>
+
+<!-- ── Menu inferior ── -->
+<nav class="c-bottom-nav">
+  <button class="c-bot-btn ativo" id="tab-pasto" onclick="mudarTab('pasto')">
+    <span class="c-bot-icon">🌿</span>
+    <span class="c-bot-label">Pasto</span>
+  </button>
+  <button class="c-bot-btn" id="tab-racao" onclick="mudarTab('racao')">
+    <span class="c-bot-icon">🌾</span>
+    <span class="c-bot-label">Ração</span>
+  </button>
+  <button class="c-bot-btn" id="tab-conf" onclick="mudarTab('conf')">
+    <span class="c-bot-icon">🏗️</span>
+    <span class="c-bot-label">Confinamento</span>
+  </button>
+  <button class="c-bot-btn" id="tab-animais" onclick="mudarTab('animais')">
+    <span class="c-bot-icon">🐂</span>
+    <span class="c-bot-label">Animais</span>
+  </button>
+</nav>
 
 <!-- Overlay de busca de animais -->
 <div id="busModal" class="c-search-overlay" style="display:none;">
