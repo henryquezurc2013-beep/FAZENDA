@@ -564,6 +564,117 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// === Fila Offline (IndexedDB) ===
+const _DB_NAME = 'campo_offline';
+const _DB_VERSION = 1;
+const _STORE = 'eventos_pendentes';
+
+let _dbPromise = null;
+function _abrirDB() {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(_DB_NAME, _DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(_STORE)) {
+        const store = db.createObjectStore(_STORE, { keyPath: 'id' });
+        store.createIndex('status', 'status');
+        store.createIndex('criado_em', 'criado_em');
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return _dbPromise;
+}
+
+function _uuid() {
+  // RFC4122 v4 simples
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+async function filaAdd(evento) {
+  // evento: { tipo, metodo, url, body }
+  const db = await _abrirDB();
+  const registro = {
+    id: _uuid(),
+    tipo: evento.tipo,
+    metodo: evento.metodo,
+    url: evento.url,
+    body: evento.body,
+    criado_em: new Date().toISOString(),
+    tentativas: 0,
+    status: 'pendente',  // pendente | sincronizando | sincronizado | erro
+    erro: null,
+    sincronizado_em: null,
+  };
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(_STORE, 'readwrite');
+    tx.objectStore(_STORE).add(registro);
+    tx.oncomplete = () => resolve(registro);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function filaList(filtroStatus = null) {
+  const db = await _abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(_STORE, 'readonly');
+    const store = tx.objectStore(_STORE);
+    const req = filtroStatus
+      ? store.index('status').getAll(filtroStatus)
+      : store.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function filaUpdate(id, updates) {
+  const db = await _abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(_STORE, 'readwrite');
+    const store = tx.objectStore(_STORE);
+    const getReq = store.get(id);
+    getReq.onsuccess = () => {
+      const reg = getReq.result;
+      if (!reg) { resolve(null); return; }
+      Object.assign(reg, updates);
+      store.put(reg);
+    };
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function filaDelete(id) {
+  const db = await _abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(_STORE, 'readwrite');
+    tx.objectStore(_STORE).delete(id);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function filaCountPendente() {
+  const reg = await filaList('pendente');
+  const erro = await filaList('erro');
+  return reg.length + erro.length;
+}
+
+async function filaLimparHistorico() {
+  // Apaga apenas registros sincronizados
+  const sincronizados = await filaList('sincronizado');
+  for (const r of sincronizados) {
+    await filaDelete(r.id);
+  }
+  return sincronizados.length;
+}
+
 const TAB_ORDER = ['pasto','racao','conf','animais'];
 const SUB_TAB_ORDER = ['pesar','medicar','morte'];
 let dadosCache = null;
