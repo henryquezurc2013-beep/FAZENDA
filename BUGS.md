@@ -31,6 +31,7 @@ durante as próprias rodadas de fix.
 | 20 | `rebanho/templates/campo.html` (form de Confinamento, `fase_id`)       | **alta**   | ✅ CORRIGIDO em `7087914` (mesmo commit que #19). `fase_id` estava hardcoded em `1`. Lotes não em fase 1 (Adaptação) geravam lançamentos na fase errada — corrompendo cálculo de custo e MS por fase. Fix: resolver fase ativa antes do POST via `GET /confinamento/lotes/{id}/fases` + filtro JS por `status === 'ATIVA'`. Se nenhuma ativa, toast claro antes do POST. Descoberto durante a investigação do Plano 1. |
 | 21 | `rebanho/routers/balanca.py:166` + `rebanho/routers/animais.py:42`     | **baixa**  | ✅ CORRIGIDO em `00c0c62`. `data_nascimento = data_compra - 240d` estava em 2 lugares: `_DATA_NASCIMENTO_OFFSET_DIAS = 240` privada em `animais.py` (reusada no POST `/animais/importar`) e literal `240` hardcoded em `balanca.py` (auto-cadastro da feature #15). Extraído para `rebanho/constants.py` como `DATA_NASCIMENTO_OFFSET_DIAS`. Ambos os routers importam `from constants import ...` (cwd do projeto é `rebanho/`, não a raiz — atestado por `iniciar.bat` e `api/index.py`). |
 | 22 | `rebanho/routers/auth.py:27-39` + `rebanho/main.py:81,237,249`         | **baixa**  | ✅ CORRIGIDO em `00a8f12`. Função fazia 2 roundtrips Supabase (SELECT em `sessoes` + SELECT em `usuarios`) e ainda era re-chamada nos handlers `/campo` e `/campo/dados` (4 roundtrips/request nesses endpoints). Fix em duas frentes: (A) JOIN via PostgREST `select="*,usuarios(*)"` aproveitando FK `sessoes.usuario_id → usuarios(id)` — caminho normal passa de 2 para 1 roundtrip; (B) cache por request em `request.state.usuario_atual` setado no `auth_middleware`, handlers leem com `getattr(request.state, "usuario_atual", None)` defensivo. Endpoints `/campo*` passam de 4 para 2 roundtrips por request; demais autenticados passam de 2 para 1. Comentário inline em `auth.py` alerta que JOIN depende do nome `usuarios` da FK. |
+| 23 | `rebanho/templates/campo.html` (`registrarConfinamento`)               | **alta**   | ✅ CORRIGIDO em `97a0cc0`. Confinamento offline não funcionava: `registrarConfinamento()` faz GET prévio em `/confinamento/lotes/{id}/fases` pra resolver `fase_id` ativo. Quando offline, esse GET falhava silenciosamente (catch retorna []) → `ativa = undefined` → toast "Lote sem fase ativa" bloqueando o registro mesmo com fila offline ativa. Descoberto durante implementação da Frente C; o relatório do Claude Code reportou explicitamente. Fix: novo store IndexedDB `cache_fases_ativas` (DB v2); pre-fetch em `carregarDados()` quando online; fallback no `registrarConfinamento()` quando GET falha. Cache atualiza a cada abertura online, sem TTL. Risco residual baixo aceito: se gestor mudar fase do lote durante o dia e vaqueiro registrar offline com cache antigo, lançamento vai pra fase desatualizada (mitigação: gestor evita mudança de fase em horário de campo). |
 
 ---
 
@@ -42,10 +43,9 @@ corrigidos. Feature #15 (auto-cadastro via balança) entregue. Bug #13
 global em `8b037f4`. Plano 1 (app do vaqueiro online) entregue,
 incluindo correção dos bugs #18–#20 descobertos durante a investigação.
 Débitos restantes: **#11** (Vercel env, só relevante quando reativar
-RLS na Fase 3). Demais débitos da Fase 1 (#12, #16) foram resolvidos
-em sessão de limpeza. **#17** (touch target da topbar) foi parcialmente
-resolvido no Plano 2.1 (`b5c00e4`) — `.btn-logout` agora tem
-`min-height: 44px`.
+RLS — não há mais Fase 3 prevista; PWA offline já foi entregue, ver
+Plano 3 abaixo). Débitos #12, #16, #17 (parcial), #21, #22 fechados
+em sessões anteriores.
 
 ---
 
@@ -98,3 +98,77 @@ Entregue em 4 commits após Plano 2:
 - `82a3a7c` resolve #12 (refactor SQL relatórios)
 - `00c0c62` resolve #21 (constante 240d duplicada)
 - `00a8f12` resolve #22 (get_usuario_atual roundtrips)
+
+---
+
+## Plano 3 — App do vaqueiro instalável + offline (sessão 2026-05-09)
+
+Decisão: pular validação com vaqueiro real (Fase 1 do roadmap
+antigo) e atacar PWA + offline diretamente, motivado por demanda
+real (2+ vaqueiros começando uso na semana seguinte).
+
+Entregue em 12 commits, divididos em 3 frentes:
+
+### Frente A — Tela /usuarios + TTL estendido
+- `447cfe5` — TTL de sessão 12h → 30 dias (vaqueiro não cai no pasto)
+- `59805b6` — backend CRUD em `/usuarios` (GET/POST/PUT/PATCH ativo)
+- `d951932` — tela `/usuarios-page` (listar/criar/editar/desativar,
+  acesso restrito a GESTOR)
+- `9c059b5` — link "🔐 Usuários" no sidebar do `base.html`
+
+Decisões: senhas continuam em SHA-256 (refator pra bcrypt fica
+pra sessão dedicada); perfis 'GESTOR' e 'FUNCIONARIO' (vaqueiros
+são FUNCIONARIO, sem migração de constraint).
+
+### Frente B — PWA instalável
+- `2a363ff` — manifest.json + 4 ícones (verde-dark + letra C) +
+  meta tags + botão "📲 Instalar app" na topbar do /campo
+- `92796f6` — service worker `/sw.js` (cache-first pra /static,
+  network-first pra HTML; escopo `/campo/`)
+
+Resultado: app instalável no Chrome Android e iOS (via
+"Adicionar à tela inicial"). Abre fullscreen com ícone na home.
+
+### Frente C — Offline real (fila + sync + aba Sync)
+- `e2852e6` — IndexedDB store `eventos_pendentes` + helpers
+  (filaAdd, filaList, filaUpdate, filaDelete, etc)
+- `f7e0542` — wrapper `fetchComFila` + sync automático + retry
+  com backoff 1s/5s/30s + listeners online/offline + ping
+  periódico em /auth/me a cada 30s quando há fila
+- `25acd41` — aba "🔄 Sync" no menu inferior (5º botão); cards
+  de Status, Pendentes (com erros visíveis), Histórico do dia;
+  badge com contador de pendentes
+- `e3b0bfa` — fix: section `#sec-sync` faltou no commit anterior
+  (edit silenciosamente parcial — old_string referenciava
+  `class="btn-primary"` que já tinha virado `btn-danger` no
+  Plano 2.1)
+- `9e79e66` — sw.js cacheia `/campo` HTML no shell + bump v2
+  (permite primeira abertura offline após instalação)
+- `97a0cc0` — cache de fases ativas em IndexedDB v2 (store
+  `cache_fases_ativas`); pre-fetch em `carregarDados()`;
+  `registrarConfinamento()` faz fallback no cache quando offline
+
+5 endpoints na fila (offline-friendly):
+- POST /pastagem/medicoes
+- POST /nutricao/lancamentos
+- POST /confinamento/lancamentos
+- POST /pesagens/
+- POST /sanidade
+
+Fora da fila (online-only, decisão consciente):
+- PUT /animais/{brinco} (registro de morte) — evento raro,
+  vaqueiro pode esperar
+- GET /animais?brinco=... (busca) — exigiria copiar tabela animais
+
+Decisão: aceitar duplicatas raras se conexão cair entre POST e
+resposta (sem idempotência server-side). Custo: limpeza manual
+ocasional pelo gestor.
+
+Resultado validado em produção:
+- PWA instala em celular Android e iOS
+- Modo avião → registros vão pra fila com toast "💾 Salvo
+  localmente"
+- Modo avião OFF → sync automático em ~30s, registros chegam
+  no Supabase
+- Histórico do dia visível ao vaqueiro
+- Confinamento offline funciona via cache de fases ativas
