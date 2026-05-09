@@ -25,6 +25,10 @@ durante as próprias rodadas de fix.
 | 14 | `rebanho/routers/balanca.py:13` (`_BRINCO_COLS`)                       | **alta**   | ✅ CORRIGIDO em `2858392`. Balança TRU-TEST S3 exporta planilha com coluna `IDV` (Identificação Visual). `_BRINCO_COLS` original (`{"animal id", "animal_id", "tag id", "tag_id", "brinco", "id", "animais"}`) não reconhecia `IDV` — `_detect_col` retornava None e `/balanca/importar` levantava 400 "Colunas obrigatórias não encontradas." independente do conteúdo do arquivo. Adicionados: `idv`, `eid`, `vid`, `ear tag`, `tag`. Cobre TRU-TEST e variantes sem virar catch-all permissivo. `_PESO_COLS` e `_DATA_COLS` já cobrem `Peso`/`Data` da S3; `_DATE_FMTS` já aceita formato BR `%d/%m/%Y`. Descoberto em uso real, fora da Fase 1. |
 | 15 | `rebanho/routers/balanca.py` + `rebanho/templates/balanca.html`        | **FEATURE** | ✅ ENTREGUE em `6e512e0` (backend) e `9845b3a` (UI). **Estratégia B**: balança auto-cadastra animais cujo brinco não existe em `animais`, em vez de pular. Defaults configuráveis na tela: sexo, raça, tipo, origem (com defaults `MACHO/NELORE/GARROTE/COMPRA`). `cadastrar_novos` checkbox default ON; `valor_medio` e `fornecedor` opcionais — se valor_medio informado, gera 1 lançamento agregado em `/compras` com `valor_total = novos × valor_medio`. `data_compra` do animal = data da pesagem; `data_nascimento` = data_compra − 240 dias. Resultado da importação ganha 5º contador "CADASTRADOS". Mudança de design solicitada após uso real do app — fluxo da fazenda é cadastrar animal novo no momento da primeira pesagem, não pré-cadastro manual. |
 | 16 | `rebanho/main.py` (`_ROTAS_PUBLICAS`)                                  | **média**  | `/docs`, `/redoc` e `/openapi.json` (auto-docs do FastAPI) estão na lista pública do middleware de auth para facilitar desenvolvimento. Em DEV é aceitável, mas em produção expõe schema completo da API a qualquer requisição não autenticada — atacante consegue inventário de endpoints e tipos sem credenciais. **Fix:** remover as 3 entradas da tupla `_ROTAS_PUBLICAS` em `rebanho/main.py` antes do próximo deploy de produção sério (com dados reais de funcionários ou clientes). Comentário inline em `main.py` (acima da definição de `_ROTAS_PUBLICAS`) reforça o aviso. **Prazo:** antes de qualquer ambiente com dados reais. Originado durante a correção do bug #13. |
+| 17 | `rebanho/templates/campo.html` (`.btn-logout` reusado por 🔍 e Sair)   | **baixa**  | Botões "🔍 Buscar" e "Sair" na topbar do `/campo` têm altura ~24-30px (touch target abaixo dos 44px recomendados). Funcional mas risco de mistap em campo. **Fix:** aumentar tamanho dos botões da topbar quando atacar redesenho UX (Plano 2 — pós validação com vaqueiro real). Originado durante o commit 7 do Plano 1 (busca por brinco). |
+| 18 | `rebanho/templates/campo.html` (form de Ração)                         | **alta**   | ✅ CORRIGIDO em `0f162bf`. Form da aba Ração no `/campo` era DUMMY: `registrarRacao()` só fazia `toast('Lançamento registrado!')` e descartava o submit. Comentário inline admitia que faltava `plano_id` no `/campo/dados`. Vaqueiro achava que tinha registrado, não tinha — perda silenciosa de dados em uso real. Fix: carrega `/nutricao/planos?status=ATIVO` em adição ao `/campo/dados` pra ter `plano_id` real no select; submit chama `POST /nutricao/lancamentos`. ZERO backend change. Descoberto durante a investigação do Plano 1. |
+| 19 | `rebanho/templates/campo.html` (form de Confinamento, path)            | **alta**   | ✅ CORRIGIDO em `7087914`. Form chamava `POST /confinamento/lotes/{id}/lancamentos` — path inexistente. Rota real é `POST /confinamento/lancamentos` (sem `/lotes/{id}/`); `lote_conf_id` vai no body. Catch genérico do JS engolia o 404. Fix: troca de URL no `fetch`. Descoberto durante a investigação do Plano 1. |
+| 20 | `rebanho/templates/campo.html` (form de Confinamento, `fase_id`)       | **alta**   | ✅ CORRIGIDO em `7087914` (mesmo commit que #19). `fase_id` estava hardcoded em `1`. Lotes não em fase 1 (Adaptação) geravam lançamentos na fase errada — corrompendo cálculo de custo e MS por fase. Fix: resolver fase ativa antes do POST via `GET /confinamento/lotes/{id}/fases` + filtro JS por `status === 'ATIVA'`. Se nenhuma ativa, toast claro antes do POST. Descoberto durante a investigação do Plano 1. |
 
 ---
 
@@ -33,6 +37,32 @@ durante as próprias rodadas de fix.
 Todos os bugs da Fase 1 (#1–#10) e os surgidos em uso real (#14) foram
 corrigidos. Feature #15 (auto-cadastro via balança) entregue. Bug #13
 (endpoints sem auth, severidade **CRÍTICA**) fechado por middleware
-global em `8b037f4`. Débitos restantes: **#11** (Vercel env), **#12**
-(refactor SQL), e **#16** — `/docs`, `/redoc`, `/openapi.json` públicos
-em DEV, fechar antes de subir prod com dados reais.
+global em `8b037f4`. Plano 1 (app do vaqueiro online) entregue,
+incluindo correção dos bugs #18–#20 descobertos durante a investigação.
+Débitos restantes: **#11** (Vercel env), **#12** (refactor SQL),
+**#16** (`/docs`, `/redoc`, `/openapi.json` públicos em DEV — fechar
+antes de subir prod com dados reais), e **#17** (touch target da
+topbar do `/campo`, polish do Plano 2).
+
+---
+
+## Plano 1 — App do Vaqueiro (Online)
+
+Entregue em 7 commits cobrindo as 6 operações do vaqueiro no `/campo`
+(antes só pesagem funcionava de verdade):
+
+- `0f162bf` fix(campo): conserta form de Ração que era dummy (#18)
+- `7087914` fix(campo): path correto + fase ativa em Confinamento (#19, #20)
+- `f370b17` feat(campo): aba Pasto ganha form de medição
+- `038db8c` refactor(campo): aba Pesagem vira "Animais" com sub-tabs Pesar/Medicar/Morte
+- `6c5a47a` feat(campo): sub-tab Medicar (sanidade)
+- `1c1c3cf` feat(campo): sub-tab Morte com modal de confirmação
+- `2e237a7` feat(campo): busca de animal por brinco (botão 🔍 na topbar)
+
+Operações cobertas: ⚖️ pesagem, 🌾 ração, 🏗️ confinamento, 📏 medição
+de pasto, 💉 sanidade, ⚠️ morte, 🔍 busca por brinco. Cada submit
+chama endpoint REST existente; ZERO mudança em backend.
+
+**Próximo passo:** validação com vaqueiro real por 1 semana antes de
+atacar o **Plano 2** (redesenho UX pós-uso real) ou PWA offline.
+Débitos visíveis hoje: #17 (touch target da topbar).
