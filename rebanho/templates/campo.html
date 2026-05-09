@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Modo Campo — Controle Bovino</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,13 +24,22 @@
     .c-top-left { display: flex; align-items: center; gap: 10px; }
     .c-top-icon { font-size: 22px; }
     .c-top-title { font-size: 16px; font-weight: 700; }
-    .c-top-sub { font-size: 11px; opacity: .75; }
+    .c-top-sub { font-size: 13px; opacity: .75; }
     .c-top-right { display: flex; align-items: center; gap: 8px; }
     .c-top-user { font-size: 12px; opacity: .85; }
     .btn-logout {
-      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
-      color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 12px;
-      cursor: pointer; white-space: nowrap;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.3);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      min-height: 44px;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .btn-logout:hover { background: rgba(255,255,255,.25); }
 
@@ -94,6 +103,20 @@
     .btn-primary:hover { opacity: .9; }
     .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
+    .btn-danger {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-danger:hover { opacity: .9; }
+
     /* ── Loading ── */
     .c-loading { text-align: center; padding: 40px 16px; color: var(--sub); font-size: 14px; }
     .c-loading-spinner { font-size: 28px; display: block; margin-bottom: 8px; animation: spin .8s linear infinite; }
@@ -102,20 +125,6 @@
     /* ── Empty state ── */
     .c-empty { text-align: center; padding: 32px 16px; color: var(--sub); }
     .c-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
-
-    /* ── Sticky bottom nav ── */
-    .c-bottom-nav {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: var(--card); border-top: 1px solid var(--border);
-      display: flex; z-index: 200; box-shadow: 0 -2px 10px rgba(0,0,0,.1);
-    }
-    .c-bot-btn {
-      flex: 1; padding: 10px 4px; text-align: center;
-      font-size: 11px; font-weight: 600; color: var(--sub);
-      background: none; border: none; cursor: pointer; transition: color .15s;
-    }
-    .c-bot-btn.ativo { color: var(--verde); }
-    .c-bot-btn span { display: block; font-size: 20px; margin-bottom: 2px; }
 
     /* ── Toast ── */
     .c-toast {
@@ -143,6 +152,18 @@
     #sec-pasto .c-field select,
     #sec-pasto .c-field textarea { font-size: 16px; padding: 12px 14px; }
     #sec-pasto .btn-primary { padding: 14px; font-size: 16px; }
+
+    /* Tamanhos mobile-friendly — aba Ração (mesmo padrão do #sec-pasto) */
+    #sec-racao .c-field input,
+    #sec-racao .c-field select,
+    #sec-racao .c-field textarea { font-size: 16px; padding: 12px 14px; }
+    #sec-racao .btn-primary { padding: 14px; font-size: 16px; }
+
+    /* Tamanhos mobile-friendly — aba Confinamento (mesmo padrão do #sec-pasto) */
+    #sec-conf .c-field input,
+    #sec-conf .c-field select,
+    #sec-conf .c-field textarea { font-size: 16px; padding: 12px 14px; }
+    #sec-conf .btn-primary { padding: 14px; font-size: 16px; }
 
     /* Sub-tabs (dentro da aba Animais) */
     .c-subtabs {
@@ -490,9 +511,7 @@
         <label>Motivo *</label>
         <select id="morMotivo"><option value="">— selecione —</option></select>
       </div>
-      <button class="btn-primary"
-              style="background:linear-gradient(135deg,#dc2626,#991b1b);"
-              onclick="registrarMorte()">⚠️ Registrar Morte</button>
+      <button class="btn-danger" onclick="registrarMorte()">⚠️ Registrar Morte</button>
     </div>
   </div>
 </section>
