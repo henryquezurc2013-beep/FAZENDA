@@ -347,8 +347,8 @@ def ganho_peso(ano: int = Query(...)):
 
 @router.get("/financeiro")
 def financeiro(ano: int = Query(...)):
-    compras_rows = supabase.table("compras").select("data,valor_total").like("data", f"{ano}-%").execute().data
-    vendas_rows = supabase.table("vendas").select("data,valor_total").like("data", f"{ano}-%").execute().data
+    compras_rows = supabase.table("compras").select("data,valor_total").gte("data", f"{ano}-01-01").lte("data", f"{ano}-12-31").execute().data
+    vendas_rows = supabase.table("vendas").select("data,valor_total").gte("data", f"{ano}-01-01").lte("data", f"{ano}-12-31").execute().data
     compras = {str(m): 0.0 for m in range(1, 13)}
     for r in compras_rows:
         try:
@@ -368,7 +368,7 @@ def financeiro(ano: int = Query(...)):
 
 @router.get("/despesas")
 def despesas_relatorio(ano: int = Query(...), status: Optional[str] = Query(None)):
-    q = supabase.table("despesas").select("vencimento,tipo,valor").like("vencimento", f"{ano}-%")
+    q = supabase.table("despesas").select("vencimento,tipo,valor").gte("vencimento", f"{ano}-01-01").lte("vencimento", f"{ano}-12-31")
     if status:
         q = q.ilike("status", status)
     registros = q.execute().data
