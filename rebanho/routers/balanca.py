@@ -7,6 +7,7 @@ import pandas as pd
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from database import supabase
+from constants import DATA_NASCIMENTO_OFFSET_DIAS
 
 router = APIRouter()
 
@@ -163,7 +164,7 @@ async def importar_balanca(
             # Auto-cadastra animal novo com defaults da UI.
             try:
                 dt_compra = date.fromisoformat(data_str)
-                data_nascimento = (dt_compra - timedelta(days=240)).isoformat()
+                data_nascimento = (dt_compra - timedelta(days=DATA_NASCIMENTO_OFFSET_DIAS)).isoformat()
                 novo_animal = {
                     "brinco":          brinco_raw,
                     "sexo":            sexo_padrao,

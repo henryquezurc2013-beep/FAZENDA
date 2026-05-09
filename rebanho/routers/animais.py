@@ -7,6 +7,7 @@ import pandas as pd
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from database import supabase, get_fazenda_id
+from constants import DATA_NASCIMENTO_OFFSET_DIAS
 
 router = APIRouter()
 
@@ -38,8 +39,6 @@ _DEFAULTS_IMP = {
     "origem": "COMPRA",
     "status": "ATIVO",
 }
-# Estimativa de idade na compra: 8 meses → data_nascimento = data_compra - 240 dias.
-_DATA_NASCIMENTO_OFFSET_DIAS = 240
 
 
 def _calc_idade(data_nascimento: str):
@@ -266,7 +265,7 @@ async def importar_animais(
     else:
         dt_compra = date.today()
     data_compra_iso = dt_compra.isoformat()
-    data_nascimento_iso = (dt_compra - timedelta(days=_DATA_NASCIMENTO_OFFSET_DIAS)).isoformat()
+    data_nascimento_iso = (dt_compra - timedelta(days=DATA_NASCIMENTO_OFFSET_DIAS)).isoformat()
 
     fid = get_fazenda_id(request)
     fazenda_id_final = fid if fid > 0 else 1
