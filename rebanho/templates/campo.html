@@ -597,7 +597,7 @@ if ('serviceWorker' in navigator) {
 
 // === Fila Offline (IndexedDB) ===
 const _DB_NAME = 'campo_offline';
-const _DB_VERSION = 1;
+const _DB_VERSION = 2;
 const _STORE = 'eventos_pendentes';
 
 let _dbPromise = null;
@@ -611,6 +611,9 @@ function _abrirDB() {
         const store = db.createObjectStore(_STORE, { keyPath: 'id' });
         store.createIndex('status', 'status');
         store.createIndex('criado_em', 'criado_em');
+      }
+      if (!db.objectStoreNames.contains('cache_fases_ativas')) {
+        db.createObjectStore('cache_fases_ativas', { keyPath: 'lote_conf_id' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -704,6 +707,54 @@ async function filaLimparHistorico() {
     await filaDelete(r.id);
   }
   return sincronizados.length;
+}
+
+// === Cache de fases ativas (pra confinamento offline) ===
+async function cacheFaseAtivaSet(lote_conf_id, fase_id, fase_nome) {
+  const db = await _abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('cache_fases_ativas', 'readwrite');
+    tx.objectStore('cache_fases_ativas').put({
+      lote_conf_id,
+      fase_id,
+      fase_nome,
+      atualizado_em: new Date().toISOString(),
+    });
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function cacheFaseAtivaGet(lote_conf_id) {
+  const db = await _abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('cache_fases_ativas', 'readonly');
+    const req = tx.objectStore('cache_fases_ativas').get(lote_conf_id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function preCacheFasesAtivas() {
+  // Best-effort: itera dadosConf (array direto de lotes do /campo/dados),
+  // busca fases de cada lote e cacheia a ATIVA. Erros silenciados —
+  // não bloqueia init.
+  if (!Array.isArray(dadosConf)) return;
+  for (const lote of dadosConf) {
+    try {
+      const r = await fetch(`/confinamento/lotes/${lote.id}/fases`);
+      if (r.ok) {
+        const fases = await r.json();
+        const ativa = (Array.isArray(fases) ? fases : [])
+          .find(f => f.status === 'ATIVA');
+        if (ativa) {
+          await cacheFaseAtivaSet(lote.id, ativa.id, ativa.nome || '');
+        }
+      }
+    } catch {
+      // silencioso — best-effort
+    }
+  }
 }
 
 // === Sync Engine ===
@@ -954,6 +1005,9 @@ async function carregarDados() {
 
     // Animais: definições para os forms de sanidade e morte.
     await carregarDefinicoesAnimais();
+
+    // Confinamento: pre-cache de fases ativas (pra registrar offline).
+    await preCacheFasesAtivas();
   } catch(e) {
     toast('Erro ao carregar dados', true);
   }
@@ -1175,20 +1229,34 @@ async function registrarConfinamento() {
   const data = document.getElementById('confData').value;
   const resp = document.getElementById('confResp').value.trim();
   if (!loteId || isNaN(qtd) || qtd <= 0 || !data) { toast('Preencha todos os campos', true); return; }
+
+  // Resolver fase_id: tenta online primeiro, fallback no cache local.
+  let fase_id = null;
   try {
-    // Resolver fase_id real: backend nao filtra por status, entao pegamos
-    // todas as fases do lote e filtramos no JS pela ATIVA.
     const fases = await fetch('/confinamento/lotes/'+loteId+'/fases')
       .then(rr => rr.ok ? rr.json() : [])
       .catch(() => []);
-    const ativa = (fases || []).find(f => f.status === 'ATIVA');
-    if (!ativa) { toast('Lote sem fase ativa', true); return; }
+    const ativa = (Array.isArray(fases) ? fases : []).find(f => f.status === 'ATIVA');
+    if (ativa) fase_id = ativa.id;
+  } catch {
+    // ignora — fallback abaixo
+  }
+  if (!fase_id) {
+    const cached = await cacheFaseAtivaGet(parseInt(loteId));
+    if (cached && cached.fase_id) fase_id = cached.fase_id;
+  }
+  if (!fase_id) {
+    toast('Lote sem fase ativa (e sem cache local). Conecte na sede e abra o app uma vez.', true);
+    return;
+  }
+
+  try {
     const r = await fetchComFila('/confinamento/lancamentos', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         lote_conf_id: parseInt(loteId),
-        fase_id: ativa.id,
+        fase_id,
         data, qtd_fornecida_kg: qtd,
         responsavel: resp || 'Campo'
       })
