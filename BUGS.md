@@ -20,15 +20,17 @@ durante as próprias rodadas de fix.
 | 9  | `rebanho/models.py` (arquivo inteiro)                                  | **média**  | ✅ CORRIGIDO em `3614396`. Arquivo deletado. Confirmado morto: `findstr` global mostrou que `seed.py` era o único import de `models.py` em todo o projeto, e `seed.py` também foi deletado no mesmo commit (Bug #10).                                                                    |
 | 10 | `rebanho/seed.py`                                                      | **baixa**  | ✅ CORRIGIDO em `3614396`. Arquivo deletado junto com `models.py` (mesmo commit). Importava `SessionLocal`/`create_tables` que não existem mais em `database.py`, e inseria com Schema B (`data_pesagem`, `peso`, `data_insem`, `mm_chuva`). Os routers já têm seeds idiomáticos `seed_*()`. |
 | 11 | Vercel — Environment Variables                                         | **baixa**  | `SUPABASE_SECRET_KEY` ainda não foi adicionada na Vercel. Será necessária quando o código precisar bypassar RLS server-side (Fase 3, ao reativar RLS). Hoje o código só usa `SUPABASE_KEY` (publishable) e não precisa da secret.                                                       |
-| 12 | `rebanho/routers/relatorios.py:350-351,371`                            | **baixa**  | Três funções (`compras_relatorio`, `vendas_relatorio`, `despesas_relatorio`) usam `.like(coluna, f"{ano}-%")` contra coluna DATE. Funciona em runtime via cast implícito do PostgREST, mas semanticamente seria mais correto usar `.gte/.lte` com intervalo de DATE (ex.: `gte("vencimento", f"{ano}-01-01").lte("vencimento", f"{ano}-12-31")`). Refactor candidato para um commit dedicado cobrindo as 3 funções juntas — não misturar com outros fixes. |
+| 12 | `rebanho/routers/relatorios.py:350-351,371`                            | **baixa**  | ✅ CORRIGIDO em `82a3a7c`. Trocadas 3 ocorrências de `.like("col", f"{ano}-%")` por `.gte().lte()` com intervalo DATE explícito em `relatorios.py:350,351,371`. NOTA: o texto original do bug mencionava 3 funções (`compras_relatorio`, `vendas_relatorio`, `despesas_relatorio`), mas no código atual `compras_relatorio` e `vendas_relatorio` foram fundidas em `financeiro(ano)`. Bug afetava as mesmas linhas, fix aplicado. Texto original: três funções usam `.like(coluna, f"{ano}-%")` contra coluna DATE. Funciona em runtime via cast implícito do PostgREST, mas semanticamente seria mais correto usar `.gte/.lte` com intervalo de DATE. |
 | 13 | Todo o app (`rebanho/routers/*.py`)                                    | **CRÍTICA** | ✅ CORRIGIDO em `8b037f4`. Middleware HTTP global adicionado em `rebanho/main.py` (`auth_middleware`) que exige autenticação em todas as rotas exceto lista pública. Lista pública (`_ROTAS_PUBLICAS`): `/login`, `/static`, `/favicon.ico`, `/docs`, `/redoc`, `/openapi.json`, `/auth/login`, `/auth/logout`, `/auth/me`. Match = path exato OU `path.startswith(p + "/")` (defensivo contra colisão `/animais` vs `/animais-page`). OPTIONS (CORS pré-flight) sempre passa direto. Não autenticado: retorna 401 JSON quando `Accept: application/json` OU path em prefixo REST conhecido (`/animais`, `/pesagens`, `/sanidade`, `/inseminacoes`, `/compras`, `/vendas`, `/despesas`, `/pessoas`, `/relatorios`, `/exportar`, `/balanca`, `/pastagem`, `/config`, `/nutricao`, `/fazendas`, `/confinamento`, `/campo/dados`); caso contrário (browser) retorna 302 redirect pra `/login`. Reusa `get_usuario_atual()` existente — sem migração pra Supabase Auth nesta fase. Routers individuais e `auth.py` não foram tocados. Originalmente descoberto durante revisão do commit `8c37ade`. |
 | 14 | `rebanho/routers/balanca.py:13` (`_BRINCO_COLS`)                       | **alta**   | ✅ CORRIGIDO em `2858392`. Balança TRU-TEST S3 exporta planilha com coluna `IDV` (Identificação Visual). `_BRINCO_COLS` original (`{"animal id", "animal_id", "tag id", "tag_id", "brinco", "id", "animais"}`) não reconhecia `IDV` — `_detect_col` retornava None e `/balanca/importar` levantava 400 "Colunas obrigatórias não encontradas." independente do conteúdo do arquivo. Adicionados: `idv`, `eid`, `vid`, `ear tag`, `tag`. Cobre TRU-TEST e variantes sem virar catch-all permissivo. `_PESO_COLS` e `_DATA_COLS` já cobrem `Peso`/`Data` da S3; `_DATE_FMTS` já aceita formato BR `%d/%m/%Y`. Descoberto em uso real, fora da Fase 1. |
 | 15 | `rebanho/routers/balanca.py` + `rebanho/templates/balanca.html`        | **FEATURE** | ✅ ENTREGUE em `6e512e0` (backend) e `9845b3a` (UI). **Estratégia B**: balança auto-cadastra animais cujo brinco não existe em `animais`, em vez de pular. Defaults configuráveis na tela: sexo, raça, tipo, origem (com defaults `MACHO/NELORE/GARROTE/COMPRA`). `cadastrar_novos` checkbox default ON; `valor_medio` e `fornecedor` opcionais — se valor_medio informado, gera 1 lançamento agregado em `/compras` com `valor_total = novos × valor_medio`. `data_compra` do animal = data da pesagem; `data_nascimento` = data_compra − 240 dias. Resultado da importação ganha 5º contador "CADASTRADOS". Mudança de design solicitada após uso real do app — fluxo da fazenda é cadastrar animal novo no momento da primeira pesagem, não pré-cadastro manual. |
-| 16 | `rebanho/main.py` (`_ROTAS_PUBLICAS`)                                  | **média**  | `/docs`, `/redoc` e `/openapi.json` (auto-docs do FastAPI) estão na lista pública do middleware de auth para facilitar desenvolvimento. Em DEV é aceitável, mas em produção expõe schema completo da API a qualquer requisição não autenticada — atacante consegue inventário de endpoints e tipos sem credenciais. **Fix:** remover as 3 entradas da tupla `_ROTAS_PUBLICAS` em `rebanho/main.py` antes do próximo deploy de produção sério (com dados reais de funcionários ou clientes). Comentário inline em `main.py` (acima da definição de `_ROTAS_PUBLICAS`) reforça o aviso. **Prazo:** antes de qualquer ambiente com dados reais. Originado durante a correção do bug #13. |
+| 16 | `rebanho/main.py` (`_ROTAS_PUBLICAS`)                                  | **média**  | ✅ CORRIGIDO em `834244c`. Defesa em profundidade: `FastAPI(docs_url=None, redoc_url=None, openapi_url=None)` desabilita os 3 endpoints no nível do framework, e as 3 entradas foram removidas de `_ROTAS_PUBLICAS` em `rebanho/main.py`. Schema da API não é mais acessível mesmo por bypass do middleware. Texto original: `/docs`, `/redoc` e `/openapi.json` (auto-docs do FastAPI) estão na lista pública do middleware de auth para facilitar desenvolvimento. Em DEV é aceitável, mas em produção expõe schema completo da API a qualquer requisição não autenticada — atacante consegue inventário de endpoints e tipos sem credenciais. Originado durante a correção do bug #13. |
 | 17 | `rebanho/templates/campo.html` (`.btn-logout` reusado por 🔍 e Sair)   | **baixa**  | Botões "🔍 Buscar" e "Sair" na topbar do `/campo` têm altura ~24-30px (touch target abaixo dos 44px recomendados). Funcional mas risco de mistap em campo. **Fix:** aumentar tamanho dos botões da topbar quando atacar redesenho UX (Plano 2 — pós validação com vaqueiro real). Originado durante o commit 7 do Plano 1 (busca por brinco). |
 | 18 | `rebanho/templates/campo.html` (form de Ração)                         | **alta**   | ✅ CORRIGIDO em `0f162bf`. Form da aba Ração no `/campo` era DUMMY: `registrarRacao()` só fazia `toast('Lançamento registrado!')` e descartava o submit. Comentário inline admitia que faltava `plano_id` no `/campo/dados`. Vaqueiro achava que tinha registrado, não tinha — perda silenciosa de dados em uso real. Fix: carrega `/nutricao/planos?status=ATIVO` em adição ao `/campo/dados` pra ter `plano_id` real no select; submit chama `POST /nutricao/lancamentos`. ZERO backend change. Descoberto durante a investigação do Plano 1. |
 | 19 | `rebanho/templates/campo.html` (form de Confinamento, path)            | **alta**   | ✅ CORRIGIDO em `7087914`. Form chamava `POST /confinamento/lotes/{id}/lancamentos` — path inexistente. Rota real é `POST /confinamento/lancamentos` (sem `/lotes/{id}/`); `lote_conf_id` vai no body. Catch genérico do JS engolia o 404. Fix: troca de URL no `fetch`. Descoberto durante a investigação do Plano 1. |
 | 20 | `rebanho/templates/campo.html` (form de Confinamento, `fase_id`)       | **alta**   | ✅ CORRIGIDO em `7087914` (mesmo commit que #19). `fase_id` estava hardcoded em `1`. Lotes não em fase 1 (Adaptação) geravam lançamentos na fase errada — corrompendo cálculo de custo e MS por fase. Fix: resolver fase ativa antes do POST via `GET /confinamento/lotes/{id}/fases` + filtro JS por `status === 'ATIVA'`. Se nenhuma ativa, toast claro antes do POST. Descoberto durante a investigação do Plano 1. |
+| 21 | `rebanho/routers/balanca.py:166` + `rebanho/routers/animais.py:42`     | **baixa**  | ✅ CORRIGIDO em `00c0c62`. `data_nascimento = data_compra - 240d` estava em 2 lugares: `_DATA_NASCIMENTO_OFFSET_DIAS = 240` privada em `animais.py` (reusada no POST `/animais/importar`) e literal `240` hardcoded em `balanca.py` (auto-cadastro da feature #15). Extraído para `rebanho/constants.py` como `DATA_NASCIMENTO_OFFSET_DIAS`. Ambos os routers importam `from constants import ...` (cwd do projeto é `rebanho/`, não a raiz — atestado por `iniciar.bat` e `api/index.py`). |
+| 22 | `rebanho/routers/auth.py:27-39` + `rebanho/main.py:81,237,249`         | **baixa**  | ✅ CORRIGIDO em `00a8f12`. Função fazia 2 roundtrips Supabase (SELECT em `sessoes` + SELECT em `usuarios`) e ainda era re-chamada nos handlers `/campo` e `/campo/dados` (4 roundtrips/request nesses endpoints). Fix em duas frentes: (A) JOIN via PostgREST `select="*,usuarios(*)"` aproveitando FK `sessoes.usuario_id → usuarios(id)` — caminho normal passa de 2 para 1 roundtrip; (B) cache por request em `request.state.usuario_atual` setado no `auth_middleware`, handlers leem com `getattr(request.state, "usuario_atual", None)` defensivo. Endpoints `/campo*` passam de 4 para 2 roundtrips por request; demais autenticados passam de 2 para 1. Comentário inline em `auth.py` alerta que JOIN depende do nome `usuarios` da FK. |
 
 ---
 
@@ -39,10 +41,11 @@ corrigidos. Feature #15 (auto-cadastro via balança) entregue. Bug #13
 (endpoints sem auth, severidade **CRÍTICA**) fechado por middleware
 global em `8b037f4`. Plano 1 (app do vaqueiro online) entregue,
 incluindo correção dos bugs #18–#20 descobertos durante a investigação.
-Débitos restantes: **#11** (Vercel env), **#12** (refactor SQL),
-**#16** (`/docs`, `/redoc`, `/openapi.json` públicos em DEV — fechar
-antes de subir prod com dados reais), e **#17** (touch target da
-topbar do `/campo`, polish do Plano 2).
+Débitos restantes: **#11** (Vercel env, só relevante quando reativar
+RLS na Fase 3). Demais débitos da Fase 1 (#12, #16) foram resolvidos
+em sessão de limpeza. **#17** (touch target da topbar) foi parcialmente
+resolvido no Plano 2.1 (`b5c00e4`) — `.btn-logout` agora tem
+`min-height: 44px`.
 
 ---
 
@@ -66,3 +69,32 @@ chama endpoint REST existente; ZERO mudança em backend.
 **Próximo passo:** validação com vaqueiro real por 1 semana antes de
 atacar o **Plano 2** (redesenho UX pós-uso real) ou PWA offline.
 Débitos visíveis hoje: #17 (touch target da topbar).
+
+---
+
+## Plano 2 — Redesenho UX (parcial)
+
+Entregue em 2 commits:
+- `b5c00e4` Plano 2.1 — higiene CSS: viewport sem maximum-scale,
+  touch targets ≥44px (resolve parcialmente #17), override
+  mobile-friendly em `#sec-racao` e `#sec-conf`, `.c-top-sub`
+  11px → 13px, CSS morto removido, classe `.btn-danger` criada
+- `db5262e` Plano 2.2 — menu inferior fixo: tabs do topo
+  substituídas por `<nav class="c-bottom-nav">` com 4 itens
+  (ícone + label), IDs `tab-{pasto,racao,conf,animais}`
+  preservados (zero JS tocado), suporte a `safe-area-inset-bottom`
+
+Decisão de processo: validação com vaqueiro real (Fase 1
+original) pulada conscientemente. Próxima sub-fase candidata
+é Plano 2.3 (cores/contraste pra sol forte) — essa SIM precisa
+de validação outdoor antes.
+
+---
+
+## Limpeza de dívida técnica (sessão 2026-05-09)
+
+Entregue em 4 commits após Plano 2:
+- `834244c` resolve #16 (/docs em produção)
+- `82a3a7c` resolve #12 (refactor SQL relatórios)
+- `00c0c62` resolve #21 (constante 240d duplicada)
+- `00a8f12` resolve #22 (get_usuario_atual roundtrips)
