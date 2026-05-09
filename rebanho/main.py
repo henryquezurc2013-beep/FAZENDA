@@ -230,6 +230,19 @@ async def page_confinamento(request: Request):
     return templates.TemplateResponse(request=request, name="confinamento.html", context=_ctx("confinamento"))
 
 
+@app.get("/usuarios-page")
+async def page_usuarios(request: Request):
+    u = getattr(request.state, "usuario_atual", None)
+    if not u:
+        return RedirectResponse(url="/login", status_code=302)
+    if u.get("perfil") != "GESTOR":
+        raise StarletteHTTPException(status_code=403, detail="Acesso restrito a GESTOR")
+    ctx = _ctx("usuarios")
+    ctx["usuario_nome"] = u.get("nome")
+    ctx["usuario_perfil"] = u.get("perfil")
+    return templates.TemplateResponse(request=request, name="usuarios.html", context=ctx)
+
+
 @app.get("/login")
 async def page_login(request: Request):
     return templates.TemplateResponse(request=request, name="login.html", context={"request": request})

@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Usuários — Fazenda Ipanema{% endblock %}
+{% block page_title %}Usuários{% endblock %}
+
+{% block content %}
+<style>
+  .lbl{display:block;font-size:10.5px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+  .inp{width:100%;border:0.5px solid #e8e8e8;border-radius:7px;padding:7px 10px;font-size:12.5px;box-sizing:border-box;font-family:inherit}
+  .inp:focus{outline:none;border-color:#4caf50;box-shadow:0 0 0 3px rgba(76,175,80,.1)}
+  .sel{background:#fff}
+  .badge-ativo{background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:600;}
+  .badge-inativo{background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:600;}
+  .badge-gestor{background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:600;}
+  .badge-funcionario{background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:600;}
+  .row-inativo{opacity:.5;}
+</style>
+
+<div style="background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+    <p style="font-size:12.5px;color:#6b7280;margin:0;">Gerenciamento de usuários do sistema. Apenas <strong>GESTOR</strong> tem acesso.</p>
+    <button onclick="abrirModalUsuario()" style="background:#2E7D32;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">➕ Novo Usuário</button>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#F1F8E9;color:#33691e;">
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Login</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Nome</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Perfil</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Status</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #C8E6C9;">Criado em</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #C8E6C9;">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyUsuarios"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modalUsuario"
+     x-data="{ aberto: false }" x-cloak
+     x-show="aberto" x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+     x-transition:leave="transition ease-in duration-150" x-transition:leave-end="opacity-0"
+     @click.self="aberto=false"
+     style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1;">
+      <h2 id="modalUsuarioTitulo" style="font-size:15px;font-weight:600;color:#1B5E20;"></h2>
+      <button onclick="fecharModalUsuario()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form id="formUsuario" onsubmit="salvarUsuario(event)" style="padding:18px 22px;">
+      <input type="hidden" id="usuarioEditId" />
+
+      <div style="margin-bottom:12px;">
+        <label class="lbl">LOGIN *</label>
+        <input id="usuarioLogin" class="inp" autocomplete="off" required />
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label class="lbl">NOME *</label>
+        <input id="usuarioNome" class="inp" required />
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label class="lbl"><span id="lblSenha">SENHA *</span></label>
+        <input type="password" id="usuarioSenha" class="inp" autocomplete="new-password" />
+        <p id="senhaHint" style="font-size:11px;color:#6b7280;margin-top:4px;display:none;">Deixe vazio para manter a senha atual.</p>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label class="lbl">PERFIL *</label>
+        <select id="usuarioPerfil" class="inp sel" required>
+          <option value="FUNCIONARIO">Funcionário (incl. vaqueiro)</option>
+          <option value="GESTOR">Gestor</option>
+        </select>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" onclick="fecharModalUsuario()" style="background:#e5e7eb;color:#374151;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:13px;">Cancelar</button>
+        <button type="submit" style="background:#1B5E20;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:13px;">💾 Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function carregarUsuarios() {
+  const r = await fetch('/usuarios');
+  if (!r.ok) {
+    showToast('Erro ao carregar usuários', 'erro');
+    return;
+  }
+  const lista = await r.json();
+  renderUsuarios(lista);
+}
+
+function renderUsuarios(lista) {
+  const tbody = document.getElementById('tbodyUsuarios');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:18px;color:#9ca3af;">Nenhum usuário cadastrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map((u, i) => {
+    const perfilBadge = u.perfil === 'GESTOR'
+      ? '<span class="badge-gestor">GESTOR</span>'
+      : '<span class="badge-funcionario">FUNCIONÁRIO</span>';
+    const statusBadge = u.ativo
+      ? '<span class="badge-ativo">ATIVO</span>'
+      : '<span class="badge-inativo">INATIVO</span>';
+    const toggleBtn = u.ativo
+      ? `<button onclick="alternarAtivo(${u.id}, false)" title="Desativar" style="background:#fef3c7;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">🚫</button>`
+      : `<button onclick="alternarAtivo(${u.id}, true)" title="Reativar" style="background:#d1fae5;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">✅</button>`;
+    return `
+      <tr class="${u.ativo ? '' : 'row-inativo'}" style="background:${i%2===0?'#fff':'#fafafa'};border-bottom:1px solid #f3f4f6;">
+        <td style="padding:8px 12px;font-weight:600;color:#1B5E20;">${u.login}</td>
+        <td style="padding:8px 12px;">${u.nome || '—'}</td>
+        <td style="padding:8px 12px;">${perfilBadge}</td>
+        <td style="padding:8px 12px;">${statusBadge}</td>
+        <td style="padding:8px 12px;color:#6b7280;font-size:12px;">${fmtDataHora(u.criado_em)}</td>
+        <td style="padding:8px 12px;text-align:center;white-space:nowrap;">
+          <button onclick='editarUsuario(${JSON.stringify(u)})' title="Editar" style="background:#e5e7eb;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:13px;">✏️</button>
+          ${toggleBtn}
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function fmtDataHora(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  } catch { return iso; }
+}
+
+function abrirModalUsuario(u) {
+  _alpineOpen('modalUsuario', true);
+  document.getElementById('modalUsuarioTitulo').textContent = u ? 'Editar Usuário' : 'Novo Usuário';
+  document.getElementById('formUsuario').reset();
+  document.getElementById('usuarioEditId').value = '';
+
+  if (u) {
+    document.getElementById('usuarioEditId').value = u.id;
+    document.getElementById('usuarioLogin').value  = u.login;
+    document.getElementById('usuarioNome').value   = u.nome || '';
+    document.getElementById('usuarioPerfil').value = u.perfil || 'FUNCIONARIO';
+    // Edit: login não pode mudar; senha opcional
+    document.getElementById('usuarioLogin').disabled = true;
+    document.getElementById('usuarioLogin').style.background = '#f9fafb';
+    document.getElementById('usuarioLogin').style.color = '#6b7280';
+    document.getElementById('usuarioSenha').required = false;
+    document.getElementById('lblSenha').textContent = 'NOVA SENHA';
+    document.getElementById('senhaHint').style.display = 'block';
+  } else {
+    document.getElementById('usuarioLogin').disabled = false;
+    document.getElementById('usuarioLogin').style.background = '';
+    document.getElementById('usuarioLogin').style.color = '';
+    document.getElementById('usuarioSenha').required = true;
+    document.getElementById('lblSenha').textContent = 'SENHA *';
+    document.getElementById('senhaHint').style.display = 'none';
+  }
+}
+
+function editarUsuario(u) { abrirModalUsuario(u); }
+function fecharModalUsuario() { _alpineOpen('modalUsuario', false); }
+
+async function salvarUsuario(ev) {
+  ev.preventDefault();
+  const id = document.getElementById('usuarioEditId').value;
+  const senha = document.getElementById('usuarioSenha').value;
+
+  if (id) {
+    // EDIT
+    const body = {
+      nome: document.getElementById('usuarioNome').value.trim(),
+      perfil: document.getElementById('usuarioPerfil').value,
+    };
+    if (senha) body.senha = senha;
+
+    const r = await fetch(`/usuarios/${id}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) { showToast(d.detail || 'Erro ao salvar.', 'erro'); return; }
+    fecharModalUsuario();
+    showToast('Usuário atualizado!', 'sucesso');
+  } else {
+    // CREATE
+    const body = {
+      login: document.getElementById('usuarioLogin').value.trim().toLowerCase(),
+      senha: senha,
+      nome: document.getElementById('usuarioNome').value.trim(),
+      perfil: document.getElementById('usuarioPerfil').value,
+    };
+
+    const r = await fetch('/usuarios', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) { showToast(d.detail || 'Erro ao salvar.', 'erro'); return; }
+    fecharModalUsuario();
+    showToast('Usuário criado!', 'sucesso');
+  }
+  await carregarUsuarios();
+}
+
+async function alternarAtivo(id, novoAtivo) {
+  const r = await fetch(`/usuarios/${id}/ativo`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ ativo: novoAtivo }),
+  });
+  const d = await r.json();
+  if (!r.ok) { showToast(d.detail || 'Erro.', 'erro'); return; }
+  showToast(novoAtivo ? 'Usuário reativado.' : 'Usuário desativado.', 'sucesso');
+  await carregarUsuarios();
+}
+
+document.addEventListener('DOMContentLoaded', carregarUsuarios);
+</script>
+{% endblock %}
